@@ -3,73 +3,34 @@ const integrations = {
   isSanityEnabled: false,
   isStripeEnabled: true,
   isAlgoliaEnabled: true,
-  isMailchimpEnabled: true,
-  isAuthEnabled: true,
+  isMailchimpEnabled: false,
+  isAuthEnabled: false,
 };
 
 const messages = {
   sanity: (
     <div style={{ whiteSpace: "pre-wrap" }}>
-      Sanity is not enabled. Follow the{" "}
-      <a
-        href="https://nextjstemplates.com/docs/enableintegration"
-        className="text-primary underline"
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        documentation
-      </a>{" "}
-      to enable it.
+      Blog-ul nu este disponibil momentan.
     </div>
   ),
   stripe: (
     <div style={{ whiteSpace: "pre-wrap" }}>
-      Stripe is not enabled. Follow the{" "}
-      <a
-        href="https://nextjstemplates.com/docs/enableintegration"
-        className="text-primary underline"
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        documentation
-      </a>{" "}
-      to enable it.
+      Plățile nu sunt configurate momentan.
     </div>
   ),
   algolia: (
     <div style={{ whiteSpace: "pre-wrap" }}>
-      Algolia is not enabled. Follow the{" "}
-      <a
-        href="https://nextjstemplates.com/docs/enableintegration"
-        className="text-primary underline"
-      >
-        documentation
-      </a>{" "}
-      to enable it.
+      Căutarea globală nu este disponibilă momentan.
     </div>
   ),
   mailchimp: (
     <div style={{ whiteSpace: "pre-wrap" }}>
-      Mailchimp is not enabled. Follow the {""}
-      <a
-        href="https://nextjstemplates.com/docs/enableintegration"
-        className="text-primary underline"
-      >
-        documentation
-      </a>{" "}
-      to enable it.
+      Abonarea la newsletter nu este disponibilă momentan.
     </div>
   ),
   auth: (
     <div style={{ whiteSpace: "pre-wrap" }}>
-      Auth is not enabled. Follow the{" "}
-      <a
-        href="https://nextjstemplates.com/docs/enableintegration"
-        className="text-primary underline"
-      >
-        documentation
-      </a>{" "}
-      to enable it.
+      Autentificarea nu este disponibilă momentan.
     </div>
   ),
 

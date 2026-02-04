@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 function notAvailable() {
   return NextResponse.json(
-    { error: "Auth is disabled (Prisma removed)." },
+    { error: "Endpoint indisponibil." },
     { status: 501 }
   );
 }
