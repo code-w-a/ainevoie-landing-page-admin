@@ -1,0 +1,357 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --font-*: initial;
+
+  --breakpoint-*: initial;
+  --breakpoint-sm: 575px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 992px;
+  --breakpoint-xl: 1200px;
+  --breakpoint-2xl: 1400px;
+  --breakpoint-xs: 450px;
+  --breakpoint-3xl: 1500px;
+
+  --color-current: currentColor;
+  --color-transparent: transparent;
+  --color-white: #ffffff;
+  --color-black: #2c3e50;
+  --color-primary: #d35400;
+  --color-secondary: ;
+  --color-stroke: #ebeff4;
+  --color-dark: #2c3e50;
+  --color-body: #79808a;
+  --color-gray: #f8f9ff;
+  --color-stroke-dark: #34374a;
+  --color-background: #f8fafc;
+  --color-foreground: #2c3e50;
+  --color-card: #ffffff;
+  --color-card-foreground: #2c3e50;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #2c3e50;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #f1f5f9;
+  --color-secondary-foreground: #2c3e50;
+  --color-muted: #f1f5f9;
+  --color-muted-foreground: #64748b;
+  --color-accent: #eef2ff;
+  --color-accent-foreground: #2c3e50;
+  --color-destructive: #ef4444;
+  --color-destructive-foreground: #ffffff;
+  --color-border: #e2e8f0;
+  --color-input: #e2e8f0;
+  --color-ring: #f39c12;
+
+  --background-image-gradient-1: linear-gradient(55.15deg,
+      #d35400 -7.09%,
+      #e67e22 45%,
+      #8aa0b3 101.48%);
+  --background-image-gradient-2: linear-gradient(120.12deg,
+      #d35400 0%,
+      #2c3e50 100%);
+  --background-image-gradient-3: linear-gradient(180deg,
+      rgba(0, 0, 0, 0) 50%,
+      rgba(0, 0, 0, 0.8) 100%);
+  --background-image-texture: url("/images/graphics/texture.svg");
+
+  --shadow-card: 0px 1px 5px rgba(44, 62, 80, 0.14);
+  --shadow-card-dark: 0px 1px 5px rgba(16, 25, 55, 0.14);
+  --shadow-input: 0px 10px 30px rgba(211, 84, 0, 0.08);
+
+  --drop-shadow-card: 0px 1px 5px rgba(44, 62, 80, 0.14);
+  --drop-shadow-card-dark: 0px 1px 5px rgba(16, 25, 55, 0.14);
+}
+
+/* Toast animation (react-hot-toast) */
+.ainevoie-toast {
+  animation:
+    ainevoie-toast-in 220ms ease-out,
+    ainevoie-toast-out 220ms ease-in 3250ms forwards;
+  will-change: transform, opacity;
+}
+
+@keyframes ainevoie-toast-in {
+  from {
+    transform: translateX(110%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes ainevoie-toast-out {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(110%);
+    opacity: 0;
+  }
+}
+
+@utility container {
+  margin-inline: auto;
+  padding-inline: 1rem;
+}
+
+/*
+  The default border color has changed to `currentColor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentColor);
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  :root {
+    color-scheme: light;
+  }
+
+  .dark {
+    color-scheme: dark;
+    --color-background: #0b1220;
+    --color-foreground: #e2e8f0;
+    --color-card: #111827;
+    --color-card-foreground: #e2e8f0;
+    --color-popover: #111827;
+    --color-popover-foreground: #e2e8f0;
+    --color-primary-foreground: #0b1220;
+    --color-secondary: #1f2937;
+    --color-secondary-foreground: #e2e8f0;
+    --color-muted: #1f2937;
+    --color-muted-foreground: #9ca3af;
+    --color-accent: #1f2937;
+    --color-accent-foreground: #e2e8f0;
+    --color-destructive: #ef4444;
+    --color-destructive-foreground: #0b1220;
+    --color-border: #1f2937;
+    --color-input: #1f2937;
+    --color-ring: #f39c12;
+  }
+}
+
+@utility menu-scroll {
+  .sticky-navbar &.active {
+    @apply text-primary dark:text-primary;
+  }
+
+  &.active {
+    @apply text-primary dark:text-primary;
+  }
+}
+
+@utility active {
+  .sticky-navbar &.menu-scroll {
+    @apply text-primary dark:text-primary;
+  }
+
+  & .menu-scroll {
+    @apply text-primary dark:text-primary;
+  }
+
+  .submenu-item &a {
+    @apply text-primary dark:text-white;
+  }
+
+  .submenu-item &a span svg {
+    @apply rotate-180 lg:rotate-0;
+  }
+}
+
+@utility menu-item {
+  .sticky-navbar ul>&>a {
+    @apply lg:py-[21px];
+  }
+}
+
+@utility submenu-item {
+  & a.active {
+    @apply text-primary dark:text-white;
+  }
+
+  & a.active span svg {
+    @apply rotate-180 lg:rotate-0;
+  }
+}
+
+@utility container {
+  @apply w-full sm:max-w-[540px] md:max-w-[720px] lg:max-w-[960px] xl:max-w-[1140px] 2xl:max-w-[1320px];
+}
+
+@utility keep-signed {
+  &:checked~span.box {
+    @apply border-primary bg-primary;
+  }
+
+  &:checked~span.box .icon {
+    @apply block;
+  }
+}
+
+@utility box {
+  .keep-signed:checked~&span {
+    @apply border-primary bg-primary;
+  }
+
+  .keep-signed:checked~&span .icon {
+    @apply block;
+  }
+}
+
+@utility icon {
+  .keep-signed:checked~span.box & {
+    @apply block;
+  }
+}
+
+@utility dot {
+  #togglePlan:checked~span & {
+    @apply translate-x-[26px];
+  }
+}
+
+@utility mySwiper {
+  & .swiper-button-next:after {
+    @apply hidden;
+  }
+
+  & .swiper-button-prev:after {
+    @apply hidden;
+  }
+
+  & .swiper-button-next svg {
+    @apply !size-auto;
+  }
+
+  & .swiper-button-prev svg {
+    @apply !size-auto;
+  }
+
+  & .swiper-button-prev {
+    @apply border-body text-body hover:border-primary hover:bg-primary !static flex !size-10 items-center justify-center rounded-full border after:hidden hover:text-white;
+  }
+
+  & .swiper-button-next {
+    @apply border-body text-body hover:border-primary hover:bg-primary flex !size-10 items-center justify-center rounded-full border after:hidden hover:text-white;
+  }
+}
+
+@utility swiper-button-next {
+  .mySwiper &:after {
+    @apply hidden;
+  }
+
+  .mySwiper & svg {
+    @apply size-auto;
+  }
+
+  .mySwiper & {
+    @apply border-body text-body hover:border-primary hover:bg-primary !static !top-auto !bottom-0 flex h-10 w-10 items-center justify-center rounded-full border after:hidden hover:text-white;
+  }
+}
+
+@utility swiper-button-prev {
+  .mySwiper &:after {
+    @apply hidden;
+  }
+
+  .mySwiper & svg {
+    @apply size-auto;
+  }
+
+  .mySwiper & {
+    @apply border-body text-body hover:border-primary hover:bg-primary !static !top-auto !bottom-0 flex h-10 w-10 items-center justify-center rounded-full border after:hidden hover:text-white;
+  }
+}
+
+@layer base {
+  html {
+    @apply scroll-smooth;
+  }
+
+  body {
+    @apply bg-white dark:bg-black;
+  }
+}
+
+.blog-details-docs {
+  @apply dark:border-stroke-dark rounded-lg border border-white p-7 shadow-sm transition-all xl:p-12 dark:bg-black;
+}
+
+.blog-details p {
+  @apply text-dark mb-8 text-base leading-relaxed dark:text-white;
+}
+
+.blog-details p strong {
+  @apply text-primary dark:text-white;
+}
+
+.blog-details h3 strong,
+.blog-details h3 {
+  @apply mb-10 text-xl leading-tight !font-semibold text-black sm:text-2xl sm:leading-tight lg:text-xl lg:leading-tight xl:text-2xl xl:leading-tight dark:text-white;
+}
+
+.blog-details h4 strong,
+.blog-details h4 {
+  @apply text-xl leading-tight !font-semibold text-black sm:text-2xl sm:leading-tight lg:text-xl lg:leading-tight xl:text-2xl xl:leading-tight dark:text-white;
+}
+
+.blog-details h5 strong,
+.blog-details h5 {
+  @apply mb-3 text-lg leading-tight !font-semibold text-black sm:text-xl dark:text-white;
+}
+
+.blog-details h1 {
+  @apply mb-4 text-3xl !leading-tight !font-bold text-black sm:text-4xl md:text-[45px] lg:text-4xl xl:text-[45px] dark:text-white;
+}
+
+.blog-details h2 strong,
+.blog-details h2 {
+  @apply mb-4 text-[26px] !leading-tight !font-bold text-black sm:text-3xl md:text-4xl dark:text-white;
+}
+
+.blog-details ul,
+.blog-details ol {
+  @apply text-dark mb-10 list-inside list-disc;
+}
+
+.blog-details li,
+.blog-details li {
+  @apply text-dark mb-2 text-base dark:text-white;
+}
+
+.blog-details blockquote {
+  @apply bg-stroke relative z-10 mb-10 overflow-hidden rounded-xs p-8 text-center text-base font-medium text-black italic md:py-9 lg:px-10 dark:bg-black dark:text-white;
+}
+
+pre {
+  @apply bg-stroke dark:bg-stroke-dark relative mb-5 rounded-lg p-4;
+}
+
+.prism-copy-button {
+  @apply text-primary absolute top-2 right-2 h-[26px] rounded-sm bg-white px-4;
+}
+
+.active-tab {
+  @apply bg-stroke text-black dark:bg-black dark:text-white;
+}

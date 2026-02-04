@@ -1,0 +1,32 @@
+---
+title: Plăți în aplicație
+description: Informații despre plata în AInevoie și statusurile tranzacțiilor (acolo unde este disponibil).
+date: 2026-01-16
+---
+
+# Plăți în AInevoie (acolo unde este disponibil)
+
+AInevoie poate integra plata în aplicație printr-un procesator compatibil (ex.: Stripe), cu suport pentru:
+
+- plată cu card bancar
+- Apple Pay (iOS)
+- Google Pay (Android)
+
+Disponibilitatea depinde de configurarea conturilor și de regulile magazinelor de aplicații.
+
+## Statusul plății
+
+O plată este considerată finalizată atunci când procesatorul confirmă tranzacția. În aplicație, statusul poate apărea ca:
+
+- **În curs**: plata este în procesare
+- **Confirmată/Plătită**: plata a fost acceptată
+- **Eșuată/Neplătită**: plata nu a fost finalizată
+
+## Comisioane și verificări
+
+Procesatorul de plăți poate percepe taxe/comisioane și poate solicita verificări de identitate (KYC). Acestea sunt gestionate în contul procesatorului, nu în AInevoie.
+
+## Recomandări
+
+- Verifică datele cardului înainte de confirmare.
+- Păstrează comunicarea și confirmările în aplicație, pentru claritate.
