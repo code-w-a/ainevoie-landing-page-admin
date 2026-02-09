@@ -25,7 +25,7 @@ export default function Home() {
       <Features />
       <About />
       <WorkProcess />
-      <Pricing />
+   
       <Screens />
       <Cta />
       <Testimonials />
