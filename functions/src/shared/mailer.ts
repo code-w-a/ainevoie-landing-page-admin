@@ -20,6 +20,25 @@ function getRequiredSecret(value: string | undefined, name: string): string {
   return value;
 }
 
+function resolveSecureFlag(port: number, value?: string): boolean {
+  const secureRaw = value?.trim();
+  if (!secureRaw) {
+    return port === 465;
+  }
+
+  const secure = secureRaw.toLowerCase();
+  if (secure === "true") {
+    return true;
+  }
+  if (secure === "false") {
+    return false;
+  }
+
+  throw new Error(
+    `Invalid SMTP_SECURE value: "${secureRaw}". Use "true" or "false".`
+  );
+}
+
 function getTransport(): nodemailer.Transporter {
   if (cachedTransport) {
     return cachedTransport;
@@ -27,7 +46,10 @@ function getTransport(): nodemailer.Transporter {
 
   const host = getRequiredSecret(SMTP_HOST.value(), "SMTP_HOST");
   const port = Number(getRequiredSecret(SMTP_PORT.value(), "SMTP_PORT"));
-  const secure = (SMTP_SECURE.value() || "").toLowerCase() === "true";
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error(`Invalid SMTP_PORT value: "${SMTP_PORT.value()}"`);
+  }
+  const secure = resolveSecureFlag(port, SMTP_SECURE.value());
   const user = getRequiredSecret(SMTP_USER.value(), "SMTP_USER");
   const pass = getRequiredSecret(SMTP_PASS.value(), "SMTP_PASS");
 

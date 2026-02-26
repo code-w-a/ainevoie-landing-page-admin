@@ -152,10 +152,10 @@ const About = () => {
                      </p>
 
                   <Link
-                    href="#"
+                    href="/providers/onboarding"
                     className="bg-primary hover:bg-primary/90 inline-block rounded-md px-8 py-[10px] text-base font-medium text-white"
                   >
-                    Devino furnizor
+                    Începe onboardingul
                   </Link>
                 </div>
               </div>

@@ -38,6 +38,36 @@ Example:
 firebase functions:secrets:set SMTP_HOST
 ```
 
+## Gmail App Password (test temporar)
+Pentru testare rapidă cu Gmail SMTP:
+
+```
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=465
+SMTP_SECURE=true
+SMTP_USER=<gmail>
+SMTP_PASS=<gmail_app_password>
+NEWSLETTER_FROM_NAME=AInevoie
+NEWSLETTER_FROM_EMAIL=<gmail>
+NEWSLETTER_REPLY_TO=<gmail>
+PUBLIC_BASE_URL=https://ainevoie.ro
+ADMIN_API_KEY=<aceeasi-valoare-ca-in-next>
+```
+
+Comenzi utile:
+```
+firebase functions:secrets:set SMTP_HOST
+firebase functions:secrets:set SMTP_PORT
+firebase functions:secrets:set SMTP_SECURE
+firebase functions:secrets:set SMTP_USER
+firebase functions:secrets:set SMTP_PASS
+firebase functions:secrets:set NEWSLETTER_FROM_NAME
+firebase functions:secrets:set NEWSLETTER_FROM_EMAIL
+firebase functions:secrets:set NEWSLETTER_REPLY_TO
+firebase functions:secrets:set PUBLIC_BASE_URL
+firebase functions:secrets:set ADMIN_API_KEY
+```
+
 ## Deploy
 ```
 cd functions

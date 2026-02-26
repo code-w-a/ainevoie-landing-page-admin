@@ -147,6 +147,7 @@ const Header = () => {
               </button>
 
               <nav className="lg:backdrop-blur-0 fixed top-0 left-0 z-999 flex h-screen w-full items-center justify-center bg-white/95 text-center backdrop-blur-xs lg:static lg:h-auto lg:w-max lg:bg-transparent lg:backdrop-blur-none dark:bg-black/95 lg:dark:bg-transparent">
+                <div className="flex flex-col items-center">
                 <ul className="items-center space-y-3 lg:flex lg:space-y-0 lg:space-x-8 xl:space-x-10">
                   {menuData.map((item, index) =>
                     item.children ? (
@@ -201,10 +202,24 @@ const Header = () => {
                     ),
                   )}
                 </ul>
+                <Link
+                  href="/providers/onboarding"
+                  onClick={closeMenu}
+                  className="bg-primary hover:bg-primary/90 mt-6 inline-flex rounded-md px-6 py-3 text-sm font-medium text-white lg:hidden"
+                >
+                  Devino prestator
+                </Link>
+                </div>
               </nav>
             </div>
 
             <div className="mr-[60px] flex items-center justify-end lg:mr-0">
+              <Link
+                href="/providers/onboarding"
+                className="bg-primary hover:bg-primary/90 mr-3 hidden rounded-md px-4 py-2 text-sm font-medium text-white lg:inline-flex"
+              >
+                Devino prestator
+              </Link>
               <DarkModeSwitcher />
 
               {/* Navigație doar pentru landing page (fără auth/blog/docs). */}

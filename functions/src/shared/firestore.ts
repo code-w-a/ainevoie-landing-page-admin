@@ -39,8 +39,8 @@ export function generateToken(): string {
 export async function ensureSubscriberFields(
   subscriberRef: FirebaseFirestore.DocumentReference,
   data: FirebaseFirestore.DocumentData
-): Promise<FirebaseFirestore.UpdateData> {
-  const updates: FirebaseFirestore.UpdateData = {};
+): Promise<FirebaseFirestore.UpdateData<FirebaseFirestore.DocumentData>> {
+  const updates: FirebaseFirestore.UpdateData<FirebaseFirestore.DocumentData> = {};
 
   if (typeof data.email === "string") {
     const normalized = normalizeEmail(data.email);

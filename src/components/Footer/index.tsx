@@ -61,12 +61,12 @@ const footerNavData: FooterMenu[] = [
     title: "Pentru furnizori",
     navItems: [
       {
-        label: "Pentru furnizori",
-        route: "/#home",
+        label: "Devino prestator",
+        route: "/providers/onboarding",
       },
       {
-        label: "Creează profil",
-        route: "/#about",
+        label: "Începe onboardingul",
+        route: "/providers/onboarding/form",
       },
       {
         label: "Primește cereri",

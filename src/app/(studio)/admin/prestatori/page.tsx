@@ -1,0 +1,240 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { useAdminData } from "@/components/admin/useAdminData";
+import {
+  providerCityOptions,
+  providerServiceOptions,
+  providerStatusLabel,
+  providerStatusVariant,
+} from "@/lib/providers";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+
+type ProviderItem = {
+  id: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  city: string;
+  serviceType: string;
+  onboardingStatus: keyof typeof providerStatusLabel;
+  createdAt?: string;
+};
+
+type ProvidersResponse = {
+  items: ProviderItem[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
+};
+
+export default function AdminProvidersPage() {
+  const [q, setQ] = useState("");
+  const [debouncedQ, setDebouncedQ] = useState("");
+  const [status, setStatus] = useState("all");
+  const [city, setCity] = useState("");
+  const [serviceType, setServiceType] = useState("");
+  const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQ(q), 250);
+    return () => clearTimeout(timer);
+  }, [q]);
+
+  const endpoint = useMemo(() => {
+    const params = new URLSearchParams();
+    params.set("page", String(page));
+    params.set("pageSize", "20");
+    if (debouncedQ.trim()) params.set("q", debouncedQ.trim());
+    if (status !== "all") params.set("status", status);
+    if (city.trim()) params.set("city", city.trim());
+    if (serviceType.trim()) params.set("serviceType", serviceType.trim());
+    return `/api/admin/providers?${params.toString()}`;
+  }, [page, debouncedQ, status, city, serviceType]);
+
+  const { data, loading, error } = useAdminData<ProvidersResponse>(endpoint);
+  const items = data?.items || [];
+  const pagination = data?.pagination;
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold">Prestatori</h1>
+        <p className="text-sm text-muted-foreground">
+          Lista prestatorilor inregistrati prin onboarding.
+        </p>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Cautare si filtre</CardTitle>
+          <CardDescription>Filtreaza dupa status, oras, serviciu sau text.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-3 md:grid-cols-2 lg:grid-cols-5">
+          <Input
+            placeholder="Cautare nume/email"
+            value={q}
+            onChange={(event) => {
+              setPage(1);
+              setQ(event.target.value);
+            }}
+          />
+          <select
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+            value={status}
+            onChange={(event) => {
+              setPage(1);
+              setStatus(event.target.value);
+            }}
+          >
+            <option value="all">Toate statusurile</option>
+            <option value="new">Nou</option>
+            <option value="in_review">In verificare</option>
+            <option value="approved">Aprobat</option>
+            <option value="rejected">Respins</option>
+          </select>
+          <select
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+            value={city}
+            onChange={(event) => {
+              setPage(1);
+              setCity(event.target.value);
+            }}
+          >
+            <option value="">Toate orasele</option>
+            {providerCityOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+          <select
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+            value={serviceType}
+            onChange={(event) => {
+              setPage(1);
+              setServiceType(event.target.value);
+            }}
+          >
+            <option value="">Toate serviciile</option>
+            {providerServiceOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setPage(1);
+              setQ("");
+              setStatus("all");
+              setCity("");
+              setServiceType("");
+            }}
+          >
+            Reseteaza filtre
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Lista prestatori</CardTitle>
+          <CardDescription>{pagination?.total || 0} rezultate</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loading && <p className="text-sm text-muted-foreground">Loading providers...</p>}
+          {error && <p className="text-sm text-rose-500">{error}</p>}
+
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nume</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Oras</TableHead>
+                <TableHead>Serviciu</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Creat la</TableHead>
+                <TableHead></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {!loading && items.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center text-sm text-muted-foreground">
+                    Nu exista prestatori pentru filtrele curente.
+                  </TableCell>
+                </TableRow>
+              )}
+              {items.map((item) => (
+                <TableRow key={item.id}>
+                  <TableCell className="font-medium">{item.fullName}</TableCell>
+                  <TableCell>{item.email}</TableCell>
+                  <TableCell>{item.city}</TableCell>
+                  <TableCell>{item.serviceType}</TableCell>
+                  <TableCell>
+                    <Badge variant={providerStatusVariant(item.onboardingStatus)}>
+                      {providerStatusLabel[item.onboardingStatus] || item.onboardingStatus}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>{item.createdAt ? new Date(item.createdAt).toLocaleString("ro-RO") : "-"}</TableCell>
+                  <TableCell className="text-right">
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href={`/admin/prestatori/${item.id}`}>Vezi fisa</Link>
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+
+          <div className="mt-4 flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">
+              Pagina {pagination?.page || 1} din {pagination?.totalPages || 1}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                disabled={(pagination?.page || 1) <= 1}
+              >
+                Anterior
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((prev) => prev + 1)}
+                disabled={(pagination?.page || 1) >= (pagination?.totalPages || 1)}
+              >
+                Urmator
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

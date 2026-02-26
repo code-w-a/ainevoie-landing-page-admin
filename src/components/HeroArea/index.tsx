@@ -116,6 +116,13 @@ const HeroArea = () => {
                   </button>
 
                   <Link
+                    href="/providers/onboarding"
+                    className="border-stroke dark:border-stroke-dark hover:border-primary hover:text-primary mr-6 mb-6 inline-flex h-[60px] items-center rounded-lg border px-[28px] py-[14px] text-black dark:text-white dark:hover:text-white"
+                  >
+                    Devino prestator
+                  </Link>
+
+                  <Link
                     href="#"
                     onClick={() => setToggler(!toggler)}
                     className="glightbox hover:text-primary dark:hover:text-primary mb-6 inline-flex items-center py-4 text-black dark:text-white"
