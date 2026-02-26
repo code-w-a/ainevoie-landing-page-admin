@@ -48,7 +48,25 @@ export default function LogsPage() {
   const { data, loading, error } = useAdminData<{ items: any[]; nextCursor: string | null }>(
     endpoint
   );
+  const { data: campaignsData } = useAdminData<{ items: any[] }>(
+    "/api/admin/newsletter/campaigns?limit=200&sortBy=createdAt&sortDir=desc"
+  );
   const logs = useMemo(() => data?.items ?? [], [data?.items]);
+  const campaigns = useMemo(() => campaignsData?.items ?? [], [campaignsData?.items]);
+  const campaignNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const campaign of campaigns) {
+      const id = typeof campaign?.id === "string" ? campaign.id : "";
+      const label =
+        (typeof campaign?.subject === "string" && campaign.subject.trim()) ||
+        (typeof campaign?.name === "string" && campaign.name.trim()) ||
+        "";
+      if (id && label) {
+        map.set(id, label);
+      }
+    }
+    return map;
+  }, [campaigns]);
   const nextCursor = data?.nextCursor ?? null;
 
   useEffect(() => {
@@ -72,11 +90,17 @@ export default function LogsPage() {
     return logs.filter((log) => {
       const message = (log.message || "").toLowerCase();
       const campaign = (log.campaignId || "").toLowerCase();
+      const campaignName =
+        typeof log.campaignId === "string" ?
+          (campaignNameById.get(log.campaignId) || "").toLowerCase()
+        : "";
       return (
-        message.includes(normalizedSearch) || campaign.includes(normalizedSearch)
+        message.includes(normalizedSearch) ||
+        campaign.includes(normalizedSearch) ||
+        campaignName.includes(normalizedSearch)
       );
     });
-  }, [logs, search]);
+  }, [logs, search, campaignNameById]);
 
   return (
     <div className="space-y-6">
@@ -153,7 +177,11 @@ export default function LogsPage() {
                   <TableCell className="max-w-[360px] truncate">
                     {log.message}
                   </TableCell>
-                  <TableCell>{log.campaignId || "-"}</TableCell>
+                  <TableCell>
+                    {log.campaignId ?
+                      campaignNameById.get(log.campaignId) || log.campaignId
+                    : "-"}
+                  </TableCell>
                   <TableCell>{log.createdAt || "-"}</TableCell>
                 </TableRow>
               ))}

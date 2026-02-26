@@ -62,11 +62,6 @@ export default function AdminOverviewPage() {
         note: "consimțământ retras",
       },
       {
-        label: "Bounced / Plângeri / Suprimați",
-        value: `${data.stats.bounced} / ${data.stats.complaint} / ${data.stats.suppressed}`,
-        note: "lifecycle livrare",
-      },
-      {
         label: "Campanii trimise",
         value: `${data.stats.campaignsSent} (+${data.stats.campaignsSentWithErrors} cu erori)`,
         note: "istoric livrare",
@@ -76,6 +71,20 @@ export default function AdminOverviewPage() {
 
   const campaigns = data?.campaigns ?? [];
   const logs = data?.logs ?? [];
+  const campaignNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const campaign of campaigns) {
+      const id = typeof campaign?.id === "string" ? campaign.id : "";
+      const label =
+        (typeof campaign?.subject === "string" && campaign.subject.trim()) ||
+        (typeof campaign?.name === "string" && campaign.name.trim()) ||
+        "";
+      if (id && label) {
+        map.set(id, label);
+      }
+    }
+    return map;
+  }, [campaigns]);
 
   return (
     <div className="space-y-8">
@@ -175,7 +184,11 @@ export default function AdminOverviewPage() {
                 className="rounded-lg border border-border p-3"
               >
                 <div className="flex items-center justify-between text-sm">
-                  <span className="font-medium">{log.campaignId || "General"}</span>
+                  <span className="font-medium">
+                    {log.campaignId ?
+                      campaignNameById.get(log.campaignId) || log.campaignId
+                    : "General"}
+                  </span>
                   <Badge variant={log.level === "error" ? "danger" : "secondary"}>
                     {logLevelLabel(log.level)}
                   </Badge>

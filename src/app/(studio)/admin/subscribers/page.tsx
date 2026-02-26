@@ -21,6 +21,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { TabContent, TabList, Tabs, TabTrigger } from "@/components/ui/tabs";
 import { useAdminData } from "@/components/admin/useAdminData";
 import { adminFetch } from "@/components/admin/adminApi";
 import { adminCommonLabels, subscriberStatusLabel } from "@/lib/adminLabels";
@@ -38,6 +39,14 @@ const STATUS_LABELS: Record<NewsletterSubscriberStatus, string> = {
   complaint: "Plângere",
   suppressed: "Suprimat",
 };
+
+const STATUS_FILTER_OPTIONS: Array<{
+  value: "active" | "unsubscribed";
+  label: string;
+}> = [
+  { value: "active", label: "Activ" },
+  { value: "unsubscribed", label: "Dezabonat" },
+];
 
 async function readErrorMessage(response: Response, fallback: string) {
   try {
@@ -72,7 +81,7 @@ export default function SubscribersPage() {
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState<"active" | "unsubscribed">("active");
   const [sortBy, setSortBy] = useState("createdAt");
   const [sortDir, setSortDir] = useState("desc");
   const [pageSize, setPageSize] = useState(10);
@@ -90,9 +99,7 @@ export default function SubscribersPage() {
     if (cursor) {
       params.set("cursor", cursor);
     }
-    if (statusFilter !== "all") {
-      params.set("status", statusFilter);
-    }
+    params.set("status", statusFilter);
     return `/api/admin/newsletter/subscribers?${params.toString()}`;
   }, [cursor, pageSize, sortBy, sortDir, statusFilter]);
 
@@ -283,279 +290,256 @@ export default function SubscribersPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold">Abonați</h1>
-        <p className="text-sm text-muted-foreground">
-          Lifecycle complet: active, unsubscribed, bounced, complaint, suppressed.
-        </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Adaugă abonat</CardTitle>
-          <CardDescription>
-            Adaugă manual un abonat cu status și consimțământ simplificat.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {actionError && <p className="text-sm text-rose-500">{actionError}</p>}
-          {actionSuccess && <p className="text-sm text-emerald-600">{actionSuccess}</p>}
+      <Tabs defaultValue="add" className="space-y-4">
+        <TabList>
+          <TabTrigger value="add">Adaugă</TabTrigger>
+          <TabTrigger value="list">Listă</TabTrigger>
+        </TabList>
 
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Email</label>
-              <Input
-                placeholder="email@exemplu.ro"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-              />
-            </div>
+        <TabContent value="add">
+          <Card>
+            <CardHeader>
+              <CardTitle>Adaugă abonat</CardTitle>
+              <CardDescription>
+                Adaugă manual un abonat cu status și consimțământ simplificat.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {actionError && <p className="text-sm text-rose-500">{actionError}</p>}
+              {actionSuccess && <p className="text-sm text-emerald-600">{actionSuccess}</p>}
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Status</label>
-              <select
-                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                value={status}
-                onChange={(event) =>
-                  setStatus(event.target.value as NewsletterSubscriberStatus)
-                }
-              >
-                {NEWSLETTER_SUBSCRIBER_STATUSES.map((statusValue) => (
-                  <option key={statusValue} value={statusValue}>
-                    {STATUS_LABELS[statusValue]}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Etichete</label>
-              <Input
-                placeholder="bucuresti, client"
-                value={tags}
-                onChange={(event) => setTags(event.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Motiv status (opțional)</label>
-              <Input
-                placeholder="Ex: hard bounce SMTP"
-                value={statusReason}
-                onChange={(event) => setStatusReason(event.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <label className="flex items-center gap-2 text-sm">
-              <Checkbox
-                checked={consentGranted}
-                onChange={(event) => setConsentGranted(event.target.checked)}
-              />
-              Consimțământ acordat (single opt-in)
-            </label>
-            <Button onClick={handleCreate} disabled={submitting}>
-              {submitting ? "Se salvează..." : "Adaugă"}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Toți abonații</CardTitle>
-          <CardDescription>
-            Trimiterile merg doar către status <strong>active</strong> cu
-            <strong> consentGranted=true</strong>.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading && (
-            <p className="text-sm text-muted-foreground">{adminCommonLabels.loadingSubscribers}</p>
-          )}
-          {error && <p className="text-sm text-rose-500">{error}</p>}
-
-          <div className="mb-4 flex flex-wrap items-center gap-3">
-            <Input
-              className="max-w-xs"
-              placeholder="Caută email, etichete sau motiv"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-            />
-            <select
-              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-              value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value)}
-            >
-              <option value="all">{adminCommonLabels.allStatuses}</option>
-              {NEWSLETTER_SUBSCRIBER_STATUSES.map((statusValue) => (
-                <option key={statusValue} value={statusValue}>
-                  {STATUS_LABELS[statusValue]}
-                </option>
-              ))}
-            </select>
-            <select
-              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-              value={sortBy}
-              onChange={(event) => setSortBy(event.target.value)}
-            >
-              <option value="createdAt">{adminCommonLabels.newest}</option>
-              <option value="email">Email</option>
-              <option value="status">Status</option>
-            </select>
-            <select
-              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-              value={sortDir}
-              onChange={(event) => setSortDir(event.target.value)}
-            >
-              <option value="desc">{adminCommonLabels.descending}</option>
-              <option value="asc">{adminCommonLabels.ascending}</option>
-            </select>
-            <Button
-              variant="outline"
-              onClick={() => handleBulkStatus("active")}
-              disabled={selectedIds.size === 0}
-            >
-              Setează activ
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => handleBulkStatus("unsubscribed")}
-              disabled={selectedIds.size === 0}
-            >
-              Setează dezabonat
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => handleBulkStatus("complaint")}
-              disabled={selectedIds.size === 0}
-            >
-              Setează plângere
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => handleBulkStatus("suppressed")}
-              disabled={selectedIds.size === 0}
-            >
-              Setează suprimat
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => handleBulkStatus("bounced")}
-              disabled={selectedIds.size === 0}
-            >
-              Setează bounced
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleBulkDelete}
-              disabled={selectedIds.size === 0}
-            >
-              Șterge selecția
-            </Button>
-          </div>
-
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>
-                  <Checkbox
-                    checked={allSelected}
-                    onChange={(event) => toggleSelectAll(event.target.checked)}
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Email</label>
+                  <Input
+                    placeholder="email@exemplu.ro"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
                   />
-                </TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Consimțământ</TableHead>
-                <TableHead>Motiv status</TableHead>
-                <TableHead>Etichete</TableHead>
-                <TableHead>Ultima trimitere</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredSubscribers.map((subscriber) => {
-                const id = subscriber.id as string | undefined;
-                const statusValue =
-                  typeof subscriber.status === "string" ?
-                    subscriber.status.toLowerCase() :
-                    "";
-                const isActive = statusValue === "active";
-                const hasConsent = subscriber.consentGranted === true;
+                </div>
 
-                return (
-                  <TableRow key={id || subscriber.email}>
-                    <TableCell>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Status</label>
+                  <select
+                    className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                    value={status}
+                    onChange={(event) =>
+                      setStatus(event.target.value as NewsletterSubscriberStatus)
+                    }
+                  >
+                    {NEWSLETTER_SUBSCRIBER_STATUSES.map((statusValue) => (
+                      <option key={statusValue} value={statusValue}>
+                        {STATUS_LABELS[statusValue]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Etichete</label>
+                  <Input
+                    placeholder="bucuresti, client"
+                    value={tags}
+                    onChange={(event) => setTags(event.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <label className="flex items-center gap-2 text-sm">
+                  <Checkbox
+                    checked={consentGranted}
+                    onChange={(event) => setConsentGranted(event.target.checked)}
+                  />
+                  Consimțământ acordat (single opt-in)
+                </label>
+                <Button onClick={handleCreate} disabled={submitting}>
+                  {submitting ? "Se salvează..." : "Adaugă"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabContent>
+
+        <TabContent value="list">
+          <Card>
+            <CardHeader>
+              <CardTitle>Toți abonații</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loading && (
+                <p className="text-sm text-muted-foreground">
+                  {adminCommonLabels.loadingSubscribers}
+                </p>
+              )}
+              {error && <p className="text-sm text-rose-500">{error}</p>}
+
+              <div className="mb-4 flex flex-wrap items-center gap-3">
+                <Input
+                  className="max-w-xs"
+                  placeholder="Caută email, etichete sau motiv"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                />
+                <select
+                  className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                  value={statusFilter}
+                  onChange={(event) =>
+                    setStatusFilter(event.target.value as "active" | "unsubscribed")
+                  }
+                >
+                  {STATUS_FILTER_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                  value={sortBy}
+                  onChange={(event) => setSortBy(event.target.value)}
+                >
+                  <option value="createdAt">{adminCommonLabels.newest}</option>
+                  <option value="email">Email</option>
+                  <option value="status">Status</option>
+                </select>
+                <select
+                  className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                  value={sortDir}
+                  onChange={(event) => setSortDir(event.target.value)}
+                >
+                  <option value="desc">{adminCommonLabels.descending}</option>
+                  <option value="asc">{adminCommonLabels.ascending}</option>
+                </select>
+                <Button
+                  variant="outline"
+                  onClick={() => handleBulkStatus("active")}
+                  disabled={selectedIds.size === 0}
+                >
+                  Setează activ
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => handleBulkStatus("unsubscribed")}
+                  disabled={selectedIds.size === 0}
+                >
+                  Setează dezabonat
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={handleBulkDelete}
+                  disabled={selectedIds.size === 0}
+                >
+                  Șterge selecția
+                </Button>
+              </div>
+
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>
                       <Checkbox
-                        checked={id ? selectedIds.has(id) : false}
-                        onChange={(event) =>
-                          id ? toggleRow(id, event.target.checked) : undefined
-                        }
-                        disabled={!id}
+                        checked={allSelected}
+                        onChange={(event) => toggleSelectAll(event.target.checked)}
                       />
-                    </TableCell>
-                    <TableCell className="font-medium">{subscriber.email}</TableCell>
-                    <TableCell>
-                      <Badge variant={isActive ? "success" : "outline"}>
-                        {subscriberStatusLabel(subscriber.status)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={hasConsent ? "success" : "danger"}>
-                        {hasConsent ? "Acordat" : "Retras"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{subscriber.statusReason || "-"}</TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-2">
-                        {(subscriber.tags || []).map((tag: string) => (
-                          <Badge key={tag} variant="secondary">
-                            {tag}
-                          </Badge>
-                        ))}
-                      </div>
-                    </TableCell>
-                    <TableCell>{subscriber.lastSentAt ?? "-"}</TableCell>
+                    </TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Consimțământ</TableHead>
+                    <TableHead>Motiv status</TableHead>
+                    <TableHead>Etichete</TableHead>
+                    <TableHead>Ultima trimitere</TableHead>
                   </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+                </TableHeader>
+                <TableBody>
+                  {filteredSubscribers.map((subscriber) => {
+                    const id = subscriber.id as string | undefined;
+                    const statusValue =
+                      typeof subscriber.status === "string" ?
+                        subscriber.status.toLowerCase() :
+                        "";
+                    const isActive = statusValue === "active";
+                    const hasConsent = subscriber.consentGranted === true;
 
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm">
-            <span className="text-muted-foreground">
-              {adminCommonLabels.page} {pageIndex + 1}
-            </span>
-            <div className="flex items-center gap-2">
-              <select
-                className="h-8 rounded-md border border-input bg-background px-2 text-xs"
-                value={pageSize}
-                onChange={(event) => setPageSize(Number(event.target.value))}
-              >
-                {PAGE_SIZE_OPTIONS.map((size) => (
-                  <option key={size} value={size}>
-                    {size}
-                  </option>
-                ))}
-              </select>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={pageIndex <= 0}
-                onClick={() => setPageIndex((prev) => Math.max(0, prev - 1))}
-              >
-                {adminCommonLabels.previous}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={!nextCursor}
-                onClick={() => setPageIndex((prev) => prev + 1)}
-              >
-                {adminCommonLabels.next}
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+                    return (
+                      <TableRow key={id || subscriber.email}>
+                        <TableCell>
+                          <Checkbox
+                            checked={id ? selectedIds.has(id) : false}
+                            onChange={(event) =>
+                              id ? toggleRow(id, event.target.checked) : undefined
+                            }
+                            disabled={!id}
+                          />
+                        </TableCell>
+                        <TableCell className="font-medium">{subscriber.email}</TableCell>
+                        <TableCell>
+                          <Badge variant={isActive ? "success" : "outline"}>
+                            {subscriberStatusLabel(subscriber.status)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={hasConsent ? "success" : "danger"}>
+                            {hasConsent ? "Acordat" : "Retras"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{subscriber.statusReason || "-"}</TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-2">
+                            {(subscriber.tags || []).map((tag: string) => (
+                              <Badge key={tag} variant="secondary">
+                                {tag}
+                              </Badge>
+                            ))}
+                          </div>
+                        </TableCell>
+                        <TableCell>{subscriber.lastSentAt ?? "-"}</TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm">
+                <span className="text-muted-foreground">
+                  {adminCommonLabels.page} {pageIndex + 1}
+                </span>
+                <div className="flex items-center gap-2">
+                  <select
+                    className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+                    value={pageSize}
+                    onChange={(event) => setPageSize(Number(event.target.value))}
+                  >
+                    {PAGE_SIZE_OPTIONS.map((size) => (
+                      <option key={size} value={size}>
+                        {size}
+                      </option>
+                    ))}
+                  </select>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={pageIndex <= 0}
+                    onClick={() => setPageIndex((prev) => Math.max(0, prev - 1))}
+                  >
+                    {adminCommonLabels.previous}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={!nextCursor}
+                    onClick={() => setPageIndex((prev) => prev + 1)}
+                  >
+                    {adminCommonLabels.next}
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabContent>
+      </Tabs>
     </div>
   );
 }
