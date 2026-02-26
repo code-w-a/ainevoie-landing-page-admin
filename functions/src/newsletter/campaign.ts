@@ -27,6 +27,21 @@ type SendConfig = {
   maxConcurrent?: number;
 };
 
+function toTemplateData(value: unknown): Record<string, string> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const entries = Object.entries(value).filter(
+    ([key, val]) => key.trim() && typeof val === "string"
+  );
+  if (!entries.length) {
+    return null;
+  }
+
+  return Object.fromEntries(entries) as Record<string, string>;
+}
+
 export const createNewsletterCampaign = onCall(
   {
     region: "europe-west1",
@@ -45,6 +60,9 @@ export const createNewsletterCampaign = onCall(
       fromName,
       fromEmail,
       replyTo,
+      templateId,
+      templateData,
+      templateVersion,
     } = request.data ?? {};
 
     if (!subject || typeof subject !== "string") {
@@ -101,6 +119,9 @@ export const createNewsletterCampaign = onCall(
       createdAt: FieldValue.serverTimestamp(),
       createdBy: request.auth?.uid ?? "system",
       status: "queued",
+      templateId: typeof templateId === "string" ? templateId : null,
+      templateData: toTemplateData(templateData),
+      templateVersion: typeof templateVersion === "string" ? templateVersion : null,
       filters: resolvedFilters,
       stats: {
         total: 0,

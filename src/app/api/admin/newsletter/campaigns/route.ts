@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { getAdminDb, requireEnv, serializeDoc } from "@/lib/firebaseAdmin";
 import { requireAdmin } from "@/lib/adminAuth";
+import {
+  isCampaignTemplateId,
+  normalizePublicBaseUrl,
+  renderCampaignTemplate,
+  validateCampaignTemplateInput,
+} from "@/lib/emailTemplates/campaignTemplates";
 
 const region = process.env.FIREBASE_REGION || "europe-west1";
 const ALLOWED_SORTS: Record<string, string> = {
@@ -28,6 +34,17 @@ function serializeCursor(value: unknown) {
     return (value as FirebaseFirestore.Timestamp).toDate().toISOString();
   }
   return value ?? null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function readString(value: unknown): string {
+  if (typeof value !== "string") {
+    return "";
+  }
+  return value.trim();
 }
 
 export async function GET(request: Request) {
@@ -76,14 +93,95 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     await requireAdmin(request);
-    const body = await request.json();
+    const body = (await request.json()) as Record<string, unknown>;
+    const subject = readString(body.subject);
+    if (!subject) {
+      return NextResponse.json(
+        { error: "Subject este obligatoriu." },
+        { status: 400 }
+      );
+    }
+
+    const previewText = readString(body.previewText) || undefined;
+    const legacyHtml = readString(body.html);
+    const legacyText = readString(body.text);
+    const db = getAdminDb();
+    let payloadData: Record<string, unknown> = {
+      ...body,
+      subject,
+      previewText,
+    };
+
+    if (legacyHtml) {
+      payloadData = {
+        ...payloadData,
+        html: legacyHtml,
+        text: legacyText || undefined,
+      };
+    } else {
+      const templateIdRaw = body.templateId;
+      if (!isCampaignTemplateId(templateIdRaw)) {
+        return NextResponse.json(
+          { error: "Template invalid. Alege unul dintre template-urile disponibile." },
+          { status: 400 }
+        );
+      }
+
+      const rawTemplateData = isRecord(body.templateData) ? body.templateData : {};
+      const validation = validateCampaignTemplateInput({
+        templateId: templateIdRaw,
+        templateData: rawTemplateData,
+      });
+
+      if (validation.errors.length > 0) {
+        return NextResponse.json(
+          { error: validation.errors[0] },
+          { status: 400 }
+        );
+      }
+
+      const settingsDoc = await db
+        .collection("newsletter_settings")
+        .doc("default")
+        .get();
+      const settings = settingsDoc.data() || {};
+      const baseUrlRaw = readString(settings.baseUrl);
+      const baseUrl = normalizePublicBaseUrl(baseUrlRaw);
+
+      if (!baseUrl) {
+        return NextResponse.json(
+          {
+            error:
+              "Setează Public base URL în Newsletter Settings înainte să creezi campanii.",
+          },
+          { status: 400 }
+        );
+      }
+
+      const rendered = renderCampaignTemplate({
+        templateId: templateIdRaw,
+        templateData: validation.normalizedData,
+        baseUrl,
+        subject,
+      });
+
+      payloadData = {
+        ...payloadData,
+        html: rendered.html,
+        text: rendered.text,
+        templateId: templateIdRaw,
+        templateData: rendered.normalizedData,
+        templateVersion: rendered.templateVersion,
+      };
+    }
+
     const projectId = requireEnv("FIREBASE_PROJECT_ID");
     const adminApiKey = process.env.ADMIN_API_KEY;
 
     const url = `https://${region}-${projectId}.cloudfunctions.net/createNewsletterCampaign`;
     const payload = {
       data: {
-        ...body,
+        ...payloadData,
         adminApiKey,
       },
     };

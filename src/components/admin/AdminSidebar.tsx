@@ -18,7 +18,7 @@ const newsletterItems = [
   { href: "/admin/campaigns", label: "Campaigns", icon: Mail },
   { href: "/admin/subscribers", label: "Subscribers", icon: Users },
   { href: "/admin/logs", label: "Logs", icon: Activity },
-  { href: "/admin/settings", label: "Settings", icon: Settings },
+  // { href: "/admin/settings", label: "Settings", icon: Settings },
 ];
 
 const providerItems = [

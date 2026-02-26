@@ -9,7 +9,10 @@ import {
   isProviderServiceOption,
 } from "@/lib/providers";
 import { getProviderWelcomeTemplate } from "@/lib/emailTemplates/providerWelcome";
-import type { ProviderLegalStatus } from "@/types/provider";
+import type {
+  ProviderLegalStatus,
+  ProviderNewsletterStatusAtSignup,
+} from "@/types/provider";
 
 type OnboardingPayload = {
   fullName?: string;
@@ -24,6 +27,7 @@ type OnboardingPayload = {
   tradeRegisterNumber?: string;
   estimatedSetupTimeline?: string;
   hasAccountant?: "yes" | "no" | "unsure";
+  newsletterOptIn?: boolean;
   acceptTerms?: boolean;
 };
 
@@ -77,6 +81,7 @@ export async function POST(request: Request) {
     const tradeRegisterNumber = normalize(body.tradeRegisterNumber);
     const estimatedSetupTimeline = normalize(body.estimatedSetupTimeline);
     const hasAccountant = body.hasAccountant || null;
+    const newsletterOptIn = body.newsletterOptIn === true;
     const acceptTerms = body.acceptTerms === true;
 
     if (!fullName || !email || !password || !phone || !city || !serviceType || !legalStatus) {
@@ -173,6 +178,59 @@ export async function POST(request: Request) {
 
     const welcomeEmailResult = await sendWelcomeEmail(email, fullName);
 
+    let newsletterStatusAtSignup: ProviderNewsletterStatusAtSignup = "skipped";
+    let newsletterError: string | null = null;
+
+    if (newsletterOptIn) {
+      try {
+        let existingSubscriber = await db
+          .collection("newsletter_subscribers")
+          .where("emailNormalized", "==", email)
+          .limit(1)
+          .get();
+
+        if (existingSubscriber.empty) {
+          existingSubscriber = await db
+            .collection("newsletter_subscribers")
+            .where("email", "==", email)
+            .limit(1)
+            .get();
+        }
+
+        if (!existingSubscriber.empty) {
+          const docRef = existingSubscriber.docs[0].ref;
+          const status = existingSubscriber.docs[0].get("status");
+
+          if (status === "active") {
+            newsletterStatusAtSignup = "already_active";
+          } else {
+            await docRef.update({
+              email,
+              emailNormalized: email,
+              status: "active",
+              source: "provider_onboarding",
+              updatedAt: FieldValue.serverTimestamp(),
+            });
+            newsletterStatusAtSignup = "subscribed";
+          }
+        } else {
+          await db.collection("newsletter_subscribers").add({
+            email,
+            emailNormalized: email,
+            status: "active",
+            tags: [],
+            source: "provider_onboarding",
+            createdAt: FieldValue.serverTimestamp(),
+          });
+          newsletterStatusAtSignup = "subscribed";
+        }
+      } catch (error) {
+        newsletterStatusAtSignup = "error";
+        newsletterError =
+          error instanceof Error ? error.message : "newsletter_subscribe_failed";
+      }
+    }
+
     await db.collection("providers").doc(userRecord.uid).set({
       uid: userRecord.uid,
       email,
@@ -190,6 +248,9 @@ export async function POST(request: Request) {
       tradeRegisterNumber: tradeRegisterNumber || null,
       estimatedSetupTimeline: estimatedSetupTimeline || null,
       hasAccountant,
+      newsletterOptIn,
+      newsletterStatusAtSignup,
+      newsletterError,
       onboardingStatus: "new",
       source: "landing_onboarding",
       welcomeEmailSent: welcomeEmailResult.sent,
@@ -210,6 +271,7 @@ export async function POST(request: Request) {
       status: "created",
       uid: userRecord.uid,
       welcomeEmailSent: welcomeEmailResult.sent,
+      newsletterStatusAtSignup,
     });
   } catch (error) {
     return NextResponse.json(

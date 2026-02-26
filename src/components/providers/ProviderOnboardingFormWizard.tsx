@@ -7,7 +7,7 @@ import { PROVIDER_LEGAL_STATUSES, type ProviderLegalStatus } from "@/types/provi
 import axios from "axios";
 import { Eye, EyeOff } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 
@@ -25,6 +25,7 @@ type FormValues = {
   tradeRegisterNumber: string;
   estimatedSetupTimeline: string;
   hasAccountant: "yes" | "no" | "unsure";
+  newsletterOptIn: boolean;
   acceptTerms: boolean;
 };
 
@@ -40,6 +41,10 @@ const legalStatusOptions: Array<{ value: ProviderLegalStatus; label: string }> =
   { value: "need_guidance", label: "Am nevoie de ghidaj" },
 ];
 
+function isValidEmail(value: string) {
+  return value.includes("@");
+}
+
 export default function ProviderOnboardingFormWizard({
   currentStep,
   onStepChange,
@@ -53,6 +58,7 @@ export default function ProviderOnboardingFormWizard({
     control,
     trigger,
     getValues,
+    setValue,
     watch,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
@@ -64,14 +70,72 @@ export default function ProviderOnboardingFormWizard({
       tradeRegisterNumber: "",
       estimatedSetupTimeline: "",
       hasAccountant: "unsure",
+      newsletterOptIn: false,
       city: providerCityOptions[0],
       serviceType: providerServiceOptions[0],
       acceptTerms: false,
     },
   });
+  const emailValue = watch("email");
   const legalStatus = watch("legalStatus");
+  const normalizedEmail = (emailValue || "").trim().toLowerCase();
+  const hasValidEmailForNewsletter = isValidEmail(normalizedEmail);
   const isLegalEntityReady = legalStatus === "pfa_ready" || legalStatus === "srl_ready";
   const isEntityInProgress = legalStatus === "in_progress";
+  const [newsletterStatusLoading, setNewsletterStatusLoading] = useState(false);
+  const [isActiveNewsletterSubscriber, setIsActiveNewsletterSubscriber] = useState(false);
+  const [newsletterStatusError, setNewsletterStatusError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!hasValidEmailForNewsletter) {
+      setNewsletterStatusLoading(false);
+      setNewsletterStatusError(null);
+      setIsActiveNewsletterSubscriber(false);
+      return;
+    }
+
+    setNewsletterStatusLoading(true);
+    setNewsletterStatusError(null);
+    setIsActiveNewsletterSubscriber(false);
+
+    let isCancelled = false;
+    const timerId = window.setTimeout(async () => {
+      try {
+        const response = await axios.get<{ isActiveSubscriber?: boolean }>("/api/newsletter/status", {
+          params: { email: normalizedEmail },
+        });
+
+        if (isCancelled) {
+          return;
+        }
+
+        const isActive = response.data?.isActiveSubscriber === true;
+        setIsActiveNewsletterSubscriber(isActive);
+
+        if (isActive) {
+          setValue("newsletterOptIn", false);
+        }
+      } catch (error) {
+        if (isCancelled) {
+          return;
+        }
+
+        setIsActiveNewsletterSubscriber(false);
+        setNewsletterStatusError(
+          "Nu am putut verifica statusul newsletter. Poți alege manual."
+        );
+      } finally {
+        if (!isCancelled) {
+          setNewsletterStatusLoading(false);
+        }
+      }
+    }, 300);
+
+    return () => {
+      isCancelled = true;
+      window.clearTimeout(timerId);
+    };
+  }, [hasValidEmailForNewsletter, normalizedEmail, setValue]);
 
   async function goNextStep() {
     const stepFields: Record<number, Array<keyof FormValues>> = {
@@ -361,6 +425,44 @@ export default function ProviderOnboardingFormWizard({
                   <option value="no">Nu</option>
                 </select>
               </fieldset>
+            </div>
+          )}
+
+          {hasValidEmailForNewsletter && (
+            <div className="rounded-md border border-border p-3 sm:p-4">
+              <p className="mb-2 text-sm font-medium">Newsletter AInevoie</p>
+
+              {newsletterStatusLoading ? (
+                <p className="text-xs text-muted-foreground">
+                  Verificăm dacă emailul este deja abonat la newsletter...
+                </p>
+              ) : isActiveNewsletterSubscriber ? (
+                <p className="text-xs text-muted-foreground">
+                  Email deja abonat la newsletter.
+                </p>
+              ) : (
+                <Controller
+                  control={control}
+                  name="newsletterOptIn"
+                  render={({ field }) => (
+                    <Checkbox
+                      name={field.name}
+                      checked={field.value}
+                      onChange={(event) => field.onChange(event.target.checked)}
+                      label={
+                        <>
+                          Vreau să primesc newsletter cu noutăți, oferte și update-uri de
+                          produs.
+                        </>
+                      }
+                    />
+                  )}
+                />
+              )}
+
+              {newsletterStatusError && !newsletterStatusLoading && (
+                <p className="mt-2 text-xs text-muted-foreground">{newsletterStatusError}</p>
+              )}
             </div>
           )}
 

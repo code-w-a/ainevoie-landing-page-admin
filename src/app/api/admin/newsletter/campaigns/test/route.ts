@@ -1,0 +1,130 @@
+import { NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/adminAuth";
+import { getAdminDb, requireEnv } from "@/lib/firebaseAdmin";
+import {
+  isCampaignTemplateId,
+  normalizePublicBaseUrl,
+  renderCampaignTemplate,
+  validateCampaignTemplateInput,
+} from "@/lib/emailTemplates/campaignTemplates";
+
+const region = process.env.FIREBASE_REGION || "europe-west1";
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function readString(value: unknown): string {
+  if (typeof value !== "string") {
+    return "";
+  }
+  return value.trim();
+}
+
+function isEmail(value: string): boolean {
+  return value.includes("@");
+}
+
+export async function POST(request: Request) {
+  try {
+    await requireAdmin(request);
+    const body = (await request.json()) as Record<string, unknown>;
+    const toEmail = readString(body.toEmail).toLowerCase();
+    const subject = readString(body.subject);
+    const previewText = readString(body.previewText) || undefined;
+    const templateIdRaw = body.templateId;
+
+    if (!toEmail || !isEmail(toEmail)) {
+      return NextResponse.json(
+        { error: "Adresa de test este invalidă." },
+        { status: 400 }
+      );
+    }
+
+    if (!subject) {
+      return NextResponse.json(
+        { error: "Subject este obligatoriu." },
+        { status: 400 }
+      );
+    }
+
+    if (!isCampaignTemplateId(templateIdRaw)) {
+      return NextResponse.json(
+        { error: "Template invalid." },
+        { status: 400 }
+      );
+    }
+
+    const rawTemplateData = isRecord(body.templateData) ? body.templateData : {};
+    const validation = validateCampaignTemplateInput({
+      templateId: templateIdRaw,
+      templateData: rawTemplateData,
+    });
+    if (validation.errors.length > 0) {
+      return NextResponse.json(
+        { error: validation.errors[0] },
+        { status: 400 }
+      );
+    }
+
+    const db = getAdminDb();
+    const settingsDoc = await db.collection("newsletter_settings").doc("default").get();
+    const settings = settingsDoc.data() || {};
+    const baseUrl = normalizePublicBaseUrl(readString(settings.baseUrl));
+    if (!baseUrl) {
+      return NextResponse.json(
+        {
+          error:
+            "Setează Public base URL în Newsletter Settings înainte să trimiți email test.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const rendered = renderCampaignTemplate({
+      templateId: templateIdRaw,
+      templateData: validation.normalizedData,
+      baseUrl,
+      subject,
+    });
+
+    const projectId = requireEnv("FIREBASE_PROJECT_ID");
+    const adminApiKey = process.env.ADMIN_API_KEY;
+    const url = `https://${region}-${projectId}.cloudfunctions.net/sendNewsletterTestEmail`;
+    const payload = {
+      data: {
+        toEmail,
+        subject,
+        html: rendered.html,
+        text: rendered.text,
+        previewText,
+        templateId: templateIdRaw,
+        templateData: rendered.normalizedData,
+        templateVersion: rendered.templateVersion,
+        adminApiKey,
+      },
+    };
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      return NextResponse.json(
+        { error: error || "Failed to send test email" },
+        { status: response.status }
+      );
+    }
+
+    const data = await response.json();
+    return NextResponse.json(data);
+  } catch (error) {
+    return NextResponse.json(
+      { error: "Failed to send test email" },
+      { status: 500 }
+    );
+  }
+}

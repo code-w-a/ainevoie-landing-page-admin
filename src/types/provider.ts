@@ -9,6 +9,15 @@ export const PROVIDER_LEGAL_STATUSES = [
 ] as const;
 export type ProviderLegalStatus = (typeof PROVIDER_LEGAL_STATUSES)[number];
 
+export const PROVIDER_NEWSLETTER_SIGNUP_STATUSES = [
+  "already_active",
+  "subscribed",
+  "skipped",
+  "error",
+] as const;
+export type ProviderNewsletterStatusAtSignup =
+  (typeof PROVIDER_NEWSLETTER_SIGNUP_STATUSES)[number];
+
 export type ProviderRecord = {
   id?: string;
   uid: string;
@@ -25,6 +34,9 @@ export type ProviderRecord = {
   tradeRegisterNumber?: string | null;
   estimatedSetupTimeline?: string | null;
   hasAccountant?: "yes" | "no" | "unsure" | null;
+  newsletterOptIn?: boolean;
+  newsletterStatusAtSignup?: ProviderNewsletterStatusAtSignup | null;
+  newsletterError?: string | null;
   onboardingStatus: ProviderStatus;
   source: "landing_onboarding";
   internalNotes?: string;
