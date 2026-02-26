@@ -209,6 +209,12 @@ export async function POST(request: Request) {
               emailNormalized: email,
               status: "active",
               source: "provider_onboarding",
+              consentGranted: true,
+              consentCapturedAt: FieldValue.serverTimestamp(),
+              consentSource: "provider_onboarding",
+              consentTextVersion: "v1",
+              consentMethod: "single_opt_in",
+              consentWithdrawnAt: null,
               updatedAt: FieldValue.serverTimestamp(),
             });
             newsletterStatusAtSignup = "subscribed";
@@ -220,7 +226,14 @@ export async function POST(request: Request) {
             status: "active",
             tags: [],
             source: "provider_onboarding",
+            consentGranted: true,
+            consentCapturedAt: FieldValue.serverTimestamp(),
+            consentSource: "provider_onboarding",
+            consentTextVersion: "v1",
+            consentMethod: "single_opt_in",
+            consentWithdrawnAt: null,
             createdAt: FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
           });
           newsletterStatusAtSignup = "subscribed";
         }

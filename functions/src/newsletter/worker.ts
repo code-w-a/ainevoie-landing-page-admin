@@ -2,6 +2,11 @@ import { FieldValue } from "firebase-admin/firestore";
 import { getFunctions } from "firebase-admin/functions";
 import { onTaskDispatched } from "firebase-functions/v2/tasks";
 import {
+  REGION,
+  RETRY_DELAYS_SECONDS,
+  SEND_QUEUE_FUNCTION,
+} from "./constants";
+import {
   NEWSLETTER_FROM_EMAIL,
   NEWSLETTER_FROM_NAME,
   NEWSLETTER_REPLY_TO,
@@ -19,10 +24,61 @@ import {
   generateToken,
   getDb,
   getNewsletterSettings,
+  isSubscriberEligibleForSend,
   logNewsletterEvent,
+  normalizeEmail,
 } from "../shared/firestore";
+import { NewsletterErrorKind } from "../shared/newsletterTypes";
 
-const RETRY_DELAYS_SECONDS = [30, 120, 600];
+type ClassifiedError = {
+  kind: NewsletterErrorKind;
+  code: string;
+  message: string;
+};
+
+function classifySmtpError(error: unknown): ClassifiedError {
+  const message = String(error);
+  const errorObj = error as {
+    code?: string;
+    responseCode?: number;
+    response?: string;
+  };
+
+  const code = typeof errorObj?.code === "string" ? errorObj.code : "UNKNOWN";
+  const responseCode =
+    typeof errorObj?.responseCode === "number" ? errorObj.responseCode : 0;
+  const responseText =
+    typeof errorObj?.response === "string" ? errorObj.response : message;
+
+  const permanentSmtpCode = responseCode >= 500 && responseCode <= 599;
+  const transientSmtpCode = responseCode >= 400 && responseCode <= 499;
+  const permanentByMessage = /\b5\d\d\b/.test(responseText);
+
+  if (permanentSmtpCode || permanentByMessage) {
+    return {
+      kind: "bounce",
+      code: responseCode ? `SMTP_${responseCode}` : code,
+      message,
+    };
+  }
+
+  if (
+    transientSmtpCode ||
+    ["ETIMEDOUT", "ECONNECTION", "ESOCKET", "ECONNRESET"].includes(code)
+  ) {
+    return {
+      kind: "transient",
+      code: responseCode ? `SMTP_${responseCode}` : code,
+      message,
+    };
+  }
+
+  return {
+    kind: "permanent",
+    code: responseCode ? `SMTP_${responseCode}` : code,
+    message,
+  };
+}
 
 async function maybeCompleteCampaign(
   campaignRef: FirebaseFirestore.DocumentReference
@@ -39,19 +95,24 @@ async function maybeCompleteCampaign(
   const failed = Number(stats.failed || 0);
   const skipped = Number(stats.skipped || 0);
 
-  if (total === 0 || (queued <= 0 && sent + failed + skipped >= total)) {
-    if (data.status !== "sent") {
-      await campaignRef.update({
-        status: "sent",
-        completedAt: FieldValue.serverTimestamp(),
-      });
-    }
+  const done = total === 0 || (queued <= 0 && sent + failed + skipped >= total);
+  if (!done) {
+    return;
+  }
+
+  const finalStatus = failed > 0 ? "sent_with_errors" : "sent";
+  if (data.status !== finalStatus) {
+    await campaignRef.update({
+      status: finalStatus,
+      completedAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
   }
 }
 
 export const newsletterSendTask = onTaskDispatched(
   {
-    region: "europe-west1",
+    region: REGION,
     secrets: [
       SMTP_HOST,
       SMTP_PORT,
@@ -81,18 +142,15 @@ export const newsletterSendTask = onTaskDispatched(
     const db = getDb();
     const jobRef = db.doc(jobPath);
     const jobSnap = await jobRef.get();
-
     if (!jobSnap.exists) {
       return;
     }
 
     const jobData = jobSnap.data() || {};
     const jobStatus = jobData.status;
-
     if (jobStatus === "sent" || jobStatus === "skipped") {
       return;
     }
-
     if (jobStatus === "sending") {
       return;
     }
@@ -104,17 +162,17 @@ export const newsletterSendTask = onTaskDispatched(
         return false;
       }
       const data = snap.data() || {};
-      if (data.status === "sent" || data.status === "skipped") {
+      if (["sent", "skipped", "sending"].includes(String(data.status || ""))) {
         return false;
       }
-      if (data.status === "sending") {
-        return false;
-      }
-      attempts = (data.attempts || 0) + 1;
+      attempts = Number(data.attempts || 0) + 1;
       tx.update(jobRef, {
         status: "sending",
         attempts,
         lastError: FieldValue.delete(),
+        errorCode: FieldValue.delete(),
+        errorKind: FieldValue.delete(),
+        updatedAt: FieldValue.serverTimestamp(),
       });
       return true;
     });
@@ -130,26 +188,34 @@ export const newsletterSendTask = onTaskDispatched(
       await jobRef.update({
         status: "failed",
         lastError: "Campaign not found",
+        errorCode: "CAMPAIGN_NOT_FOUND",
+        errorKind: "permanent",
+        updatedAt: FieldValue.serverTimestamp(),
       });
       await logNewsletterEvent(db, {
         campaignId,
-        email: jobData.email,
+        email: typeof jobData.email === "string" ? normalizeEmail(jobData.email) : undefined,
         level: "error",
-        message: "Campaign not found for job.",
+        message: "Campania nu există pentru acest job.",
       });
       return;
     }
 
     const campaign = campaignSnap.data() || {};
-    if (campaign.status && !["queued", "sending", "sent"].includes(campaign.status)) {
+    if (campaign.status && !["queued", "sending"].includes(String(campaign.status))) {
       await jobRef.update({
         status: "skipped",
         lastError: `Campaign status ${campaign.status}`,
+        errorCode: "CAMPAIGN_NOT_SENDABLE",
+        errorKind: "permanent",
+        updatedAt: FieldValue.serverTimestamp(),
       });
       await campaignRef.update({
         "stats.skipped": FieldValue.increment(1),
         "stats.queued": FieldValue.increment(-1),
+        updatedAt: FieldValue.serverTimestamp(),
       });
+      await maybeCompleteCampaign(campaignRef);
       return;
     }
 
@@ -157,6 +223,7 @@ export const newsletterSendTask = onTaskDispatched(
       await campaignRef.update({
         status: "sending",
         startedAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
       });
     }
 
@@ -171,61 +238,72 @@ export const newsletterSendTask = onTaskDispatched(
       }
     }
 
-    if (subscriberData && subscriberData.status && subscriberData.status !== "active") {
+    if (subscriberRef && subscriberData) {
+      await ensureSubscriberFields(subscriberRef, subscriberData);
+      const refreshed = await subscriberRef.get();
+      subscriberData = refreshed.exists ? refreshed.data() || null : subscriberData;
+    }
+
+    if (!isSubscriberEligibleForSend(subscriberData)) {
       await jobRef.update({
         status: "skipped",
-        lastError: "Subscriber not active",
+        lastError: "Subscriber not eligible",
+        errorCode: "SUBSCRIBER_NOT_ELIGIBLE",
+        errorKind: "permanent",
+        updatedAt: FieldValue.serverTimestamp(),
       });
       await campaignRef.update({
         "stats.skipped": FieldValue.increment(1),
         "stats.queued": FieldValue.increment(-1),
+        updatedAt: FieldValue.serverTimestamp(),
       });
       await maybeCompleteCampaign(campaignRef);
       await logNewsletterEvent(db, {
         campaignId,
-        email: jobData.email,
+        email: typeof jobData.email === "string" ? normalizeEmail(jobData.email) : undefined,
         level: "info",
-        message: "Subscriber inactive, skipped.",
+        message: "Abonat neeligibil, job ignorat.",
       });
       return;
     }
 
-    if (subscriberRef && subscriberData) {
-      await ensureSubscriberFields(subscriberRef, subscriberData);
-    }
-
-    const settings = await getNewsletterSettings(db);
-    const unsubscribeToken = subscriberData?.unsubscribeToken || generateToken();
-    const unsubscribeUrl = buildUnsubscribeUrl(
-      unsubscribeToken,
-      settings?.baseUrl
-    );
-
-    if (subscriberRef && subscriberData && !subscriberData.unsubscribeToken) {
-      await subscriberRef.update({ unsubscribeToken });
-    }
-
-    if (!jobData.email) {
+    const email =
+      typeof jobData.email === "string" ? normalizeEmail(jobData.email) : "";
+    if (!email.includes("@")) {
       await jobRef.update({
         status: "failed",
-        lastError: "Missing email on job",
+        lastError: "Missing or invalid email on job",
+        errorCode: "JOB_EMAIL_INVALID",
+        errorKind: "permanent",
+        updatedAt: FieldValue.serverTimestamp(),
       });
       await campaignRef.update({
         "stats.failed": FieldValue.increment(1),
         "stats.queued": FieldValue.increment(-1),
+        updatedAt: FieldValue.serverTimestamp(),
       });
       await maybeCompleteCampaign(campaignRef);
       await logNewsletterEvent(db, {
         campaignId,
         level: "error",
-        message: "Job missing email, failed.",
+        message: "Job fără email valid.",
       });
       return;
     }
 
+    const settings = await getNewsletterSettings(db);
+    const unsubscribeToken = subscriberData?.unsubscribeToken || generateToken();
+    const unsubscribeUrl = buildUnsubscribeUrl(unsubscribeToken, settings?.baseUrl);
+
+    if (subscriberRef && subscriberData && !subscriberData.unsubscribeToken) {
+      await subscriberRef.update({
+        unsubscribeToken,
+      });
+    }
+
     try {
       await sendNewsletterEmail({
-        to: jobData.email,
+        to: email,
         subject: campaign.subject,
         html: campaign.html,
         text: campaign.text || undefined,
@@ -239,11 +317,16 @@ export const newsletterSendTask = onTaskDispatched(
       await jobRef.update({
         status: "sent",
         sentAt: FieldValue.serverTimestamp(),
+        errorCode: null,
+        errorKind: null,
+        lastError: null,
+        updatedAt: FieldValue.serverTimestamp(),
       });
 
       await campaignRef.update({
         "stats.sent": FieldValue.increment(1),
         "stats.queued": FieldValue.increment(-1),
+        updatedAt: FieldValue.serverTimestamp(),
       });
       await maybeCompleteCampaign(campaignRef);
 
@@ -255,24 +338,27 @@ export const newsletterSendTask = onTaskDispatched(
 
       await logNewsletterEvent(db, {
         campaignId,
-        email: jobData.email,
+        email,
         level: "info",
-        message: "Email sent successfully.",
+        message: "Email trimis cu succes.",
       });
     } catch (error) {
-      const errorMessage = String(error);
+      const classified = classifySmtpError(error);
+      const canRetry = classified.kind === "transient" && attempts < 3;
       const retryIndex = Math.max(0, attempts - 1);
-      const canRetry = attempts < 3;
 
       if (canRetry) {
         await jobRef.update({
           status: "queued",
-          lastError: errorMessage,
+          lastError: classified.message,
+          errorCode: classified.code,
+          errorKind: classified.kind,
+          updatedAt: FieldValue.serverTimestamp(),
         });
 
         const delaySeconds =
           RETRY_DELAYS_SECONDS[retryIndex] || RETRY_DELAYS_SECONDS.at(-1) || 600;
-        const queue = getFunctions().taskQueue("newsletter-send");
+        const queue = getFunctions().taskQueue(SEND_QUEUE_FUNCTION);
         await queue.enqueue(
           { campaignId, jobPath },
           { scheduleDelaySeconds: delaySeconds }
@@ -280,29 +366,42 @@ export const newsletterSendTask = onTaskDispatched(
 
         await logNewsletterEvent(db, {
           campaignId,
-          email: jobData.email,
-          level: "error",
-          message: `Send failed, retry scheduled: ${errorMessage}`,
+          email,
+          level: "warning",
+          message: `Trimitere eșuată temporar, retry programat: ${classified.message}`,
         });
         return;
       }
 
       await jobRef.update({
         status: "failed",
-        lastError: errorMessage,
+        lastError: classified.message,
+        errorCode: classified.code,
+        errorKind: classified.kind,
+        updatedAt: FieldValue.serverTimestamp(),
       });
 
       await campaignRef.update({
         "stats.failed": FieldValue.increment(1),
         "stats.queued": FieldValue.increment(-1),
+        updatedAt: FieldValue.serverTimestamp(),
       });
       await maybeCompleteCampaign(campaignRef);
 
+      if (classified.kind === "bounce" && subscriberRef) {
+        await subscriberRef.update({
+          status: "bounced",
+          bouncedAt: FieldValue.serverTimestamp(),
+          statusReason: classified.message.slice(0, 500),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      }
+
       await logNewsletterEvent(db, {
         campaignId,
-        email: jobData.email,
+        email,
         level: "error",
-        message: `Send failed permanently: ${errorMessage}`,
+        message: `Trimitere eșuată definitiv: ${classified.message}`,
       });
     }
   }

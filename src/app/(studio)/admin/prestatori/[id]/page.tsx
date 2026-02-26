@@ -99,7 +99,7 @@ export default function ProviderDetailPage() {
       setNotes(item?.internalNotes || "");
       setEvents(history);
     } catch {
-      setError("Nu am putut incarca fisa prestatorului.");
+      setError("Nu am putut încărca fișa prestatorului.");
     } finally {
       setLoading(false);
     }
@@ -127,22 +127,22 @@ export default function ProviderDetailPage() {
       }
       await loadDetails();
     } catch {
-      setError("Nu am putut salva modificarile.");
+      setError("Nu am putut salva modificările.");
     } finally {
       setSaving(false);
     }
   }
 
   if (loading) {
-    return <p className="text-sm text-muted-foreground">Loading provider...</p>;
+    return <p className="text-sm text-muted-foreground">Se încarcă prestatorul...</p>;
   }
 
   if (!data) {
     return (
       <div className="space-y-3">
-        <p className="text-sm text-rose-500">{error || "Prestatorul nu a fost gasit."}</p>
+        <p className="text-sm text-rose-500">{error || "Prestatorul nu a fost găsit."}</p>
         <Button asChild variant="outline">
-          <Link href="/admin/prestatori">Inapoi la lista</Link>
+          <Link href="/admin/prestatori">Înapoi la listă</Link>
         </Button>
       </div>
     );
@@ -156,7 +156,7 @@ export default function ProviderDetailPage() {
           <p className="text-sm text-muted-foreground">{data.email}</p>
         </div>
         <Button variant="outline" asChild>
-          <Link href="/admin/prestatori">Inapoi la lista</Link>
+          <Link href="/admin/prestatori">Înapoi la listă</Link>
         </Button>
       </div>
 
@@ -170,7 +170,7 @@ export default function ProviderDetailPage() {
             <p className="text-sm">{data.phone || "-"}</p>
           </div>
           <div>
-            <p className="text-xs uppercase text-muted-foreground">Oras</p>
+            <p className="text-xs uppercase text-muted-foreground">Oraș</p>
             <p className="text-sm">{data.city || "-"}</p>
           </div>
           <div>
@@ -192,7 +192,7 @@ export default function ProviderDetailPage() {
             <p className="text-sm">{data.cui || "-"}</p>
           </div>
           <div>
-            <p className="text-xs uppercase text-muted-foreground">Nr. Registrul Comerțului</p>
+            <p className="text-xs uppercase text-muted-foreground">Nr. Registrului Comerțului</p>
             <p className="text-sm">{data.tradeRegisterNumber || "-"}</p>
           </div>
           <div>
@@ -233,41 +233,41 @@ export default function ProviderDetailPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <label className="mb-2 inline-block text-sm font-medium">Schimba status</label>
+            <label className="mb-2 inline-block text-sm font-medium">Schimbă status</label>
             <select
               className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm md:max-w-xs"
               value={status}
               onChange={(event) => setStatus(event.target.value)}
             >
               <option value="new">Nou</option>
-              <option value="in_review">In verificare</option>
+              <option value="in_review">În verificare</option>
               <option value="approved">Aprobat</option>
               <option value="rejected">Respins</option>
             </select>
           </div>
           <div>
-            <label className="mb-2 inline-block text-sm font-medium">Notite interne</label>
+            <label className="mb-2 inline-block text-sm font-medium">Notițe interne</label>
             <textarea
               className="min-h-[140px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               value={notes}
               onChange={(event) => setNotes(event.target.value)}
-              placeholder="Observatii pentru echipa interna..."
+              placeholder="Observații pentru echipa internă..."
             />
           </div>
           {error && <p className="text-sm text-rose-500">{error}</p>}
           <Button onClick={saveChanges} disabled={saving}>
-            {saving ? "Se salveaza..." : "Salveaza modificarile"}
+            {saving ? "Se salvează..." : "Salvează modificările"}
           </Button>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Timeline status</CardTitle>
+          <CardTitle>Istoric status</CardTitle>
         </CardHeader>
         <CardContent>
           {events.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nu exista evenimente inca.</p>
+            <p className="text-sm text-muted-foreground">Nu există evenimente încă.</p>
           ) : (
             <div className="space-y-3">
               {events.map((event) => (
@@ -293,7 +293,7 @@ export default function ProviderDetailPage() {
                     })()}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {event.createdAt || "-"} • actor: {event.actorUid || "n/a"}
+                    {event.createdAt || "-"} • actor: {event.actorUid || "necunoscut"}
                   </p>
                   {event.note && <p className="mt-2 text-sm">{event.note}</p>}
                 </div>

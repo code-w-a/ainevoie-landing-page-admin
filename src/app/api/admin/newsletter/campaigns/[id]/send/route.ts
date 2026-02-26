@@ -15,18 +15,16 @@ export async function POST(
     const projectId = requireEnv("FIREBASE_PROJECT_ID");
     const adminApiKey = process.env.ADMIN_API_KEY;
 
-    const url = `https://${region}-${projectId}.cloudfunctions.net/requeueFailedJobs`;
-    const payload = {
-      data: {
-        campaignId: id,
-        adminApiKey,
-      },
-    };
-
+    const url = `https://${region}-${projectId}.cloudfunctions.net/sendNewsletterCampaignNow`;
     const response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        data: {
+          campaignId: id,
+          adminApiKey,
+        },
+      }),
     });
 
     if (!response.ok) {
@@ -34,7 +32,7 @@ export async function POST(
         {
           error: await parseCallableErrorResponse(
             response,
-            "Nu am putut recoada joburile eșuate."
+            "Nu am putut porni trimiterea campaniei."
           ),
         },
         { status: response.status }
@@ -42,10 +40,32 @@ export async function POST(
     }
 
     const data = await response.json();
-    return NextResponse.json(data);
+    const result = (
+      data &&
+      typeof data === "object" &&
+      "result" in data
+    ) ?
+      (data as {
+        result: {
+          campaignId?: string;
+          status?: string;
+          counts?: Record<string, number>;
+        };
+      }).result :
+      (data as {
+        campaignId?: string;
+        status?: string;
+        counts?: Record<string, number>;
+      });
+
+    return NextResponse.json({
+      campaignId: result?.campaignId || id,
+      status: result?.status || "queued",
+      counts: result?.counts || null,
+    });
   } catch (error) {
     return NextResponse.json(
-      { error: "Nu am putut recoada joburile eșuate." },
+      { error: "Nu am putut porni trimiterea campaniei." },
       { status: 500 }
     );
   }

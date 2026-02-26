@@ -1,4 +1,5 @@
 import { HttpsError, onCall } from "firebase-functions/v2/https";
+import { REGION } from "./constants";
 import { ADMIN_API_KEY, requireAdmin } from "../shared/auth";
 import {
   NEWSLETTER_FROM_EMAIL,
@@ -22,7 +23,7 @@ import {
 
 export const sendNewsletterTestEmail = onCall(
   {
-    region: "europe-west1",
+    region: REGION,
     invoker: "public",
     secrets: [
       ADMIN_API_KEY,
@@ -44,15 +45,15 @@ export const sendNewsletterTestEmail = onCall(
       request.data ?? {};
 
     if (!toEmail || typeof toEmail !== "string") {
-      throw new HttpsError("invalid-argument", "Missing toEmail");
+      throw new HttpsError("invalid-argument", "Lipsește toEmail.");
     }
 
     if (!subject || typeof subject !== "string") {
-      throw new HttpsError("invalid-argument", "Missing subject");
+      throw new HttpsError("invalid-argument", "Lipsește subject.");
     }
 
     if (!html || typeof html !== "string") {
-      throw new HttpsError("invalid-argument", "Missing html");
+      throw new HttpsError("invalid-argument", "Lipsește html.");
     }
 
     const token = generateToken();
@@ -75,7 +76,7 @@ export const sendNewsletterTestEmail = onCall(
     await logNewsletterEvent(db, {
       level: "info",
       email: toEmail,
-      message: "Test newsletter email sent.",
+      message: "Emailul de test a fost trimis.",
     });
 
     return { status: "ok" };

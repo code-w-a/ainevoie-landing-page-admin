@@ -13,13 +13,13 @@ export function useAdminData<T>(endpoint: string) {
       setLoading(true);
       const res = await adminFetch(endpoint, { cache: "no-store" });
       if (!res.ok) {
-        throw new Error("Request failed");
+        throw new Error("Cererea a eșuat");
       }
       const json = await res.json();
       setData(json);
       setError(null);
     } catch (err) {
-      setError("Failed to load data");
+      setError("Nu am putut încărca datele.");
     } finally {
       setLoading(false);
     }

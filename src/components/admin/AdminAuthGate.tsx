@@ -45,7 +45,7 @@ export default function AdminAuthGate({
   if (!ready && pathname !== "/admin/login") {
     return (
       <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
-        Checking session...
+        Verific sesiunea...
       </div>
     );
   }

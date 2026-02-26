@@ -13,7 +13,7 @@ export default function AdminTopbar() {
           <Search className="h-4 w-4 text-muted-foreground" />
           <Input
             className="border-none bg-transparent px-0 focus-visible:ring-0"
-            placeholder="Search"
+            placeholder="Căutare"
           />
         </div>
 

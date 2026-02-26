@@ -59,7 +59,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ items, nextCursor });
   } catch (error) {
     return NextResponse.json(
-      { error: "Failed to load logs" },
+      { error: "Nu am putut încărca logurile." },
       { status: 500 }
     );
   }

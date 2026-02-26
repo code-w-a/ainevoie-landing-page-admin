@@ -21,7 +21,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ item: serializeDoc(doc) });
   } catch (error) {
     return NextResponse.json(
-      { error: "Failed to load settings" },
+      { error: "Nu am putut încărca setările." },
       { status: 500 }
     );
   }
@@ -44,7 +44,7 @@ export async function PUT(request: Request) {
     return NextResponse.json({ status: "ok" });
   } catch (error) {
     return NextResponse.json(
-      { error: "Failed to update settings" },
+      { error: "Nu am putut actualiza setările." },
       { status: 500 }
     );
   }

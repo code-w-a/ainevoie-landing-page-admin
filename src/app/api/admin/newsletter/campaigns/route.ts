@@ -7,6 +7,10 @@ import {
   renderCampaignTemplate,
   validateCampaignTemplateInput,
 } from "@/lib/emailTemplates/campaignTemplates";
+import {
+  parseCallableErrorResponse,
+  sanitizePayload,
+} from "@/lib/newsletterAdmin";
 
 const region = process.env.FIREBASE_REGION || "europe-west1";
 const ALLOWED_SORTS: Record<string, string> = {
@@ -84,7 +88,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ items, nextCursor });
   } catch (error) {
     return NextResponse.json(
-      { error: "Failed to load campaigns" },
+      { error: "Nu am putut încărca campaniile." },
       { status: 500 }
     );
   }
@@ -97,7 +101,7 @@ export async function POST(request: Request) {
     const subject = readString(body.subject);
     if (!subject) {
       return NextResponse.json(
-        { error: "Subject este obligatoriu." },
+        { error: "Subiectul este obligatoriu." },
         { status: 400 }
       );
     }
@@ -122,7 +126,7 @@ export async function POST(request: Request) {
       const templateIdRaw = body.templateId;
       if (!isCampaignTemplateId(templateIdRaw)) {
         return NextResponse.json(
-          { error: "Template invalid. Alege unul dintre template-urile disponibile." },
+          { error: "Template nevalid. Alege unul dintre template-urile disponibile." },
           { status: 400 }
         );
       }
@@ -152,7 +156,7 @@ export async function POST(request: Request) {
         return NextResponse.json(
           {
             error:
-              "Setează Public base URL în Newsletter Settings înainte să creezi campanii.",
+              "Setează URL-ul public de bază în Setări newsletter înainte să creezi campanii.",
           },
           { status: 400 }
         );
@@ -179,12 +183,14 @@ export async function POST(request: Request) {
     const adminApiKey = process.env.ADMIN_API_KEY;
 
     const url = `https://${region}-${projectId}.cloudfunctions.net/createNewsletterCampaign`;
-    const payload = {
+    const payload = sanitizePayload({
       data: {
         ...payloadData,
+        filters: body.filters,
+        sendConfig: body.sendConfig,
         adminApiKey,
       },
-    };
+    });
 
     const response = await fetch(url, {
       method: "POST",
@@ -193,18 +199,33 @@ export async function POST(request: Request) {
     });
 
     if (!response.ok) {
-      const error = await response.text();
       return NextResponse.json(
-        { error: error || "Failed to create campaign" },
+        {
+          error: await parseCallableErrorResponse(
+            response,
+            "Nu am putut crea campania."
+          ),
+        },
         { status: response.status }
       );
     }
 
     const data = await response.json();
-    return NextResponse.json(data);
+    const result = (
+      data &&
+      typeof data === "object" &&
+      "result" in data
+    ) ?
+      (data as { result: { campaignId?: string; status?: string } }).result :
+      (data as { campaignId?: string; status?: string });
+
+    return NextResponse.json({
+      campaignId: result?.campaignId || null,
+      status: result?.status || "draft",
+    });
   } catch (error) {
     return NextResponse.json(
-      { error: "Failed to create campaign" },
+      { error: "Nu am putut crea campania." },
       { status: 500 }
     );
   }

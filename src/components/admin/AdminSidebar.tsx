@@ -14,11 +14,11 @@ import {
 } from "lucide-react";
 
 const newsletterItems = [
-  { href: "/admin", label: "Overview", icon: BarChart2 },
-  { href: "/admin/campaigns", label: "Campaigns", icon: Mail },
-  { href: "/admin/subscribers", label: "Subscribers", icon: Users },
-  { href: "/admin/logs", label: "Logs", icon: Activity },
-  { href: "/admin/settings", label: "Settings", icon: Settings },
+  { href: "/admin", label: "Sumar", icon: BarChart2 },
+  { href: "/admin/campaigns", label: "Campanii", icon: Mail },
+  { href: "/admin/subscribers", label: "Abonați", icon: Users },
+  { href: "/admin/logs", label: "Loguri", icon: Activity },
+  { href: "/admin/settings", label: "Setări", icon: Settings },
 ];
 
 const providerItems = [

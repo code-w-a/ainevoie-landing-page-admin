@@ -84,7 +84,7 @@ export default function AdminLoginPage() {
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Password</label>
+              <label className="text-sm font-medium">Parolă</label>
               <Input
                 type="password"
                 placeholder="••••••••"
@@ -94,7 +94,7 @@ export default function AdminLoginPage() {
             </div>
             {error && <p className="text-sm text-rose-500">{error}</p>}
             <Button type="submit" disabled={loading} className="w-full">
-              {loading ? "Signing in..." : "Sign in"}
+              {loading ? "Se autentifică..." : "Autentificare"}
             </Button>
           </form>
         </CardContent>

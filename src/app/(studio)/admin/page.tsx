@@ -21,47 +21,55 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useAdminData } from "@/components/admin/useAdminData";
+import {
+  adminCommonLabels,
+  campaignStatusLabel,
+  logLevelLabel,
+} from "@/lib/adminLabels";
+
+type OverviewResponse = {
+  stats: {
+    activeSubscribers: number;
+    unsubscribed: number;
+    bounced: number;
+    complaint: number;
+    suppressed: number;
+    campaignsSent: number;
+    campaignsSentWithErrors: number;
+  };
+  campaigns: Array<any>;
+  logs: Array<any>;
+};
 
 export default function AdminOverviewPage() {
-  const { data, loading, error } = useAdminData<{
-    stats: {
-      activeSubscribers: number;
-      unsubscribed: number;
-      campaignsSent: number;
-      avgOpenRate: number;
-    };
-    campaigns: Array<any>;
-    logs: Array<any>;
-  }>("/api/admin/newsletter/overview");
+  const { data, loading, error } =
+    useAdminData<OverviewResponse>("/api/admin/newsletter/overview");
 
   const overviewStats = useMemo(() => {
     if (!data?.stats) {
       return [];
     }
+
     return [
       {
-        label: "Active subscribers",
+        label: "Abonați activi",
         value: data.stats.activeSubscribers,
-        change: "",
-        note: "current",
+        note: "eligibili la trimitere",
       },
       {
-        label: "Unsubscribed",
+        label: "Dezabonați",
         value: data.stats.unsubscribed,
-        change: "",
-        note: "current",
+        note: "consimțământ retras",
       },
       {
-        label: "Campaigns sent",
-        value: data.stats.campaignsSent,
-        change: "",
-        note: "latest",
+        label: "Bounced / Plângeri / Suprimați",
+        value: `${data.stats.bounced} / ${data.stats.complaint} / ${data.stats.suppressed}`,
+        note: "lifecycle livrare",
       },
       {
-        label: "Avg. open rate",
-        value: data.stats.avgOpenRate ? `${data.stats.avgOpenRate}%` : "N/A",
-        change: "",
-        note: "placeholder",
+        label: "Campanii trimise",
+        value: `${data.stats.campaignsSent} (+${data.stats.campaignsSentWithErrors} cu erori)`,
+        note: "istoric livrare",
       },
     ];
   }, [data]);
@@ -73,18 +81,20 @@ export default function AdminOverviewPage() {
     <div className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Newsletter Overview</h1>
+          <h1 className="text-2xl font-semibold">Sumar newsletter</h1>
           <p className="text-sm text-muted-foreground">
-            Rezumat rapid al performanței newsletterului.
+            Draft → Test → Schedule/Send → Report.
           </p>
         </div>
         <Button asChild>
-          <Link href="/admin/campaigns">New campaign</Link>
+          <Link href="/admin/campaigns">Campanie nouă</Link>
         </Button>
       </div>
 
       {loading && (
-        <p className="text-sm text-muted-foreground">Loading overview...</p>
+        <p className="text-sm text-muted-foreground">
+          {adminCommonLabels.loadingOverview}
+        </p>
       )}
       {error && <p className="text-sm text-rose-500">{error}</p>}
 
@@ -95,9 +105,8 @@ export default function AdminOverviewPage() {
               <CardDescription>{item.label}</CardDescription>
               <CardTitle className="text-2xl">{item.value}</CardTitle>
             </CardHeader>
-            <CardContent className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>{item.note}</span>
-              <span className="text-foreground">{item.change}</span>
+            <CardContent className="text-xs text-muted-foreground">
+              {item.note}
             </CardContent>
           </Card>
         ))}
@@ -106,42 +115,49 @@ export default function AdminOverviewPage() {
       <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
         <Card>
           <CardHeader>
-            <CardTitle>Recent campaigns</CardTitle>
-            <CardDescription>Ultimele campanii trimise sau în pregătire.</CardDescription>
+            <CardTitle>Campanii recente</CardTitle>
+            <CardDescription>
+              Ultimele campanii create, programate sau trimise.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Campaign</TableHead>
+                  <TableHead>Campanie</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Recipients</TableHead>
-                  <TableHead>Sent</TableHead>
+                  <TableHead>Destinatari</TableHead>
+                  <TableHead>Trimise</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {campaigns.map((campaign) => (
-                  <TableRow key={campaign.id || campaign.name}>
-                    <TableCell className="font-medium">
-                      {campaign.subject || campaign.name}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          campaign.status === "sent" || campaign.status === "Sent"
-                            ? "success"
-                            : campaign.status === "queued" || campaign.status === "Queued"
-                              ? "warning"
-                              : "outline"
-                        }
-                      >
-                        {campaign.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{campaign.stats?.total ?? campaign.recipients ?? "-"}</TableCell>
-                    <TableCell>{campaign.stats?.sent ?? campaign.sent ?? "-"}</TableCell>
-                  </TableRow>
-                ))}
+                {campaigns.map((campaign) => {
+                  const status =
+                    typeof campaign.status === "string" ?
+                      campaign.status.toLowerCase() :
+                      "";
+                  const badgeVariant =
+                    status === "sent" ?
+                      "success" :
+                      ["queued", "scheduled", "sending"].includes(status) ?
+                        "warning" :
+                        ["sent_with_errors", "failed", "canceled"].includes(status) ?
+                          "danger" :
+                          "outline";
+
+                  return (
+                    <TableRow key={campaign.id || campaign.name}>
+                      <TableCell className="font-medium">
+                        {campaign.subject || campaign.name}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={badgeVariant}>{campaignStatusLabel(campaign.status)}</Badge>
+                      </TableCell>
+                      <TableCell>{campaign.stats?.total ?? campaign.recipients ?? "-"}</TableCell>
+                      <TableCell>{campaign.stats?.sent ?? campaign.sent ?? "-"}</TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </CardContent>
@@ -149,8 +165,8 @@ export default function AdminOverviewPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Latest logs</CardTitle>
-            <CardDescription>Ultimele evenimente de trimitere.</CardDescription>
+            <CardTitle>Ultimele loguri</CardTitle>
+            <CardDescription>Evenimente recente din pipeline.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {logs.map((log, index) => (
@@ -160,10 +176,8 @@ export default function AdminOverviewPage() {
               >
                 <div className="flex items-center justify-between text-sm">
                   <span className="font-medium">{log.campaignId || "General"}</span>
-                  <Badge
-                    variant={log.level === "error" ? "danger" : "secondary"}
-                  >
-                    {log.level}
+                  <Badge variant={log.level === "error" ? "danger" : "secondary"}>
+                    {logLevelLabel(log.level)}
                   </Badge>
                 </div>
                 <p className="mt-2 text-xs text-muted-foreground">{log.message}</p>

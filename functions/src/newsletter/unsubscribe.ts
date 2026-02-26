@@ -26,6 +26,9 @@ export const unsubscribe = onRequest(
     await subscriberSnap.ref.update({
       status: "unsubscribed",
       unsubscribedAt: FieldValue.serverTimestamp(),
+      consentGranted: false,
+      consentWithdrawnAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
     });
 
     res.status(200).send(

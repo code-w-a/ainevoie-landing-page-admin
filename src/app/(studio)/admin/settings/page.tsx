@@ -13,6 +13,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { useAdminData } from "@/components/admin/useAdminData";
 import { adminFetch } from "@/components/admin/adminApi";
+import { adminCommonLabels } from "@/lib/adminLabels";
 
 export default function SettingsPage() {
   const { data, loading, error, reload } = useAdminData<{
@@ -61,7 +62,7 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Settings</h1>
+        <h1 className="text-2xl font-semibold">Setări</h1>
         <p className="text-sm text-muted-foreground">
           Configurații de bază pentru newsletter.
         </p>
@@ -69,16 +70,18 @@ export default function SettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Sender profile</CardTitle>
+          <CardTitle>Profil expeditor</CardTitle>
           <CardDescription>Datele folosite la trimitere.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
           {loading && (
-            <p className="text-sm text-muted-foreground">Loading settings...</p>
+            <p className="text-sm text-muted-foreground">
+              {adminCommonLabels.loadingSettings}
+            </p>
           )}
           {error && <p className="text-sm text-rose-500">{error}</p>}
           <div className="space-y-2">
-            <label className="text-sm font-medium">From name</label>
+            <label className="text-sm font-medium">Nume expeditor</label>
             <Input
               placeholder="AInevoie"
               value={formState.fromName}
@@ -91,7 +94,7 @@ export default function SettingsPage() {
             />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium">From email</label>
+            <label className="text-sm font-medium">Email expeditor</label>
             <Input
               placeholder="contact@ainevoie.ro"
               value={formState.fromEmail}
@@ -104,7 +107,7 @@ export default function SettingsPage() {
             />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium">Reply-to</label>
+            <label className="text-sm font-medium">Adresă reply-to</label>
             <Input
               placeholder="support@ainevoie.ro"
               value={formState.replyTo}
@@ -117,7 +120,7 @@ export default function SettingsPage() {
             />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium">Public base URL</label>
+            <label className="text-sm font-medium">URL public de bază</label>
             <Input
               placeholder="https://ainevoie.ro"
               value={formState.baseUrl}
@@ -130,7 +133,7 @@ export default function SettingsPage() {
             />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium">Max per second</label>
+            <label className="text-sm font-medium">Maxim pe secundă</label>
             <Input
               placeholder="5"
               value={formState.maxPerSecond}
@@ -143,7 +146,7 @@ export default function SettingsPage() {
             />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium">Max concurrent</label>
+            <label className="text-sm font-medium">Maxim concurent</label>
             <Input
               placeholder="50"
               value={formState.maxConcurrent}
@@ -160,7 +163,7 @@ export default function SettingsPage() {
 
       <div className="flex justify-end">
         <Button onClick={handleSave} disabled={saving}>
-          {saving ? "Saving..." : "Save settings"}
+          {saving ? "Se salvează..." : "Salvează setările"}
         </Button>
       </div>
     </div>

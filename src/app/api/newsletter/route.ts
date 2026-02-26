@@ -9,7 +9,7 @@ export async function POST(req: Request) {
 
   if (!normalizedEmail) {
     return NextResponse.json(
-      { error: "Email is required" },
+      { error: "Emailul este obligatoriu." },
       { status: 400 },
     );
   }
@@ -17,7 +17,7 @@ export async function POST(req: Request) {
   // Minimal email sanity check.
   if (!normalizedEmail.includes("@")) {
     return NextResponse.json(
-      { error: "Invalid email" },
+      { error: "Email invalid." },
       { status: 400 },
     );
   }
@@ -44,7 +44,13 @@ export async function POST(req: Request) {
         email: normalizedEmail,
         emailNormalized: normalizedEmail,
         status: "active",
-        source: "landing",
+        source: "landing_form",
+        consentGranted: true,
+        consentCapturedAt: FieldValue.serverTimestamp(),
+        consentSource: "landing_form",
+        consentTextVersion: "v1",
+        consentMethod: "single_opt_in",
+        consentWithdrawnAt: null,
         updatedAt: FieldValue.serverTimestamp(),
       });
       return NextResponse.json({ status: "already_subscribed" }, { status: 200 });
@@ -55,14 +61,21 @@ export async function POST(req: Request) {
       emailNormalized: normalizedEmail,
       status: "active",
       tags: [],
-      source: "landing",
+      source: "landing_form",
+      consentGranted: true,
+      consentCapturedAt: FieldValue.serverTimestamp(),
+      consentSource: "landing_form",
+      consentTextVersion: "v1",
+      consentMethod: "single_opt_in",
+      consentWithdrawnAt: null,
       createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
     });
 
     return NextResponse.json({ status: "subscribed" }, { status: 200 });
   } catch (error) {
     return NextResponse.json(
-      { error: "Something went wrong" },
+      { error: "Nu am putut finaliza abonarea." },
       { status: 500 },
     );
   }

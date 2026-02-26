@@ -7,6 +7,10 @@ import {
   renderCampaignTemplate,
   validateCampaignTemplateInput,
 } from "@/lib/emailTemplates/campaignTemplates";
+import {
+  parseCallableErrorResponse,
+  sanitizePayload,
+} from "@/lib/newsletterAdmin";
 
 const region = process.env.FIREBASE_REGION || "europe-west1";
 
@@ -36,21 +40,21 @@ export async function POST(request: Request) {
 
     if (!toEmail || !isEmail(toEmail)) {
       return NextResponse.json(
-        { error: "Adresa de test este invalidă." },
+        { error: "Adresa de test este nevalidă." },
         { status: 400 }
       );
     }
 
     if (!subject) {
       return NextResponse.json(
-        { error: "Subject este obligatoriu." },
+        { error: "Subiectul este obligatoriu." },
         { status: 400 }
       );
     }
 
     if (!isCampaignTemplateId(templateIdRaw)) {
       return NextResponse.json(
-        { error: "Template invalid." },
+        { error: "Template nevalid." },
         { status: 400 }
       );
     }
@@ -75,7 +79,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error:
-            "Setează Public base URL în Newsletter Settings înainte să trimiți email test.",
+            "Setează URL-ul public de bază în Setări newsletter înainte să trimiți emailul de test.",
         },
         { status: 400 }
       );
@@ -91,7 +95,7 @@ export async function POST(request: Request) {
     const projectId = requireEnv("FIREBASE_PROJECT_ID");
     const adminApiKey = process.env.ADMIN_API_KEY;
     const url = `https://${region}-${projectId}.cloudfunctions.net/sendNewsletterTestEmail`;
-    const payload = {
+    const payload = sanitizePayload({
       data: {
         toEmail,
         subject,
@@ -103,7 +107,7 @@ export async function POST(request: Request) {
         templateVersion: rendered.templateVersion,
         adminApiKey,
       },
-    };
+    });
 
     const response = await fetch(url, {
       method: "POST",
@@ -112,9 +116,13 @@ export async function POST(request: Request) {
     });
 
     if (!response.ok) {
-      const error = await response.text();
       return NextResponse.json(
-        { error: error || "Failed to send test email" },
+        {
+          error: await parseCallableErrorResponse(
+            response,
+            "Nu am putut trimite emailul de test."
+          ),
+        },
         { status: response.status }
       );
     }
@@ -123,7 +131,7 @@ export async function POST(request: Request) {
     return NextResponse.json(data);
   } catch (error) {
     return NextResponse.json(
-      { error: "Failed to send test email" },
+      { error: "Nu am putut trimite emailul de test." },
       { status: 500 }
     );
   }

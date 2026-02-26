@@ -7,10 +7,24 @@ export async function GET(request: Request) {
     await requireAdmin(request);
     const db = getAdminDb();
 
-    const [activeSnap, unsubSnap, sentCampaignsSnap, campaignSnap, logSnap] = await Promise.all([
+    const [
+      activeSnap,
+      unsubscribedSnap,
+      bouncedSnap,
+      complaintSnap,
+      suppressedSnap,
+      sentCampaignsSnap,
+      sentWithErrorsSnap,
+      campaignSnap,
+      logSnap,
+    ] = await Promise.all([
       db.collection("newsletter_subscribers").where("status", "==", "active").count().get(),
       db.collection("newsletter_subscribers").where("status", "==", "unsubscribed").count().get(),
+      db.collection("newsletter_subscribers").where("status", "==", "bounced").count().get(),
+      db.collection("newsletter_subscribers").where("status", "==", "complaint").count().get(),
+      db.collection("newsletter_subscribers").where("status", "==", "suppressed").count().get(),
       db.collection("newsletter_campaigns").where("status", "==", "sent").count().get(),
+      db.collection("newsletter_campaigns").where("status", "==", "sent_with_errors").count().get(),
       db.collection("newsletter_campaigns").orderBy("createdAt", "desc").limit(5).get(),
       db.collection("newsletter_logs").orderBy("createdAt", "desc").limit(5).get(),
     ]);
@@ -21,16 +35,19 @@ export async function GET(request: Request) {
     return NextResponse.json({
       stats: {
         activeSubscribers: activeSnap.data().count,
-        unsubscribed: unsubSnap.data().count,
+        unsubscribed: unsubscribedSnap.data().count,
+        bounced: bouncedSnap.data().count,
+        complaint: complaintSnap.data().count,
+        suppressed: suppressedSnap.data().count,
         campaignsSent: sentCampaignsSnap.data().count,
-        avgOpenRate: 0,
+        campaignsSentWithErrors: sentWithErrorsSnap.data().count,
       },
       campaigns,
       logs,
     });
   } catch (error) {
     return NextResponse.json(
-      { error: "Failed to load overview" },
+      { error: "Nu am putut încărca sumarul." },
       { status: 500 }
     );
   }

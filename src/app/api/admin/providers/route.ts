@@ -33,10 +33,10 @@ export async function GET(request: Request) {
     const q = normalizeQuery(searchParams.get("q"));
 
     if (city && !isProviderCityOption(city)) {
-      return NextResponse.json({ error: "Invalid city filter" }, { status: 400 });
+      return NextResponse.json({ error: "Filtrul de oraș este nevalid." }, { status: 400 });
     }
     if (serviceType && !isProviderServiceOption(serviceType)) {
-      return NextResponse.json({ error: "Invalid service filter" }, { status: 400 });
+      return NextResponse.json({ error: "Filtrul de serviciu este nevalid." }, { status: 400 });
     }
 
     const db = getAdminDb();
@@ -92,7 +92,7 @@ export async function GET(request: Request) {
     });
   } catch {
     return NextResponse.json(
-      { error: "Failed to load providers" },
+      { error: "Nu am putut încărca prestatorii." },
       { status: 500 }
     );
   }

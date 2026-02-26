@@ -6,8 +6,9 @@ import {
   Timestamp,
   getFirestore,
 } from "firebase-admin/firestore";
+import { NewsletterSubscriberStatus } from "./newsletterTypes";
 
-export type NewsletterLogLevel = "info" | "error";
+export type NewsletterLogLevel = "info" | "error" | "warning";
 export type NewsletterSettings = {
   fromName?: string;
   fromEmail?: string;
@@ -16,6 +17,10 @@ export type NewsletterSettings = {
   maxPerSecond?: number;
   maxConcurrent?: number;
 };
+
+const LEGACY_CONSENT_SOURCE = "legacy";
+const LEGACY_CONSENT_TEXT_VERSION = "legacy-unknown";
+const CONSENT_METHOD = "single_opt_in";
 
 export function getDb(): Firestore {
   if (!getApps().length) {
@@ -60,6 +65,29 @@ export async function ensureSubscriberFields(
     updates.createdAt = FieldValue.serverTimestamp();
   }
 
+  if (typeof data.consentGranted !== "boolean") {
+    updates.consentGranted = true;
+  }
+
+  if (!data.consentSource) {
+    updates.consentSource = LEGACY_CONSENT_SOURCE;
+  }
+
+  if (!data.consentTextVersion) {
+    updates.consentTextVersion = LEGACY_CONSENT_TEXT_VERSION;
+  }
+
+  if (!data.consentMethod) {
+    updates.consentMethod = CONSENT_METHOD;
+  }
+
+  const consentGranted =
+    typeof data.consentGranted === "boolean" ? data.consentGranted : true;
+
+  if (consentGranted && !data.consentCapturedAt) {
+    updates.consentCapturedAt = data.createdAt || FieldValue.serverTimestamp();
+  }
+
   if (!data.unsubscribeToken) {
     updates.unsubscribeToken = generateToken();
   }
@@ -69,6 +97,34 @@ export async function ensureSubscriberFields(
   }
 
   return updates;
+}
+
+export function readSubscriberStatus(
+  value: unknown
+): NewsletterSubscriberStatus {
+  if (
+    value === "active" ||
+    value === "unsubscribed" ||
+    value === "bounced" ||
+    value === "complaint" ||
+    value === "suppressed"
+  ) {
+    return value;
+  }
+  return "active";
+}
+
+export function isSubscriberEligibleForSend(
+  data: FirebaseFirestore.DocumentData | null
+): boolean {
+  if (!data) {
+    return false;
+  }
+  const status = readSubscriberStatus(data.status);
+  const consentGranted =
+    typeof data.consentGranted === "boolean" ? data.consentGranted : true;
+
+  return status === "active" && consentGranted === true;
 }
 
 export async function getSubscriberByToken(

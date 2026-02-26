@@ -21,6 +21,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useAdminData } from "@/components/admin/useAdminData";
+import { adminCommonLabels, logLevelLabel } from "@/lib/adminLabels";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50];
 
@@ -47,7 +48,7 @@ export default function LogsPage() {
   const { data, loading, error } = useAdminData<{ items: any[]; nextCursor: string | null }>(
     endpoint
   );
-  const logs = data?.items ?? [];
+  const logs = useMemo(() => data?.items ?? [], [data?.items]);
   const nextCursor = data?.nextCursor ?? null;
 
   useEffect(() => {
@@ -80,7 +81,7 @@ export default function LogsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Logs</h1>
+        <h1 className="text-2xl font-semibold">Loguri</h1>
         <p className="text-sm text-muted-foreground">
           Evenimente recente din pipeline-ul de newsletter.
         </p>
@@ -88,18 +89,20 @@ export default function LogsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Delivery logs</CardTitle>
+          <CardTitle>Loguri de livrare</CardTitle>
           <CardDescription>Mesaje de status și erori.</CardDescription>
         </CardHeader>
         <CardContent>
           {loading && (
-            <p className="text-sm text-muted-foreground">Loading logs...</p>
+            <p className="text-sm text-muted-foreground">
+              {adminCommonLabels.loadingLogs}
+            </p>
           )}
           {error && <p className="text-sm text-rose-500">{error}</p>}
           <div className="mb-4 flex flex-wrap items-center gap-3">
             <Input
               className="max-w-xs"
-              placeholder="Search logs"
+              placeholder="Caută în loguri"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
@@ -108,34 +111,35 @@ export default function LogsPage() {
               value={levelFilter}
               onChange={(event) => setLevelFilter(event.target.value)}
             >
-              <option value="all">All levels</option>
+              <option value="all">Toate nivelele</option>
               <option value="info">Info</option>
-              <option value="error">Error</option>
+              <option value="warning">Avertisment</option>
+              <option value="error">Eroare</option>
             </select>
             <select
               className="h-9 rounded-md border border-input bg-background px-3 text-sm"
               value={sortBy}
               onChange={(event) => setSortBy(event.target.value)}
             >
-              <option value="createdAt">Newest</option>
-              <option value="level">Level</option>
+              <option value="createdAt">{adminCommonLabels.newest}</option>
+              <option value="level">Nivel</option>
             </select>
             <select
               className="h-9 rounded-md border border-input bg-background px-3 text-sm"
               value={sortDir}
               onChange={(event) => setSortDir(event.target.value)}
             >
-              <option value="desc">Desc</option>
-              <option value="asc">Asc</option>
+              <option value="desc">{adminCommonLabels.descending}</option>
+              <option value="asc">{adminCommonLabels.ascending}</option>
             </select>
           </div>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Level</TableHead>
-                <TableHead>Message</TableHead>
-                <TableHead>Campaign</TableHead>
-                <TableHead>Time</TableHead>
+                <TableHead>Nivel</TableHead>
+                <TableHead>Mesaj</TableHead>
+                <TableHead>Campanie</TableHead>
+                <TableHead>Timp</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -143,7 +147,7 @@ export default function LogsPage() {
                 <TableRow key={`${log.message || log.id}-${index}`}>
                   <TableCell>
                     <Badge variant={log.level === "error" ? "danger" : "secondary"}>
-                      {log.level}
+                      {logLevelLabel(log.level)}
                     </Badge>
                   </TableCell>
                   <TableCell className="max-w-[360px] truncate">
@@ -157,7 +161,9 @@ export default function LogsPage() {
           </Table>
 
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm">
-            <span className="text-muted-foreground">Page {pageIndex + 1}</span>
+            <span className="text-muted-foreground">
+              {adminCommonLabels.page} {pageIndex + 1}
+            </span>
             <div className="flex items-center gap-2">
               <select
                 className="h-8 rounded-md border border-input bg-background px-2 text-xs"
@@ -176,7 +182,7 @@ export default function LogsPage() {
                 disabled={pageIndex <= 0}
                 onClick={() => setPageIndex((prev) => Math.max(0, prev - 1))}
               >
-                Prev
+                {adminCommonLabels.previous}
               </Button>
               <Button
                 size="sm"
@@ -184,7 +190,7 @@ export default function LogsPage() {
                 disabled={!nextCursor}
                 onClick={() => setPageIndex((prev) => prev + 1)}
               >
-                Next
+                {adminCommonLabels.next}
               </Button>
             </div>
           </div>

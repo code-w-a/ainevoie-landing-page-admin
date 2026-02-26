@@ -82,18 +82,18 @@ export default function AdminProvidersPage() {
       <div>
         <h1 className="text-2xl font-semibold">Prestatori</h1>
         <p className="text-sm text-muted-foreground">
-          Lista prestatorilor inregistrati prin onboarding.
+          Lista prestatorilor înregistrați prin onboarding.
         </p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Cautare si filtre</CardTitle>
-          <CardDescription>Filtreaza dupa status, oras, serviciu sau text.</CardDescription>
+          <CardTitle>Căutare și filtre</CardTitle>
+          <CardDescription>Filtrează după status, oraș, serviciu sau text.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-2 lg:grid-cols-5">
           <Input
-            placeholder="Cautare nume/email"
+            placeholder="Căutare nume/email"
             value={q}
             onChange={(event) => {
               setPage(1);
@@ -110,7 +110,7 @@ export default function AdminProvidersPage() {
           >
             <option value="all">Toate statusurile</option>
             <option value="new">Nou</option>
-            <option value="in_review">In verificare</option>
+            <option value="in_review">În verificare</option>
             <option value="approved">Aprobat</option>
             <option value="rejected">Respins</option>
           </select>
@@ -122,7 +122,7 @@ export default function AdminProvidersPage() {
               setCity(event.target.value);
             }}
           >
-            <option value="">Toate orasele</option>
+            <option value="">Toate orașele</option>
             {providerCityOptions.map((option) => (
               <option key={option} value={option}>
                 {option}
@@ -154,7 +154,7 @@ export default function AdminProvidersPage() {
               setServiceType("");
             }}
           >
-            Reseteaza filtre
+            Resetează filtre
           </Button>
         </CardContent>
       </Card>
@@ -165,7 +165,11 @@ export default function AdminProvidersPage() {
           <CardDescription>{pagination?.total || 0} rezultate</CardDescription>
         </CardHeader>
         <CardContent>
-          {loading && <p className="text-sm text-muted-foreground">Loading providers...</p>}
+          {loading && (
+            <p className="text-sm text-muted-foreground">
+              Se încarcă prestatorii...
+            </p>
+          )}
           {error && <p className="text-sm text-rose-500">{error}</p>}
 
           <Table>
@@ -173,7 +177,7 @@ export default function AdminProvidersPage() {
               <TableRow>
                 <TableHead>Nume</TableHead>
                 <TableHead>Email</TableHead>
-                <TableHead>Oras</TableHead>
+                <TableHead>Oraș</TableHead>
                 <TableHead>Serviciu</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Creat la</TableHead>
@@ -184,7 +188,7 @@ export default function AdminProvidersPage() {
               {!loading && items.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center text-sm text-muted-foreground">
-                    Nu exista prestatori pentru filtrele curente.
+                    Nu există prestatori pentru filtrele curente.
                   </TableCell>
                 </TableRow>
               )}
@@ -202,7 +206,7 @@ export default function AdminProvidersPage() {
                   <TableCell>{item.createdAt ? new Date(item.createdAt).toLocaleString("ro-RO") : "-"}</TableCell>
                   <TableCell className="text-right">
                     <Button variant="outline" size="sm" asChild>
-                      <Link href={`/admin/prestatori/${item.id}`}>Vezi fisa</Link>
+                      <Link href={`/admin/prestatori/${item.id}`}>Vezi fișa</Link>
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -229,7 +233,7 @@ export default function AdminProvidersPage() {
                 onClick={() => setPage((prev) => prev + 1)}
                 disabled={(pagination?.page || 1) >= (pagination?.totalPages || 1)}
               >
-                Urmator
+                Următor
               </Button>
             </div>
           </div>

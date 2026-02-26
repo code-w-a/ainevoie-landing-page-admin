@@ -20,7 +20,7 @@ export async function GET(
     const doc = await db.collection("providers").doc(id).get();
 
     if (!doc.exists) {
-      return NextResponse.json({ error: "Provider not found" }, { status: 404 });
+      return NextResponse.json({ error: "Prestatorul nu a fost găsit." }, { status: 404 });
     }
 
     const eventsSnapshot = await db
@@ -37,7 +37,7 @@ export async function GET(
     return NextResponse.json({ item: serializeDoc(doc), events });
   } catch {
     return NextResponse.json(
-      { error: "Failed to load provider" },
+      { error: "Nu am putut încărca prestatorul." },
       { status: 500 }
     );
   }
@@ -65,7 +65,7 @@ export async function PATCH(
     if (typeof body.onboardingStatus === "string") {
       const normalized = body.onboardingStatus.trim().toLowerCase();
       if (!isProviderStatus(normalized)) {
-        return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+        return NextResponse.json({ error: "Status nevalid." }, { status: 400 });
       }
       payload.onboardingStatus = normalized;
       nextStatus = normalized;
@@ -94,7 +94,7 @@ export async function PATCH(
     return NextResponse.json({ status: "updated" });
   } catch {
     return NextResponse.json(
-      { error: "Failed to update provider" },
+      { error: "Nu am putut actualiza prestatorul." },
       { status: 500 }
     );
   }
