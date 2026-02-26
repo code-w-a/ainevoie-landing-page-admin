@@ -1,3 +1,5 @@
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import nodemailer from "nodemailer";
 import { defineSecret } from "firebase-functions/params";
 
@@ -12,6 +14,11 @@ export const NEWSLETTER_REPLY_TO = defineSecret("NEWSLETTER_REPLY_TO");
 export const PUBLIC_BASE_URL = defineSecret("PUBLIC_BASE_URL");
 
 let cachedTransport: nodemailer.Transporter | null = null;
+let cachedInlineLogoBuffer: Buffer | null = null;
+
+const INLINE_LOGO_CID = "ainevoie-logo";
+const LOGO_IMAGE_REGEX =
+  /src="[^"]*\/images\/logo\/logo(?:-email)?\.(?:png|svg)(?:\?[^"]*)?"/i;
 
 function getRequiredSecret(value: string | undefined, name: string): string {
   if (!value) {
@@ -94,13 +101,16 @@ export function buildUnsubscribeUrl(token: string, baseUrlOverride?: string): st
 
 function appendFooter(html: string, unsubscribeUrl: string): string {
   const footer = `
-    <hr style="margin-top:24px;border:none;border-top:1px solid #e5e7eb"/>
-    <p style="font-size:12px;line-height:1.5;color:#6b7280;margin:16px 0 0">
-      Primești acest email deoarece te-ai înscris pe lista AInevoie.
-      <br />
-      Dacă nu mai dorești să primești mesaje, te poți dezabona aici:
-      <a href="${unsubscribeUrl}" style="color:#2563eb">Dezabonare</a>
-    </p>
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-top:24px;border-top:1px solid #e2e8f0;">
+      <tr>
+        <td style="padding-top:14px;font-size:12px;line-height:1.6;color:#64748b;">
+          Primești acest email deoarece te-ai înscris pe lista AInevoie.
+          <br />
+          Dacă nu mai dorești să primești mesaje, te poți dezabona:
+          <a href="${unsubscribeUrl}" style="color:#0f172a;font-weight:700;">Dezabonare</a>
+        </td>
+      </tr>
+    </table>
   `;
 
   if (html.includes("</body>")) {
@@ -108,6 +118,42 @@ function appendFooter(html: string, unsubscribeUrl: string): string {
   }
 
   return `${html}${footer}`;
+}
+
+function inlineLogoIfPossible(html: string): {
+  html: string;
+  inlineLogoUsed: boolean;
+} {
+  if (!LOGO_IMAGE_REGEX.test(html)) {
+    return { html, inlineLogoUsed: false };
+  }
+
+  const replacedHtml = html.replace(LOGO_IMAGE_REGEX, `src="cid:${INLINE_LOGO_CID}"`);
+  return { html: replacedHtml, inlineLogoUsed: replacedHtml !== html };
+}
+
+function getInlineLogoAttachment():
+  | { filename: string; content: Buffer; cid: string }
+  | null {
+  if (cachedInlineLogoBuffer) {
+    return {
+      filename: "logo-email.png",
+      content: cachedInlineLogoBuffer,
+      cid: INLINE_LOGO_CID,
+    };
+  }
+
+  const logoPath = join(process.cwd(), "src", "assets", "logo-email.png");
+  if (!existsSync(logoPath)) {
+    return null;
+  }
+
+  cachedInlineLogoBuffer = readFileSync(logoPath);
+  return {
+    filename: "logo-email.png",
+    content: cachedInlineLogoBuffer,
+    cid: INLINE_LOGO_CID,
+  };
 }
 
 export async function sendNewsletterEmail(options: {
@@ -134,7 +180,11 @@ export async function sendNewsletterEmail(options: {
 
   const htmlWithPreview = insertPreviewText(options.html, options.previewText);
   const htmlWithFooter = appendFooter(htmlWithPreview, options.unsubscribeUrl);
-  const textContent = options.text || stripHtml(htmlWithFooter);
+  const inlineLogoResult = inlineLogoIfPossible(htmlWithFooter);
+  const textContent = options.text || stripHtml(inlineLogoResult.html);
+  const logoAttachment = inlineLogoResult.inlineLogoUsed
+    ? getInlineLogoAttachment()
+    : null;
 
   return transport.sendMail({
     to: options.to,
@@ -142,7 +192,8 @@ export async function sendNewsletterEmail(options: {
     replyTo: options.replyTo || NEWSLETTER_REPLY_TO.value() || undefined,
     subject: options.subject,
     text: textContent,
-    html: htmlWithFooter,
+    html: inlineLogoResult.html,
+    attachments: logoAttachment ? [logoAttachment] : undefined,
     headers: {
       "List-Unsubscribe": `<${options.unsubscribeUrl}>`,
       "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",

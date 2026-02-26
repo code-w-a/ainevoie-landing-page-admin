@@ -7,6 +7,7 @@ import { getDb, logNewsletterEvent } from "../shared/firestore";
 export const requeueFailedJobs = onCall(
   {
     region: "europe-west1",
+    invoker: "public",
     secrets: [ADMIN_API_KEY],
   },
   async (request) => {

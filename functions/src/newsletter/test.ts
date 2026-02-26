@@ -23,6 +23,7 @@ import {
 export const sendNewsletterTestEmail = onCall(
   {
     region: "europe-west1",
+    invoker: "public",
     secrets: [
       ADMIN_API_KEY,
       SMTP_HOST,

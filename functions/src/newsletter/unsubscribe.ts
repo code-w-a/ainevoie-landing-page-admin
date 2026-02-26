@@ -3,7 +3,7 @@ import { onRequest } from "firebase-functions/v2/https";
 import { getDb, getSubscriberByToken } from "../shared/firestore";
 
 export const unsubscribe = onRequest(
-  { region: "europe-west1" },
+  { region: "europe-west1", invoker: "public" },
   async (req, res) => {
     const token = typeof req.query.token === "string" ? req.query.token : "";
     if (!token) {

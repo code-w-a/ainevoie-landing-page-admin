@@ -117,6 +117,18 @@ export default function CampaignsPage() {
     ? settingsData.item.baseUrl
     : "";
   const baseUrl = useMemo(() => normalizePublicBaseUrl(rawBaseUrl), [rawBaseUrl]);
+  const isLocalBaseUrl = useMemo(() => {
+    if (!baseUrl) {
+      return false;
+    }
+
+    try {
+      const parsed = new URL(baseUrl);
+      return parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1";
+    } catch {
+      return false;
+    }
+  }, [baseUrl]);
   const selectedTemplate = getCampaignTemplateDefinition(templateId);
 
   useEffect(() => {
@@ -396,6 +408,12 @@ export default function CampaignsPage() {
             <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
               Setează câmpul <strong>Public base URL</strong> în Settings pentru a
               activa creatorul de campanii.
+            </p>
+          )}
+          {isLocalBaseUrl && (
+            <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              Public base URL este local ({baseUrl}). Preview-ul merge local, dar
+              imaginile din email nu se vor încărca în inbox extern.
             </p>
           )}
           {createError && <p className="text-sm text-rose-500">{createError}</p>}

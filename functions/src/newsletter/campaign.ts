@@ -45,6 +45,7 @@ function toTemplateData(value: unknown): Record<string, string> | null {
 export const createNewsletterCampaign = onCall(
   {
     region: "europe-west1",
+    invoker: "public",
     secrets: [ADMIN_API_KEY, NEWSLETTER_FROM_NAME, NEWSLETTER_FROM_EMAIL],
   },
   async (request) => {

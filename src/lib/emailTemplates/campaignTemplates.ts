@@ -1,4 +1,4 @@
-export const CAMPAIGN_TEMPLATE_VERSION = "v1" as const;
+export const CAMPAIGN_TEMPLATE_VERSION = "v2" as const;
 
 export type CampaignTemplateId = "updates" | "promo" | "alert";
 type AlertSeverity = "info" | "important" | "urgent";
@@ -309,15 +309,15 @@ function renderMultilineHtml(value: string): string {
 }
 
 function buildLogoUrl(baseUrl: string): string {
-  return `${baseUrl}/images/logo/logo.svg`;
+  return `${baseUrl}/images/logo/logo-email.png`;
 }
 
 function buildButtonHtml(label: string, url: string): string {
   return `
-    <table cellpadding="0" cellspacing="0" role="presentation" style="margin-top:18px;">
+    <table cellpadding="0" cellspacing="0" role="presentation" style="margin-top:20px;">
       <tr>
-        <td style="border-radius:8px;background:#d35400;padding:0;">
-          <a href="${escapeHtml(url)}" style="display:inline-block;padding:12px 18px;color:#ffffff;text-decoration:none;font-weight:600;">
+        <td style="border-radius:10px;background:#0f172a;padding:0;">
+          <a href="${escapeHtml(url)}" style="display:inline-block;padding:13px 20px;color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;letter-spacing:0.01em;">
             ${escapeHtml(label)}
           </a>
         </td>
@@ -338,19 +338,38 @@ function wrapTemplateHtml(input: {
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>${escapeHtml(input.subject)}</title>
   </head>
-  <body style="margin:0;padding:0;background:#f3f4f6;font-family:Arial,sans-serif;color:#111827;">
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#f3f4f6;padding:24px 0;">
+  <body style="margin:0;padding:0;background:#eef2f7;font-family:Arial,sans-serif;color:#0f172a;">
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#eef2f7;padding:24px 0;">
       <tr>
         <td align="center">
-          <table width="640" cellpadding="0" cellspacing="0" role="presentation" style="max-width:640px;width:100%;background:#ffffff;border-radius:14px;overflow:hidden;">
+          <table width="640" cellpadding="0" cellspacing="0" role="presentation" style="max-width:640px;width:100%;background:#ffffff;border:1px solid #d6deea;border-radius:16px;overflow:hidden;">
             <tr>
-              <td align="center" style="padding:24px;border-bottom:1px solid #e5e7eb;">
-                <img src="${escapeHtml(input.logoUrl)}" alt="AInevoie" width="144" style="display:block;border:0;max-width:144px;height:auto;" />
+              <td style="height:6px;line-height:6px;font-size:0;background:#0f172a;">&nbsp;</td>
+            </tr>
+            <tr>
+              <td style="padding:20px 24px 8px 24px;border-bottom:1px solid #e8edf5;">
+                <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+                  <tr>
+                    <td valign="middle">
+                      <img src="${escapeHtml(input.logoUrl)}" alt="AInevoie" width="180" style="display:block;border:0;width:180px;max-width:100%;height:auto;" />
+                      <p style="margin:8px 0 0 0;font-size:12px;line-height:1.3;color:#64748b;">
+                        Newsletter
+                      </p>
+                    </td>
+                  </tr>
+                </table>
               </td>
             </tr>
             <tr>
-              <td style="padding:28px 24px 24px 24px;">
+              <td style="padding:24px;">
                 ${input.bodyHtml}
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 24px 18px 24px;">
+                <p style="margin:0;font-size:12px;line-height:1.5;color:#94a3b8;">
+                  AInevoie • Soluții digitale pentru prestatori
+                </p>
               </td>
             </tr>
           </table>
@@ -368,27 +387,59 @@ function renderUpdatesTemplate(data: Record<string, string>) {
   const highlightsHtml =
     highlights.length > 0
       ? `
-        <div style="margin-top:16px;padding:14px;border:1px solid #e5e7eb;border-radius:10px;background:#f9fafb;">
-          <p style="margin:0 0 8px;font-size:14px;font-weight:700;color:#111827;">Pe scurt</p>
-          <ul style="margin:0;padding-left:18px;color:#374151;font-size:14px;line-height:1.6;">
-            ${highlights.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
-          </ul>
-        </div>
+        <tr>
+          <td style="padding-top:16px;">
+            <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #e2e8f0;border-radius:12px;background:#f8fafc;">
+              <tr>
+                <td style="padding:14px 14px 6px 14px;font-size:14px;line-height:1.4;font-weight:700;color:#0f172a;">
+                  Pe scurt
+                </td>
+              </tr>
+              ${highlights
+                .map(
+                  (item) => `
+                <tr>
+                  <td style="padding:0 14px 9px 14px;font-size:14px;line-height:1.55;color:#334155;">
+                    • ${escapeHtml(item)}
+                  </td>
+                </tr>
+              `
+                )
+                .join("")}
+            </table>
+          </td>
+        </tr>
       `
       : "";
 
   const bodyHtml = `
-    <h1 style="margin:0 0 12px;font-size:26px;line-height:1.25;color:#111827;">
-      ${escapeHtml(data.title)}
-    </h1>
-    <p style="margin:0 0 12px;font-size:16px;line-height:1.65;color:#374151;">
-      ${renderMultilineHtml(data.lead)}
-    </p>
-    <p style="margin:0;font-size:15px;line-height:1.7;color:#374151;">
-      ${renderMultilineHtml(data.content)}
-    </p>
-    ${highlightsHtml}
-    ${hasCta ? buildButtonHtml(data.ctaLabel, data.ctaUrl) : ""}
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+      <tr>
+        <td style="font-size:28px;line-height:1.25;font-weight:700;color:#0f172a;">
+          ${escapeHtml(data.title)}
+        </td>
+      </tr>
+      <tr>
+        <td style="padding-top:12px;font-size:16px;line-height:1.65;color:#334155;">
+          ${renderMultilineHtml(data.lead)}
+        </td>
+      </tr>
+      <tr>
+        <td style="padding-top:12px;font-size:15px;line-height:1.75;color:#475569;">
+          ${renderMultilineHtml(data.content)}
+        </td>
+      </tr>
+      ${highlightsHtml}
+      ${
+        hasCta
+          ? `
+        <tr>
+          <td>${buildButtonHtml(data.ctaLabel, data.ctaUrl)}</td>
+        </tr>
+      `
+          : ""
+      }
+    </table>
   `;
 
   const text = [
@@ -410,39 +461,63 @@ function renderUpdatesTemplate(data: Record<string, string>) {
 
 function renderPromoTemplate(data: Record<string, string>) {
   const bodyHtml = `
-    <p style="margin:0 0 10px;">
-      <span style="display:inline-block;padding:6px 10px;border-radius:999px;background:#fff7ed;color:#c2410c;font-size:12px;font-weight:700;letter-spacing:.02em;">
-        ${escapeHtml(data.badgeText)}
-      </span>
-    </p>
-    <h1 style="margin:0 0 12px;font-size:28px;line-height:1.25;color:#111827;">
-      ${escapeHtml(data.title)}
-    </h1>
-    <p style="margin:0;font-size:15px;line-height:1.75;color:#374151;">
-      ${renderMultilineHtml(data.offerDetails)}
-    </p>
-    ${
-      data.promoCode
-        ? `
-      <div style="margin-top:16px;padding:14px;border:1px dashed #d97706;border-radius:10px;background:#fff7ed;">
-        <p style="margin:0 0 6px;font-size:12px;color:#9a3412;">Cod promo</p>
-        <p style="margin:0;font-size:18px;font-weight:700;color:#9a3412;letter-spacing:0.04em;">
-          ${escapeHtml(data.promoCode)}
-        </p>
-      </div>
-    `
-        : ""
-    }
-    ${
-      data.deadline
-        ? `
-      <p style="margin:14px 0 0;font-size:13px;color:#6b7280;">
-        ${escapeHtml(data.deadline)}
-      </p>
-    `
-        : ""
-    }
-    ${buildButtonHtml(data.ctaLabel, data.ctaUrl)}
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+      <tr>
+        <td>
+          <table cellpadding="0" cellspacing="0" role="presentation">
+            <tr>
+              <td style="padding:7px 11px;border-radius:999px;background:#fff7ed;color:#c2410c;font-size:12px;line-height:1.2;font-weight:700;letter-spacing:.02em;">
+                ${escapeHtml(data.badgeText)}
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding-top:12px;font-size:30px;line-height:1.2;font-weight:700;color:#0f172a;">
+          ${escapeHtml(data.title)}
+        </td>
+      </tr>
+      <tr>
+        <td style="padding-top:12px;font-size:15px;line-height:1.75;color:#475569;">
+          ${renderMultilineHtml(data.offerDetails)}
+        </td>
+      </tr>
+      ${
+        data.promoCode
+          ? `
+        <tr>
+          <td style="padding-top:16px;">
+            <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border:1px dashed #d97706;border-radius:12px;background:#fff7ed;">
+              <tr>
+                <td style="padding:14px;">
+                  <p style="margin:0 0 6px 0;font-size:12px;line-height:1.2;color:#9a3412;">Cod promo</p>
+                  <p style="margin:0;font-size:20px;line-height:1.2;font-weight:700;color:#9a3412;letter-spacing:0.03em;">
+                    ${escapeHtml(data.promoCode)}
+                  </p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      `
+          : ""
+      }
+      ${
+        data.deadline
+          ? `
+        <tr>
+          <td style="padding-top:12px;font-size:13px;line-height:1.5;color:#64748b;">
+            ${escapeHtml(data.deadline)}
+          </td>
+        </tr>
+      `
+          : ""
+      }
+      <tr>
+        <td>${buildButtonHtml(data.ctaLabel, data.ctaUrl)}</td>
+      </tr>
+    </table>
   `;
 
   const text = [
@@ -472,27 +547,59 @@ function getAlertStyle(severity: string) {
 function renderAlertTemplate(data: Record<string, string>) {
   const style = getAlertStyle(data.severity);
   const bodyHtml = `
-    <p style="margin:0 0 10px;">
-      <span style="display:inline-block;padding:6px 10px;border-radius:999px;background:${style.badgeBg};color:${style.badgeColor};font-size:12px;font-weight:700;">
-        ${style.badgeLabel}
-      </span>
-    </p>
-    <h1 style="margin:0 0 12px;font-size:26px;line-height:1.25;color:#111827;">
-      ${escapeHtml(data.title)}
-    </h1>
-    <div style="margin-top:12px;padding:14px;border:1px solid ${style.borderColor};border-radius:10px;background:#fafafa;">
-      <p style="margin:0 0 8px;font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;">Ce s-a schimbat</p>
-      <p style="margin:0;font-size:15px;line-height:1.7;color:#374151;">
-        ${renderMultilineHtml(data.whatChanged)}
-      </p>
-    </div>
-    <div style="margin-top:12px;padding:14px;border:1px solid #e5e7eb;border-radius:10px;background:#ffffff;">
-      <p style="margin:0 0 8px;font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;">Acțiune necesară</p>
-      <p style="margin:0;font-size:15px;line-height:1.7;color:#374151;">
-        ${renderMultilineHtml(data.actionRequired)}
-      </p>
-    </div>
-    ${buildButtonHtml(data.ctaLabel, data.ctaUrl)}
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+      <tr>
+        <td>
+          <table cellpadding="0" cellspacing="0" role="presentation">
+            <tr>
+              <td style="padding:7px 11px;border-radius:999px;background:${style.badgeBg};color:${style.badgeColor};font-size:12px;line-height:1.2;font-weight:700;">
+                ${style.badgeLabel}
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding-top:12px;font-size:28px;line-height:1.25;font-weight:700;color:#0f172a;">
+          ${escapeHtml(data.title)}
+        </td>
+      </tr>
+      <tr>
+        <td style="padding-top:12px;">
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid ${style.borderColor};border-radius:12px;background:#f8fafc;">
+            <tr>
+              <td style="padding:14px;">
+                <p style="margin:0 0 8px 0;font-size:12px;line-height:1.2;font-weight:700;color:#64748b;text-transform:uppercase;">
+                  Ce s-a schimbat
+                </p>
+                <p style="margin:0;font-size:15px;line-height:1.75;color:#334155;">
+                  ${renderMultilineHtml(data.whatChanged)}
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding-top:12px;">
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #e2e8f0;border-radius:12px;background:#ffffff;">
+            <tr>
+              <td style="padding:14px;">
+                <p style="margin:0 0 8px 0;font-size:12px;line-height:1.2;font-weight:700;color:#64748b;text-transform:uppercase;">
+                  Acțiune necesară
+                </p>
+                <p style="margin:0;font-size:15px;line-height:1.75;color:#334155;">
+                  ${renderMultilineHtml(data.actionRequired)}
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr>
+        <td>${buildButtonHtml(data.ctaLabel, data.ctaUrl)}</td>
+      </tr>
+    </table>
   `;
 
   const text = [
