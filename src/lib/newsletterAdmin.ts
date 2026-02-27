@@ -29,22 +29,37 @@ type CallableErrorShape = {
   error?: string | { message?: string };
 };
 
+export function readCallableErrorMessage(payload: unknown): string | null {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  const errorValue = (payload as CallableErrorShape).error;
+  if (typeof errorValue === "string" && errorValue.trim()) {
+    return errorValue;
+  }
+
+  if (
+    errorValue &&
+    typeof errorValue === "object" &&
+    typeof errorValue.message === "string" &&
+    errorValue.message.trim()
+  ) {
+    return errorValue.message;
+  }
+
+  return null;
+}
+
 export async function parseCallableErrorResponse(
   response: Response,
   fallback: string
 ): Promise<string> {
   try {
-    const json = (await response.clone().json()) as CallableErrorShape;
-    if (typeof json?.error === "string" && json.error.trim()) {
-      return json.error;
-    }
-    if (
-      json?.error &&
-      typeof json.error === "object" &&
-      typeof json.error.message === "string" &&
-      json.error.message.trim()
-    ) {
-      return json.error.message;
+    const json = await response.clone().json();
+    const message = readCallableErrorMessage(json);
+    if (message) {
+      return message;
     }
   } catch {
     // noop

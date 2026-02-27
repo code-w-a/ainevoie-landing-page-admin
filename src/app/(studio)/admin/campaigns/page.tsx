@@ -42,6 +42,9 @@ import {
 const PAGE_SIZE_OPTIONS = [10, 20, 50];
 const SCHEDULE_TIMEZONE = "Europe/Bucharest";
 const ONE_HOUR_MS = 60 * 60 * 1000;
+const MIN_SCHEDULE_DELAY_MS = 60 * 1000;
+const MIN_SCHEDULE_DELAY_ERROR =
+  "Programarea trebuie să fie cu cel puțin 60s în viitor.";
 
 type CampaignTabValue = "create" | "list";
 type CreateActionType = "draft" | "send_now" | "schedule";
@@ -254,6 +257,18 @@ function campaignBadgeVariant(status: string): "success" | "warning" | "danger" 
   return "outline";
 }
 
+function isScheduleTooSoon(utcIso: string): boolean {
+  const scheduleDate = new Date(utcIso);
+  if (Number.isNaN(scheduleDate.getTime())) {
+    return false;
+  }
+  return scheduleDate.getTime() - Date.now() < MIN_SCHEDULE_DELAY_MS;
+}
+
+function isMinScheduleDelayMessage(message: string): boolean {
+  return message.toLowerCase().includes("cel puțin 60s în viitor");
+}
+
 export default function CampaignsPage() {
   const [subject, setSubject] = useState("");
   const [previewText, setPreviewText] = useState("");
@@ -268,7 +283,7 @@ export default function CampaignsPage() {
   const [createSuccess, setCreateSuccess] = useState<string | null>(null);
   const [testError, setTestError] = useState<string | null>(null);
   const [testSuccess, setTestSuccess] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<CampaignTabValue>("create");
+  const [activeTab, setActiveTab] = useState<CampaignTabValue>("list");
   const [createActionDialogOpen, setCreateActionDialogOpen] = useState(false);
   const [scheduleActionDialogOpen, setScheduleActionDialogOpen] = useState(false);
   const [createScheduleAtLocal, setCreateScheduleAtLocal] = useState(() =>
@@ -422,6 +437,22 @@ export default function CampaignsPage() {
     }
   }, [baseUrl, subject, templateData, templateId]);
 
+  const reportCampaignLabel = useMemo(() => {
+    const campaign = reportData?.campaign;
+    const subject =
+      typeof campaign?.subject === "string" ? campaign.subject.trim() : "";
+    if (subject) {
+      return subject;
+    }
+
+    const name = typeof campaign?.name === "string" ? campaign.name.trim() : "";
+    if (name) {
+      return name;
+    }
+
+    return reportCampaignId || "-";
+  }, [reportCampaignId, reportData]);
+
   function handleTemplateFieldChange(key: string, value: string) {
     setTemplateData((prev) => ({
       ...prev,
@@ -568,6 +599,13 @@ export default function CampaignsPage() {
     }
   }
 
+  async function deleteCampaign(campaignId: string): Promise<boolean> {
+    const response = await adminFetch(`/api/admin/newsletter/campaigns/${campaignId}`, {
+      method: "DELETE",
+    });
+    return response.ok;
+  }
+
   async function executeCreateAction(
     action: CreateActionType,
     scheduleLocalValue?: string
@@ -588,6 +626,10 @@ export default function CampaignsPage() {
         setCreateError("Data programării este invalidă.");
         return;
       }
+      if (isScheduleTooSoon(parsedUtc)) {
+        setCreateError(MIN_SCHEDULE_DELAY_ERROR);
+        return;
+      }
       scheduleUtcIso = parsedUtc;
     }
 
@@ -596,12 +638,11 @@ export default function CampaignsPage() {
     setCreateSuccess(null);
     try {
       const campaignId = await createDraftCampaign();
+      let shouldFinalize = true;
 
       if (action === "draft") {
         setCreateSuccess("Campania a fost salvată ca draft.");
-      }
-
-      if (action === "send_now") {
+      } else if (action === "send_now") {
         try {
           await sendCampaignNow(campaignId);
           setCreateSuccess("Campania a fost creată și trimiterea a pornit.");
@@ -613,26 +654,48 @@ export default function CampaignsPage() {
             )}`
           );
         }
-      }
-
-      if (action === "schedule" && scheduleUtcIso) {
-        try {
-          await scheduleCampaign(campaignId, scheduleUtcIso);
-          setCreateSuccess("Campania a fost creată și programată.");
-        } catch (error) {
+      } else if (action === "schedule" && scheduleUtcIso) {
+        if (isScheduleTooSoon(scheduleUtcIso)) {
+          const deleted = await deleteCampaign(campaignId).catch(() => false);
           setCreateError(
-            `Campania a fost salvată ca draft, dar acțiunea ulterioară a eșuat: ${getActionErrorMessage(
+            deleted ?
+              MIN_SCHEDULE_DELAY_ERROR :
+              `${MIN_SCHEDULE_DELAY_ERROR} Draftul nu a putut fi șters automat.`
+          );
+          shouldFinalize = false;
+        } else {
+          try {
+            await scheduleCampaign(campaignId, scheduleUtcIso);
+            setCreateSuccess("Campania a fost creată și programată.");
+          } catch (error) {
+            const scheduleError = getActionErrorMessage(
               error,
               "Nu am putut programa campania."
-            )}`
-          );
+            );
+
+            if (isMinScheduleDelayMessage(scheduleError)) {
+              const deleted = await deleteCampaign(campaignId).catch(() => false);
+              setCreateError(
+                deleted ?
+                  scheduleError :
+                  `${scheduleError} Draftul nu a putut fi șters automat.`
+              );
+              shouldFinalize = false;
+            } else {
+              setCreateError(
+                `Campania a fost salvată ca draft, dar acțiunea ulterioară a eșuat: ${scheduleError}`
+              );
+            }
+          }
         }
       }
 
-      closeCreateDialogs();
-      resetCreateForm();
-      setActiveTab("list");
-      reload();
+      if (shouldFinalize) {
+        closeCreateDialogs();
+        resetCreateForm();
+        setActiveTab("list");
+        reload();
+      }
     } catch (error) {
       setCreateError(getActionErrorMessage(error, "Nu am putut salva draftul."));
     } finally {
@@ -751,6 +814,10 @@ export default function CampaignsPage() {
     const utcIso = bucharestLocalToUtcIso(localValue);
     if (!utcIso) {
       setCreateError("Data programării este invalidă.");
+      return;
+    }
+    if (isScheduleTooSoon(utcIso)) {
+      setCreateError(MIN_SCHEDULE_DELAY_ERROR);
       return;
     }
 
@@ -1249,14 +1316,14 @@ export default function CampaignsPage() {
                         <TableCell>{campaign.createdAt ?? "-"}</TableCell>
                         <TableCell className="space-y-2">
                           <div className="flex flex-wrap gap-2">
-                            <Button
+                            {/* <Button
                               size="sm"
                               variant="secondary"
                               onClick={() => (id ? handleRequeue(id) : undefined)}
                               disabled={!id || isRowActionLoading(id || "")}
                             >
                               {id && isRowActionLoading(id, "requeue") ? "Se recoadă..." : "Recoadă eșuate"}
-                            </Button>
+                            </Button> */}
                             <Button
                               size="sm"
                               variant="outline"
@@ -1492,7 +1559,7 @@ export default function CampaignsPage() {
               <div>
                 <CardTitle>Raport campanie</CardTitle>
                 <CardDescription>
-                  Campanie: <span className="font-medium">{reportCampaignId}</span>
+                  Campanie: <span className="font-medium">{reportCampaignLabel}</span>
                 </CardDescription>
               </div>
               <Button variant="outline" onClick={closeReportDialog}>

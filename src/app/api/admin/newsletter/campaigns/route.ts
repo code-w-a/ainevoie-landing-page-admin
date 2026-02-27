@@ -8,6 +8,7 @@ import {
   validateCampaignTemplateInput,
 } from "@/lib/emailTemplates/campaignTemplates";
 import {
+  readCallableErrorMessage,
   parseCallableErrorResponse,
   sanitizePayload,
 } from "@/lib/newsletterAdmin";
@@ -198,19 +199,24 @@ export async function POST(request: Request) {
       body: JSON.stringify(payload),
     });
 
-    if (!response.ok) {
+    const callablePayload = await response.clone().json().catch(() => null);
+    const callableError = readCallableErrorMessage(callablePayload);
+
+    if (!response.ok || callableError) {
       return NextResponse.json(
         {
-          error: await parseCallableErrorResponse(
-            response,
-            "Nu am putut crea campania."
-          ),
+          error:
+            callableError ||
+            (await parseCallableErrorResponse(
+              response,
+              "Nu am putut crea campania."
+            )),
         },
-        { status: response.status }
+        { status: response.ok ? 400 : response.status }
       );
     }
 
-    const data = await response.json();
+    const data = callablePayload ?? (await response.json().catch(() => null));
     const result = (
       data &&
       typeof data === "object" &&

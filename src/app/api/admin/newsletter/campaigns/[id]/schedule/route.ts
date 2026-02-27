@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { requireEnv } from "@/lib/firebaseAdmin";
 import { requireAdmin } from "@/lib/adminAuth";
-import { parseCallableErrorResponse } from "@/lib/newsletterAdmin";
+import {
+  parseCallableErrorResponse,
+  readCallableErrorMessage,
+} from "@/lib/newsletterAdmin";
 
 const region = process.env.FIREBASE_REGION || "europe-west1";
 
@@ -53,19 +56,24 @@ export async function POST(
       }),
     });
 
-    if (!response.ok) {
+    const callablePayload = await response.clone().json().catch(() => null);
+    const callableError = readCallableErrorMessage(callablePayload);
+
+    if (!response.ok || callableError) {
       return NextResponse.json(
         {
-          error: await parseCallableErrorResponse(
-            response,
-            "Nu am putut programa campania."
-          ),
+          error:
+            callableError ||
+            (await parseCallableErrorResponse(
+              response,
+              "Nu am putut programa campania."
+            )),
         },
-        { status: response.status }
+        { status: response.ok ? 400 : response.status }
       );
     }
 
-    const data = await response.json();
+    const data = callablePayload ?? (await response.json().catch(() => null));
     const result = (
       data &&
       typeof data === "object" &&
@@ -86,9 +94,18 @@ export async function POST(
         scheduleTaskId?: string;
       });
 
+    const resultStatus =
+      typeof result?.status === "string" ? result.status.trim() : "";
+    if (!resultStatus) {
+      return NextResponse.json(
+        { error: "Răspuns invalid de la serviciul de programare." },
+        { status: 502 }
+      );
+    }
+
     return NextResponse.json({
       campaignId: result?.campaignId || id,
-      status: result?.status || "scheduled",
+      status: resultStatus,
       scheduledAt: result?.scheduledAt || scheduleDate.toISOString(),
       scheduleTaskId: result?.scheduleTaskId || null,
     });

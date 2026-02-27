@@ -31,6 +31,7 @@ import {
 } from "@/types/newsletter";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50];
+type SubscribersTabValue = "add" | "list";
 
 const STATUS_LABELS: Record<NewsletterSubscriberStatus, string> = {
   active: "Activ",
@@ -79,6 +80,7 @@ export default function SubscribersPage() {
   const [submitting, setSubmitting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<SubscribersTabValue>("list");
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"active" | "unsubscribed">("active");
@@ -292,10 +294,24 @@ export default function SubscribersPage() {
         <h1 className="text-2xl font-semibold">Abonați</h1>
       </div>
 
-      <Tabs defaultValue="add" className="space-y-4">
-        <TabList>
-          <TabTrigger value="add">Adaugă</TabTrigger>
-          <TabTrigger value="list">Listă</TabTrigger>
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => setActiveTab(value === "add" ? "add" : "list")}
+        className="space-y-4"
+      >
+        <TabList className="inline-flex rounded-lg border border-border bg-muted/30 p-1">
+          <TabTrigger
+            value="add"
+            className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition data-[active=true]:bg-background data-[active=true]:text-foreground"
+          >
+            Adaugă
+          </TabTrigger>
+          <TabTrigger
+            value="list"
+            className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition data-[active=true]:bg-background data-[active=true]:text-foreground"
+          >
+            Listă
+          </TabTrigger>
         </TabList>
 
         <TabContent value="add">
