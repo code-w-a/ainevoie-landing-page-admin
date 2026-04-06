@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
+import PhoneMockup from "@/components/PhoneMockup";
 import { Button } from "@/components/ui/button";
-import Image from "next/image";
 import Link from "next/link";
 
 const miniBenefits = [
@@ -61,13 +61,11 @@ export default function ProviderIntroHero() {
 
         <div className="w-full px-4 lg:w-5/12">
           <div className="relative z-10 mx-auto w-full max-w-[530px] pt-8 lg:mr-0">
-            <Image
-              width={361}
-              height={546}
-              src={"/images/hero/hero-light.png"}
-              alt="Onboarding prestatori AInevoie"
-              className="mx-auto max-w-full"
-              priority
+            <PhoneMockup
+              src="/images/screenshots/Prestator_calendar.jpg"
+              alt="Calendarul prestatorului în aplicația AInevoie"
+              priority={true}
+              sizes="(min-width: 1280px) 360px, (min-width: 1024px) 320px, 280px"
             />
             <div className="bg-gradient-1 absolute inset-x-0 top-0 -z-10 mx-auto aspect-square w-full rounded-full opacity-80" />
 

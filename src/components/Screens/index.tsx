@@ -7,6 +7,74 @@ import "swiper/css/navigation";
 import { Navigation } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/react";
 
+const appScreenshots = [
+  {
+    src: "/images/screenshots/splash.jpg",
+    alt: "Ecran splash AInevoie",
+  },
+  {
+    src: "/images/screenshots/Onboarding_unu.jpg",
+    alt: "Primul ecran de onboarding",
+  },
+  {
+    src: "/images/screenshots/Onboarding_doi.jpg",
+    alt: "Al doilea ecran de onboarding",
+  },
+  {
+    src: "/images/screenshots/Onboarding_trei.jpg",
+    alt: "Al treilea ecran de onboarding",
+  },
+  {
+    src: "/images/screenshots/utilizator_ecran_home.jpg",
+    alt: "Ecranul principal pentru utilizator",
+  },
+  {
+    src: "/images/screenshots/utilizator_ecran_prestator.jpg",
+    alt: "Ecran cu profilul prestatorului",
+  },
+  {
+    src: "/images/screenshots/utilizator_ecran_confirmare_rezervare.jpg",
+    alt: "Ecran de confirmare rezervare",
+  },
+  {
+    src: "/images/screenshots/utilizator_ecran_chat.jpg",
+    alt: "Ecran de chat între utilizator și prestator",
+  },
+  {
+    src: "/images/screenshots/Prestator_cereri.jpg",
+    alt: "Ecran cu cereri pentru prestator",
+  },
+  {
+    src: "/images/screenshots/Prestator_calendar.jpg",
+    alt: "Ecran calendar pentru prestator",
+  },
+  {
+    src: "/images/screenshots/Prestator_ecran_recenzii.jpg",
+    alt: "Ecran cu recenzii pentru prestator",
+  },
+];
+
+const PhoneFrameOverlay = () => {
+  return (
+    <div className="pointer-events-none absolute top-0 right-0 left-0 z-50 mx-auto w-full">
+      <div className="relative mx-auto w-[272px]">
+        <div className="absolute top-24 -left-[1px] h-10 w-[3px] rounded-full bg-slate-300/80 shadow-sm dark:bg-slate-700/80" />
+        <div className="absolute top-36 -left-[1px] h-16 w-[3px] rounded-full bg-slate-300/80 shadow-sm dark:bg-slate-700/80" />
+        <div className="absolute top-28 -right-[1px] h-20 w-[3px] rounded-full bg-slate-300/80 shadow-sm dark:bg-slate-700/80" />
+
+        <div className="relative h-[592px] rounded-[2.9rem] border-[5px] border-slate-300 bg-transparent shadow-[0_35px_90px_rgba(15,23,42,0.18)] dark:border-slate-600">
+          <div className="absolute inset-[5px] rounded-[2.65rem] border-x-[7px] border-t-[40px] border-b-[7px] border-slate-950" />
+          <div className="absolute inset-x-0 top-3 z-20 flex justify-center">
+            <div className="flex h-6 w-28 items-center justify-center rounded-full bg-slate-950/95 ring-1 ring-white/5">
+              <div className="h-1.5 w-14 rounded-full bg-slate-800" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const Screens = () => {
   return (
     <>
@@ -33,6 +101,7 @@ const Screens = () => {
             <Swiper
               className="swiper mySwiper relative z-20"
               modules={[Navigation]}
+              centeredSlides={true}
               navigation={{
                 nextEl: ".swiper-button-next",
                 prevEl: ".swiper-button-prev",
@@ -44,95 +113,32 @@ const Screens = () => {
                 },
                 768: {
                   slidesPerView: 3,
-                  spaceBetween: 40,
+                  spaceBetween: 28,
                 },
                 1024: {
                   slidesPerView: 3,
-                  spaceBetween: 40,
+                  spaceBetween: 28,
                 },
               }}
             >
-              <div className="absolute top-0 right-0 left-0 z-50 mx-auto w-full md:w-1/3">
-                <Image
-                  width={288}
-                  height={594}
-                  src={"/images/screens/mobile-frame.png"}
-                  alt="mobile-frame"
-                  className="mx-auto max-w-full"
-                />
-              </div>
+              <PhoneFrameOverlay />
 
-              <SwiperSlide>
-                <div className="xs:max-w-[265px] mx-auto w-full max-w-[252px]">
-                  <Image
-                    width={265}
-                    height={573}
-                    src={"/images/screens/screen-1-light.png"}
-                    alt="screenshot"
-                    className="mx-auto w-full rounded-2xl"
-                  />
-                </div>
-              </SwiperSlide>
-
-              <SwiperSlide>
-                <div className="xs:max-w-[265px] mx-auto w-full max-w-[252px]">
-                  <Image
-                    width={265}
-                    height={573}
-                    src={"/images/screens/screen-2-light.png"}
-                    alt="screenshot"
-                    className="mx-auto w-full rounded-2xl"
-                  />
-                </div>
-              </SwiperSlide>
-
-              <SwiperSlide>
-                <div className="xs:max-w-[265px] mx-auto w-full max-w-[252px]">
-                  <Image
-                    width={265}
-                    height={573}
-                    src={"/images/screens/screen-3-light.png"}
-                    alt="screenshot"
-                    className="mx-auto w-full rounded-2xl"
-                  />
-                </div>
-              </SwiperSlide>
-
-              <SwiperSlide>
-                <div className="xs:max-w-[265px] mx-auto w-full max-w-[252px]">
-                  <Image
-                    width={265}
-                    height={573}
-                    src={"/images/screens/screen-1-light.png"}
-                    alt="screenshot"
-                    className="mx-auto w-full rounded-2xl"
-                  />
-                </div>
-              </SwiperSlide>
-
-              <SwiperSlide>
-                <div className="xs:max-w-[265px] mx-auto w-full max-w-[252px]">
-                  <Image
-                    width={265}
-                    height={573}
-                    src={"/images/screens/screen-2-light.png"}
-                    alt="screenshot"
-                    className="mx-auto w-full rounded-2xl"
-                  />
-                </div>
-              </SwiperSlide>
-
-              <SwiperSlide>
-                <div className="xs:max-w-[265px] mx-auto w-full max-w-[252px]">
-                  <Image
-                    width={265}
-                    height={573}
-                    src={"/images/screens/screen-3-light.png"}
-                    alt="screenshot"
-                    className="mx-auto w-full rounded-2xl"
-                  />
-                </div>
-              </SwiperSlide>
+              {appScreenshots.map((screenshot) => (
+                <SwiperSlide key={screenshot.src}>
+                  <div className="mx-auto w-[272px] max-w-full px-[12px] pt-[45px] pb-[15px]">
+                    <div className="overflow-hidden rounded-[2.25rem] bg-black">
+                      <Image
+                        width={1080}
+                        height={2316}
+                        src={screenshot.src}
+                        alt={screenshot.alt}
+                        sizes="248px"
+                        className="h-auto w-full"
+                      />
+                    </div>
+                  </div>
+                </SwiperSlide>
+              ))}
 
               <div className="flex items-center justify-center gap-x-4 pt-20">
                 <button className="swiper-button-prev">

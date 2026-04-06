@@ -1,5 +1,5 @@
 import Graphics from "@/components/Cta/Graphics";
-import Image from "next/image";
+import PhoneMockup from "@/components/PhoneMockup";
 import Link from "next/link";
 
 const Cta = () => {
@@ -7,8 +7,8 @@ const Cta = () => {
     <>
       <section id="cta" className="relative z-10 pt-[110px]">
         <div className="container max-w-[1390px]">
-          <div className="shadow-card dark:bg-dark dark:shadow-card-dark rounded-2xl bg-white px-10 pt-14 sm:px-20 lg:px-12 lg:pt-20 xl:px-20">
-            <div className="-mx-4 flex flex-wrap">
+          <div className="shadow-card dark:bg-dark dark:shadow-card-dark overflow-hidden rounded-2xl bg-white px-10 pt-14 sm:px-20 lg:px-12 lg:pt-20 xl:px-20">
+            <div className="-mx-4 flex flex-wrap lg:items-center">
               <div className="w-full self-center px-4 lg:w-1/2">
                 <div
                   className="wow fadeInUp mx-auto max-w-[530px] text-center lg:ml-0 lg:text-left"
@@ -87,16 +87,16 @@ const Cta = () => {
 
               <div className="w-full px-4 lg:w-1/2">
                 <div
-                  className="wow fadeInUp relative z-10 mx-auto mt-20 max-w-[435px] lg:mt-0"
+                  className="wow fadeInUp relative z-10 mx-auto mt-20 h-[380px] max-w-[435px] lg:mt-0"
                   data-wow-delay=".3s"
                 >
-                  <Image
-                    width={299}
-                    height={419}
-                    src={"/images/cta/cta-light.png"}
-                    alt="cta image"
-                    className="mx-auto max-w-full"
-                  />
+                  <div className="absolute inset-x-0 -top-10 z-10 mx-auto w-full max-w-[300px] scale-[0.97] origin-top">
+                    <PhoneMockup
+                      src="/images/screenshots/Onboarding_unu.jpg"
+                      alt="Ecran de onboarding AInevoie pentru utilizatori"
+                      sizes="290px"
+                    />
+                  </div>
 
                   <div className="bg-gradient-2 absolute -top-5 right-0 left-0 -z-10 aspect-square w-full rounded-full"></div>
                   <div className="absolute top-0 right-0 -z-10">

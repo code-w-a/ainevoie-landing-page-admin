@@ -1,5 +1,5 @@
 import Graphics from "@/components/About/Graphics";
-import Image from "next/image";
+import PhoneMockup from "@/components/PhoneMockup";
 import Link from "next/link";
 
 const About = () => {
@@ -14,12 +14,10 @@ const About = () => {
                   className="wow fadeInUp relative z-10 mx-auto mb-14 w-full max-w-[470px] pb-6 lg:mx-0 lg:mb-0"
                   data-wow-delay=".2s"
                 >
-                  <Image
-                    width={294}
-                    height={594}
-                    src={"/images/about/about-1-light.png"}
-                    alt="about image"
-                    className="mx-auto max-w-full"
+                  <PhoneMockup
+                    src="/images/screenshots/utilizator_ecran_prestator.jpg"
+                    alt="Detalii prestator și rezervare pentru client"
+                    sizes="(min-width: 1024px) 294px, (min-width: 768px) 280px, 260px"
                   />
 
                   <div className="absolute top-0 right-5 -z-10">
@@ -165,12 +163,10 @@ const About = () => {
                   className="wow fadeInUp relative z-10 mx-auto mb-14 w-full max-w-[470px] pb-6 lg:mr-0 lg:mb-0"
                   data-wow-delay=".3s"
                 >
-                  <Image
-                    width={294}
-                    height={594}
-                    src={"/images/about/about-2-light.png"}
-                    alt="about image"
-                    className="mx-auto max-w-full"
+                  <PhoneMockup
+                    src="/images/screenshots/Prestator_cereri.jpg"
+                    alt="Cereri noi pentru prestator"
+                    sizes="(min-width: 1024px) 294px, (min-width: 768px) 280px, 260px"
                   />
 
                   <div className="absolute top-0 right-5 -z-10">

@@ -1,6 +1,6 @@
 "use client";
 import dynamic from "next/dynamic";
-import Image from "next/image";
+import PhoneMockup from "@/components/PhoneMockup";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
@@ -157,12 +157,11 @@ const HeroArea = () => {
                 className="wow fadeInUp relative z-10 mx-auto w-full max-w-[530px] pt-8 lg:mr-0"
                 data-wow-delay=".3s"
               >
-                <Image
-                  width={361}
-                  height={546}
-                  src={"/images/hero/hero-light.png"}
-                  alt="hero image"
-                  className="mx-auto max-w-full"
+                <PhoneMockup
+                  src="/images/screenshots/utilizator_ecran_home.jpg"
+                  alt="Ecranul principal al aplicației AInevoie"
+                  priority={true}
+                  sizes="(min-width: 1280px) 360px, (min-width: 1024px) 320px, 280px"
                 />
                 <div className="max-auto bg-gradient-1 absolute top-0 right-0 left-0 -z-10 aspect-square w-full rounded-full">
                   <div className="absolute top-5 right-0">
@@ -305,4 +304,3 @@ const HeroArea = () => {
 };
 
 export default HeroArea;
-
