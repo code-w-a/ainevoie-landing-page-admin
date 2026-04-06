@@ -96,7 +96,7 @@ export default function SettingsPage() {
           <div className="space-y-2">
             <label className="text-sm font-medium">Email expeditor</label>
             <Input
-              placeholder="contact@ainevoie.ro"
+              placeholder="no-reply@ai-nevoie.ro"
               value={formState.fromEmail}
               onChange={(event) =>
                 setFormState((prev) => ({
@@ -109,7 +109,7 @@ export default function SettingsPage() {
           <div className="space-y-2">
             <label className="text-sm font-medium">Adresă reply-to</label>
             <Input
-              placeholder="support@ainevoie.ro"
+              placeholder="contact@ai-nevoie.ro"
               value={formState.replyTo}
               onChange={(event) =>
                 setFormState((prev) => ({

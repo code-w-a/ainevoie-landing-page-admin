@@ -38,8 +38,42 @@ Example:
 firebase functions:secrets:set SMTP_HOST
 ```
 
-## Gmail App Password (test temporar)
-Pentru testare rapidă cu Gmail SMTP:
+## Producție — mail.ai-nevoie.ro (SSL/TLS, port 465)
+
+Valori pentru contul `no-reply@ai-nevoie.ro` (aceleași ca în panoul de hosting: Outgoing `mail.ai-nevoie.ro`, SMTP 465, autentificare obligatorie):
+
+```
+SMTP_HOST=mail.ai-nevoie.ro
+SMTP_PORT=465
+SMTP_SECURE=true
+SMTP_USER=no-reply@ai-nevoie.ro
+SMTP_PASS=<parola_contului_mail>
+NEWSLETTER_FROM_NAME=AInevoie
+NEWSLETTER_FROM_EMAIL=no-reply@ai-nevoie.ro
+NEWSLETTER_REPLY_TO=<adresa_monitorizata_ex_contact@ai-nevoie.ro>
+PUBLIC_BASE_URL=https://ainevoie.ro
+ADMIN_API_KEY=<aceeași valoare ca ADMIN_API_KEY din Next.js>
+```
+
+`NEWSLETTER_REPLY_TO` poate fi o adresă la care răspundeti (nu e obligatoriu să fie no-reply).
+
+Setare secret din terminal (exemplu non-interactiv pentru valori scurte; pentru `SMTP_PASS` folosește aceeași metodă cu parola reală):
+
+```bash
+printf '%s' 'mail.ai-nevoie.ro' | firebase functions:secrets:set SMTP_HOST --data-file=-
+printf '%s' '465' | firebase functions:secrets:set SMTP_PORT --data-file=-
+printf '%s' 'true' | firebase functions:secrets:set SMTP_SECURE --data-file=-
+printf '%s' 'no-reply@ai-nevoie.ro' | firebase functions:secrets:set SMTP_USER --data-file=-
+printf '%s' 'PAROLA_AICI' | firebase functions:secrets:set SMTP_PASS --data-file=-
+printf '%s' 'AInevoie' | firebase functions:secrets:set NEWSLETTER_FROM_NAME --data-file=-
+printf '%s' 'no-reply@ai-nevoie.ro' | firebase functions:secrets:set NEWSLETTER_FROM_EMAIL --data-file=-
+# opțional:
+printf '%s' 'contact@ai-nevoie.ro' | firebase functions:secrets:set NEWSLETTER_REPLY_TO --data-file=-
+```
+
+După orice schimbare de secrete: `firebase deploy --only functions` (vezi secțiunea Deploy).
+
+## Alternativ: Gmail App Password (doar test)
 
 ```
 SMTP_HOST=smtp.gmail.com
@@ -51,10 +85,11 @@ NEWSLETTER_FROM_NAME=AInevoie
 NEWSLETTER_FROM_EMAIL=<gmail>
 NEWSLETTER_REPLY_TO=<gmail>
 PUBLIC_BASE_URL=https://ainevoie.ro
-ADMIN_API_KEY=<aceeasi-valoare-ca-in-next>
+ADMIN_API_KEY=<aceeași-valoare-ca-in-next>
 ```
 
-Comenzi utile:
+Comenzi interactive (orice secret):
+
 ```
 firebase functions:secrets:set SMTP_HOST
 firebase functions:secrets:set SMTP_PORT
@@ -100,8 +135,8 @@ Example payload:
   "filters": { "tags": ["bucuresti"] },
   "sendConfig": { "maxPerSecond": 5, "maxConcurrent": 50 },
   "fromName": "AInevoie",
-  "fromEmail": "contact@domeniu.ro",
-  "replyTo": "contact@domeniu.ro",
+  "fromEmail": "no-reply@ai-nevoie.ro",
+  "replyTo": "contact@ai-nevoie.ro",
   "adminApiKey": "<optional>"
 }
 ```
