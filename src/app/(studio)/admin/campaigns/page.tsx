@@ -22,6 +22,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TabContent, TabList, Tabs, TabTrigger } from "@/components/ui/tabs";
+import { AdminConfirmDialog } from "@/components/admin/AdminConfirmDialog";
 import { useAdminData } from "@/components/admin/useAdminData";
 import { adminFetch } from "@/components/admin/adminApi";
 import {
@@ -38,6 +39,7 @@ import {
   campaignStatusLabel,
   logLevelLabel,
 } from "@/lib/adminLabels";
+import { formatAdminDateTime } from "@/lib/formatAdminDateTime";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50];
 const SCHEDULE_TIMEZONE = "Europe/Bucharest";
@@ -301,6 +303,14 @@ export default function CampaignsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [rowLoading, setRowLoading] = useState<Record<string, string>>({});
   const [scheduleById, setScheduleById] = useState<Record<string, string>>({});
+  const [scheduleRowDialogId, setScheduleRowDialogId] = useState<string | null>(
+    null
+  );
+  const [scheduleRowDialogAtLocal, setScheduleRowDialogAtLocal] = useState("");
+  const [unscheduleTargetId, setUnscheduleTargetId] = useState<string | null>(
+    null
+  );
+  const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
   const [reportCampaignId, setReportCampaignId] = useState<string | null>(null);
   const [reportLoading, setReportLoading] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
@@ -333,6 +343,31 @@ export default function CampaignsPage() {
   } = useAdminData<NewsletterSettingsResponse>("/api/admin/newsletter/settings");
 
   const campaigns = useMemo(() => data?.items ?? [], [data?.items]);
+  const scheduleRowDialogLabel = useMemo(() => {
+    if (!scheduleRowDialogId) {
+      return "";
+    }
+    const row = campaigns.find(
+      (c) => typeof c.id === "string" && c.id === scheduleRowDialogId
+    );
+    if (!row) {
+      return "Campanie";
+    }
+    return String(row.subject || row.name || "Campanie");
+  }, [scheduleRowDialogId, campaigns]);
+
+  const unscheduleTargetLabel = useMemo(() => {
+    if (!unscheduleTargetId) {
+      return "";
+    }
+    const row = campaigns.find(
+      (c) => typeof c.id === "string" && c.id === unscheduleTargetId
+    );
+    if (!row) {
+      return "Campanie";
+    }
+    return String(row.subject || row.name || "Campanie");
+  }, [unscheduleTargetId, campaigns]);
   const nextCursor = data?.nextCursor ?? null;
   const rawBaseUrl =
     typeof settingsData?.item?.baseUrl === "string" ? settingsData.item.baseUrl : "";
@@ -800,12 +835,13 @@ export default function CampaignsPage() {
     }
   }
 
-  async function handleSchedule(id: string) {
+  async function handleSchedule(id: string, localValueOverride?: string) {
     if (!id) {
       return;
     }
 
-    const localValue = scheduleById[id] || "";
+    const localValue =
+      localValueOverride !== undefined ? localValueOverride : scheduleById[id] || "";
     if (!localValue) {
       setCreateError("Selectează data și ora programării.");
       return;
@@ -827,6 +863,8 @@ export default function CampaignsPage() {
     try {
       await scheduleCampaign(id, utcIso);
       setCreateSuccess("Campania a fost programată.");
+      setScheduleById((prev) => ({ ...prev, [id]: localValue }));
+      setScheduleRowDialogId((open) => (open === id ? null : open));
       reload();
     } catch (error) {
       setCreateError(getActionErrorMessage(error, "Nu am putut programa campania."));
@@ -835,9 +873,19 @@ export default function CampaignsPage() {
     }
   }
 
-  async function handleUnschedule(id: string) {
+  function openScheduleRowDialog(id: string) {
+    setCreateError(null);
+    setScheduleRowDialogId(id);
+    setScheduleRowDialogAtLocal(scheduleById[id] || getDefaultScheduleInput());
+  }
+
+  function closeScheduleRowDialog() {
+    setScheduleRowDialogId(null);
+  }
+
+  async function handleUnschedule(id: string): Promise<boolean> {
     if (!id) {
-      return;
+      return false;
     }
 
     setCreateError(null);
@@ -853,11 +901,12 @@ export default function CampaignsPage() {
         setCreateError(
           await readErrorMessage(response, "Nu am putut anula programarea.")
         );
-        return;
+        return false;
       }
 
       setCreateSuccess("Programarea campaniei a fost anulată.");
       reload();
+      return true;
     } finally {
       setRowAction(id, null);
     }
@@ -915,10 +964,10 @@ export default function CampaignsPage() {
     reload();
   }
 
-  async function handleBulkDelete() {
+  async function handleBulkDelete(): Promise<boolean> {
     const ids = Array.from(selectedIds);
     if (!ids.length) {
-      return;
+      return false;
     }
 
     setCreateError(null);
@@ -936,12 +985,13 @@ export default function CampaignsPage() {
       setCreateError(
         await readErrorMessage(failed, "Nu am putut șterge toate campaniile selectate.")
       );
-      return;
+      return false;
     }
 
     setSelectedIds(new Set());
     setCreateSuccess("Campaniile selectate au fost șterse.");
     reload();
+    return true;
   }
 
   async function handleViewReport(id: string) {
@@ -1255,7 +1305,7 @@ export default function CampaignsPage() {
                 </Button>
                 <Button
                   variant="destructive"
-                  onClick={handleBulkDelete}
+                  onClick={() => setBulkDeleteConfirmOpen(true)}
                   disabled={selectedIds.size === 0}
                 >
                   Șterge selecția
@@ -1285,7 +1335,6 @@ export default function CampaignsPage() {
                   {filteredCampaigns.map((campaign) => {
                     const id = campaign.id as string | undefined;
                     const status = normalizeCampaignStatus(campaign.status);
-                    const scheduleValue = id ? scheduleById[id] || "" : "";
                     const canSendNow = ["draft", "scheduled"].includes(status);
                     const canSchedule = ["draft", "scheduled"].includes(status);
                     const canUnschedule = status === "scheduled";
@@ -1311,9 +1360,13 @@ export default function CampaignsPage() {
                         <TableCell>{campaign.stats?.sent ?? campaign.sent ?? "-"}</TableCell>
                         <TableCell>{campaign.stats?.failed ?? campaign.failed ?? "-"}</TableCell>
                         <TableCell>
-                          {campaign.scheduledAt ? utcIsoToBucharestInput(campaign.scheduledAt) : "-"}
+                          {campaign.scheduledAt ?
+                            formatAdminDateTime(campaign.scheduledAt)
+                          : "-"}
                         </TableCell>
-                        <TableCell>{campaign.createdAt ?? "-"}</TableCell>
+                        <TableCell>
+                          {formatAdminDateTime(campaign.createdAt)}
+                        </TableCell>
                         <TableCell className="space-y-2">
                           <div className="flex flex-wrap gap-2">
                             {/* <Button
@@ -1351,7 +1404,7 @@ export default function CampaignsPage() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => (id ? handleUnschedule(id) : undefined)}
+                                onClick={() => (id ? setUnscheduleTargetId(id) : undefined)}
                                 disabled={!id || isRowActionLoading(id || "")}
                               >
                                 {id && isRowActionLoading(id, "unschedule") ? "Se anulează..." : "Anulează programarea"}
@@ -1360,28 +1413,16 @@ export default function CampaignsPage() {
                           </div>
 
                           {canSchedule && id && (
-                            <div className="flex flex-wrap items-center gap-2">
-                              <Input
-                                type="datetime-local"
-                                className="h-8 w-[210px]"
-                                value={scheduleValue}
-                                onChange={(event) =>
-                                  setScheduleById((prev) => ({
-                                    ...prev,
-                                    [id]: event.target.value,
-                                  }))
-                                }
-                                disabled={isRowActionLoading(id)}
-                              />
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleSchedule(id)}
-                                disabled={isRowActionLoading(id)}
-                              >
-                                {isRowActionLoading(id, "schedule") ? "Se programează..." : "Programează"}
-                              </Button>
-                            </div>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openScheduleRowDialog(id)}
+                              disabled={isRowActionLoading(id)}
+                            >
+                              {isRowActionLoading(id, "schedule") ?
+                                "Se programează..."
+                              : "Programează"}
+                            </Button>
                           )}
                         </TableCell>
                       </TableRow>
@@ -1544,6 +1585,106 @@ export default function CampaignsPage() {
         </div>
       )}
 
+      {scheduleRowDialogId && (
+        <div
+          className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="schedule-row-dialog-title"
+          onClick={closeScheduleRowDialog}
+        >
+          <Card
+            className="w-full max-w-lg"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <CardHeader>
+              <CardTitle id="schedule-row-dialog-title">
+                Programează trimiterea
+              </CardTitle>
+              <CardDescription className="space-y-1">
+                <span className="block font-medium text-foreground">
+                  {scheduleRowDialogLabel}
+                </span>
+                <span>
+                  Selectează data și ora în fusul orar {SCHEDULE_TIMEZONE}.
+                </span>
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium" htmlFor="schedule-row-datetime">
+                  Data și ora ({SCHEDULE_TIMEZONE})
+                </label>
+                <Input
+                  id="schedule-row-datetime"
+                  type="datetime-local"
+                  value={scheduleRowDialogAtLocal}
+                  onChange={(event) =>
+                    setScheduleRowDialogAtLocal(event.target.value)
+                  }
+                  disabled={isRowActionLoading(scheduleRowDialogId)}
+                />
+              </div>
+              <div className="flex flex-wrap justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={closeScheduleRowDialog}
+                  disabled={isRowActionLoading(scheduleRowDialogId)}
+                >
+                  Anulează
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() =>
+                    handleSchedule(scheduleRowDialogId, scheduleRowDialogAtLocal)
+                  }
+                  disabled={isRowActionLoading(scheduleRowDialogId)}
+                >
+                  {isRowActionLoading(scheduleRowDialogId, "schedule") ?
+                    "Se programează..."
+                  : "Salvează programarea"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      <AdminConfirmDialog
+        open={Boolean(unscheduleTargetId)}
+        onOpenChange={(next) => {
+          if (!next) {
+            setUnscheduleTargetId(null);
+          }
+        }}
+        title="Anulezi programarea?"
+        description={
+          <>
+            Campanie: <strong>{unscheduleTargetLabel}</strong>. Trimiterea nu va mai
+            porni automat la data și ora programate.
+          </>
+        }
+        confirmLabel="Da, anulează programarea"
+        cancelLabel="Închide"
+        variant="destructive"
+        onConfirm={() =>
+          unscheduleTargetId ? handleUnschedule(unscheduleTargetId) : false
+        }
+        confirmDisabled={!unscheduleTargetId}
+      />
+
+      <AdminConfirmDialog
+        open={bulkDeleteConfirmOpen}
+        onOpenChange={setBulkDeleteConfirmOpen}
+        title="Ștergi campaniile selectate?"
+        description={`Sigur vrei să ștergi ${selectedIds.size} ${selectedIds.size === 1 ? "campanie" : "campanii"}? Acțiunea este ireversibilă.`}
+        confirmLabel="Șterge definitiv"
+        variant="destructive"
+        confirmDisabled={selectedIds.size === 0}
+        onConfirm={handleBulkDelete}
+      />
+
       {reportDialogOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
@@ -1623,7 +1764,11 @@ export default function CampaignsPage() {
                           {reportData.logs.map((log, index) => (
                             <div key={`${log.id || index}-${log.message || ""}`} className="rounded-md border p-3 text-xs">
                               <div className="flex items-center justify-between">
-                                <span className="font-medium">{log.createdAt || "-"}</span>
+                                <span className="font-medium">
+                                  {formatAdminDateTime(log.createdAt, {
+                                    includeSeconds: true,
+                                  })}
+                                </span>
                                 <Badge variant={log.level === "error" ? "danger" : "secondary"}>
                                   {logLevelLabel(log.level)}
                                 </Badge>

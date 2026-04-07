@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useAdminData } from "@/components/admin/useAdminData";
 import { adminCommonLabels, logLevelLabel } from "@/lib/adminLabels";
+import { formatAdminDateTime } from "@/lib/formatAdminDateTime";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50];
 
@@ -182,7 +183,9 @@ export default function LogsPage() {
                       campaignNameById.get(log.campaignId) || log.campaignId
                     : "-"}
                   </TableCell>
-                  <TableCell>{log.createdAt || "-"}</TableCell>
+                  <TableCell>
+                    {formatAdminDateTime(log.createdAt, { includeSeconds: true })}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

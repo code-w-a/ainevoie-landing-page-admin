@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { devLogServerError } from "@/lib/devServerErrorLog";
 import { getAdminDb, requireEnv, serializeDoc } from "@/lib/firebaseAdmin";
 import { requireAdmin } from "@/lib/adminAuth";
 import {
@@ -88,6 +89,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ items, nextCursor });
   } catch (error) {
+    devLogServerError("GET /api/admin/newsletter/campaigns", error);
     return NextResponse.json(
       { error: "Nu am putut încărca campaniile." },
       { status: 500 }

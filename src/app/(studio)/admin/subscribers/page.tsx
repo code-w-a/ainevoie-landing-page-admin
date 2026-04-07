@@ -22,9 +22,11 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TabContent, TabList, Tabs, TabTrigger } from "@/components/ui/tabs";
+import { AdminConfirmDialog } from "@/components/admin/AdminConfirmDialog";
 import { useAdminData } from "@/components/admin/useAdminData";
 import { adminFetch } from "@/components/admin/adminApi";
 import { adminCommonLabels, subscriberStatusLabel } from "@/lib/adminLabels";
+import { formatAdminDateTime } from "@/lib/formatAdminDateTime";
 import {
   NEWSLETTER_SUBSCRIBER_STATUSES,
   type NewsletterSubscriberStatus,
@@ -40,14 +42,6 @@ const STATUS_LABELS: Record<NewsletterSubscriberStatus, string> = {
   complaint: "Plângere",
   suppressed: "Suprimat",
 };
-
-const STATUS_FILTER_OPTIONS: Array<{
-  value: "active" | "unsubscribed";
-  label: string;
-}> = [
-  { value: "active", label: "Activ" },
-  { value: "unsubscribed", label: "Dezabonat" },
-];
 
 async function readErrorMessage(response: Response, fallback: string) {
   try {
@@ -91,6 +85,7 @@ export default function SubscribersPage() {
   const [cursors, setCursors] = useState<(string | null)[]>([null]);
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
 
   const cursor = cursors[pageIndex];
   const endpoint = useMemo(() => {
@@ -258,10 +253,10 @@ export default function SubscribersPage() {
     reload();
   }
 
-  async function handleBulkDelete() {
+  async function handleBulkDelete(): Promise<boolean> {
     const ids = Array.from(selectedIds);
     if (!ids.length) {
-      return;
+      return false;
     }
 
     setActionError(null);
@@ -280,12 +275,190 @@ export default function SubscribersPage() {
       setActionError(
         await readErrorMessage(failed, "Nu am putut șterge selecția de abonați.")
       );
-      return;
+      return false;
     }
 
     setSelectedIds(new Set());
     setActionSuccess("Abonații selectați au fost șterși.");
     reload();
+    return true;
+  }
+
+  const listSegmentTabTriggerClassName =
+    "rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition data-[active=true]:bg-background data-[active=true]:text-foreground";
+
+  function renderListSegment() {
+    return (
+      <>
+        {loading && (
+          <p className="text-sm text-muted-foreground">
+            {adminCommonLabels.loadingSubscribers}
+          </p>
+        )}
+        {error && <p className="text-sm text-rose-500">{error}</p>}
+
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <Input
+            className="max-w-xs"
+            placeholder="Caută email, etichete sau motiv"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+          <select
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+            value={sortBy}
+            onChange={(event) => setSortBy(event.target.value)}
+          >
+            <option value="createdAt">{adminCommonLabels.newest}</option>
+            <option value="email">Email</option>
+            <option value="status">Status</option>
+          </select>
+          <select
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+            value={sortDir}
+            onChange={(event) => setSortDir(event.target.value)}
+          >
+            <option value="desc">{adminCommonLabels.descending}</option>
+            <option value="asc">{adminCommonLabels.ascending}</option>
+          </select>
+          {statusFilter === "active" ?
+            <>
+              <Button
+                variant="outline"
+                onClick={() => handleBulkStatus("active")}
+                disabled={selectedIds.size === 0}
+              >
+                Setează activ
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => handleBulkStatus("unsubscribed")}
+                disabled={selectedIds.size === 0}
+              >
+                Setează dezabonat
+              </Button>
+            </>
+          : <Button
+              variant="default"
+              onClick={() => handleBulkStatus("active")}
+              disabled={selectedIds.size === 0}
+            >
+              Reactivează abonarea
+            </Button>
+          }
+          <Button
+            variant="destructive"
+            onClick={() => setBulkDeleteConfirmOpen(true)}
+            disabled={selectedIds.size === 0}
+          >
+            Șterge selecția
+          </Button>
+        </div>
+
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>
+                <Checkbox
+                  checked={allSelected}
+                  onChange={(event) => toggleSelectAll(event.target.checked)}
+                />
+              </TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Consimțământ</TableHead>
+              <TableHead>Motiv status</TableHead>
+              <TableHead>Etichete</TableHead>
+              <TableHead>Ultima trimitere</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredSubscribers.map((subscriber) => {
+              const id = subscriber.id as string | undefined;
+              const statusValue =
+                typeof subscriber.status === "string" ?
+                  subscriber.status.toLowerCase()
+                : "";
+              const isActive = statusValue === "active";
+              const hasConsent = subscriber.consentGranted === true;
+
+              return (
+                <TableRow key={id || subscriber.email}>
+                  <TableCell>
+                    <Checkbox
+                      checked={id ? selectedIds.has(id) : false}
+                      onChange={(event) =>
+                        id ? toggleRow(id, event.target.checked) : undefined
+                      }
+                      disabled={!id}
+                    />
+                  </TableCell>
+                  <TableCell className="font-medium">{subscriber.email}</TableCell>
+                  <TableCell>
+                    <Badge variant={isActive ? "success" : "outline"}>
+                      {subscriberStatusLabel(subscriber.status)}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={hasConsent ? "success" : "danger"}>
+                      {hasConsent ? "Acordat" : "Retras"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>{subscriber.statusReason || "-"}</TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-2">
+                      {(subscriber.tags || []).map((tag: string) => (
+                        <Badge key={tag} variant="secondary">
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    {formatAdminDateTime(subscriber.lastSentAt)}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm">
+          <span className="text-muted-foreground">
+            {adminCommonLabels.page} {pageIndex + 1}
+          </span>
+          <div className="flex items-center gap-2">
+            <select
+              className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+              value={pageSize}
+              onChange={(event) => setPageSize(Number(event.target.value))}
+            >
+              {PAGE_SIZE_OPTIONS.map((size) => (
+                <option key={size} value={size}>
+                  {size}
+                </option>
+              ))}
+            </select>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={pageIndex <= 0}
+              onClick={() => setPageIndex((prev) => Math.max(0, prev - 1))}
+            >
+              {adminCommonLabels.previous}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!nextCursor}
+              onClick={() => setPageIndex((prev) => prev + 1)}
+            >
+              {adminCommonLabels.next}
+            </Button>
+          </div>
+        </div>
+      </>
+    );
   }
 
   return (
@@ -380,182 +553,61 @@ export default function SubscribersPage() {
         </TabContent>
 
         <TabContent value="list">
-          <Card>
-            <CardHeader>
-              <CardTitle>Toți abonații</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {loading && (
-                <p className="text-sm text-muted-foreground">
-                  {adminCommonLabels.loadingSubscribers}
-                </p>
-              )}
-              {error && <p className="text-sm text-rose-500">{error}</p>}
-
-              <div className="mb-4 flex flex-wrap items-center gap-3">
-                <Input
-                  className="max-w-xs"
-                  placeholder="Caută email, etichete sau motiv"
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                />
-                <select
-                  className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-                  value={statusFilter}
-                  onChange={(event) =>
-                    setStatusFilter(event.target.value as "active" | "unsubscribed")
-                  }
-                >
-                  {STATUS_FILTER_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-                  value={sortBy}
-                  onChange={(event) => setSortBy(event.target.value)}
-                >
-                  <option value="createdAt">{adminCommonLabels.newest}</option>
-                  <option value="email">Email</option>
-                  <option value="status">Status</option>
-                </select>
-                <select
-                  className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-                  value={sortDir}
-                  onChange={(event) => setSortDir(event.target.value)}
-                >
-                  <option value="desc">{adminCommonLabels.descending}</option>
-                  <option value="asc">{adminCommonLabels.ascending}</option>
-                </select>
-                <Button
-                  variant="outline"
-                  onClick={() => handleBulkStatus("active")}
-                  disabled={selectedIds.size === 0}
-                >
-                  Setează activ
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => handleBulkStatus("unsubscribed")}
-                  disabled={selectedIds.size === 0}
-                >
-                  Setează dezabonat
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={handleBulkDelete}
-                  disabled={selectedIds.size === 0}
-                >
-                  Șterge selecția
-                </Button>
-              </div>
-
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>
-                      <Checkbox
-                        checked={allSelected}
-                        onChange={(event) => toggleSelectAll(event.target.checked)}
-                      />
-                    </TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Consimțământ</TableHead>
-                    <TableHead>Motiv status</TableHead>
-                    <TableHead>Etichete</TableHead>
-                    <TableHead>Ultima trimitere</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredSubscribers.map((subscriber) => {
-                    const id = subscriber.id as string | undefined;
-                    const statusValue =
-                      typeof subscriber.status === "string" ?
-                        subscriber.status.toLowerCase() :
-                        "";
-                    const isActive = statusValue === "active";
-                    const hasConsent = subscriber.consentGranted === true;
-
-                    return (
-                      <TableRow key={id || subscriber.email}>
-                        <TableCell>
-                          <Checkbox
-                            checked={id ? selectedIds.has(id) : false}
-                            onChange={(event) =>
-                              id ? toggleRow(id, event.target.checked) : undefined
-                            }
-                            disabled={!id}
-                          />
-                        </TableCell>
-                        <TableCell className="font-medium">{subscriber.email}</TableCell>
-                        <TableCell>
-                          <Badge variant={isActive ? "success" : "outline"}>
-                            {subscriberStatusLabel(subscriber.status)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={hasConsent ? "success" : "danger"}>
-                            {hasConsent ? "Acordat" : "Retras"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{subscriber.statusReason || "-"}</TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-2">
-                            {(subscriber.tags || []).map((tag: string) => (
-                              <Badge key={tag} variant="secondary">
-                                {tag}
-                              </Badge>
-                            ))}
-                          </div>
-                        </TableCell>
-                        <TableCell>{subscriber.lastSentAt ?? "-"}</TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm">
-                <span className="text-muted-foreground">
-                  {adminCommonLabels.page} {pageIndex + 1}
-                </span>
-                <div className="flex items-center gap-2">
-                  <select
-                    className="h-8 rounded-md border border-input bg-background px-2 text-xs"
-                    value={pageSize}
-                    onChange={(event) => setPageSize(Number(event.target.value))}
+          <Tabs
+            value={statusFilter}
+            onValueChange={(value) =>
+              setStatusFilter(value as "active" | "unsubscribed")
+            }
+            className="space-y-4"
+          >
+            <Card>
+              <CardHeader>
+                <CardTitle>
+                  {statusFilter === "active" ? "Abonați activi" : "Dezabonați"}
+                </CardTitle>
+                <CardDescription>
+                  {statusFilter === "active" ?
+                    "Abonați care primesc newsletterul."
+                  : "Adrese care s-au dezabonat; nu mai primesc trimiteri."}
+                </CardDescription>
+                <TabList className="mt-4 inline-flex rounded-lg border border-border bg-muted/30 p-1">
+                  <TabTrigger
+                    value="active"
+                    className={listSegmentTabTriggerClassName}
                   >
-                    {PAGE_SIZE_OPTIONS.map((size) => (
-                      <option key={size} value={size}>
-                        {size}
-                      </option>
-                    ))}
-                  </select>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={pageIndex <= 0}
-                    onClick={() => setPageIndex((prev) => Math.max(0, prev - 1))}
+                    Abonați activi
+                  </TabTrigger>
+                  <TabTrigger
+                    value="unsubscribed"
+                    className={listSegmentTabTriggerClassName}
                   >
-                    {adminCommonLabels.previous}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={!nextCursor}
-                    onClick={() => setPageIndex((prev) => prev + 1)}
-                  >
-                    {adminCommonLabels.next}
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                    Dezabonați
+                  </TabTrigger>
+                </TabList>
+              </CardHeader>
+              <CardContent>
+                <TabContent value="active" className="mt-0 outline-none">
+                  {renderListSegment()}
+                </TabContent>
+                <TabContent value="unsubscribed" className="mt-0 outline-none">
+                  {renderListSegment()}
+                </TabContent>
+              </CardContent>
+            </Card>
+          </Tabs>
         </TabContent>
       </Tabs>
+
+      <AdminConfirmDialog
+        open={bulkDeleteConfirmOpen}
+        onOpenChange={setBulkDeleteConfirmOpen}
+        title="Ștergi abonații selectați?"
+        description={`Sigur vrei să ștergi ${selectedIds.size} ${selectedIds.size === 1 ? "abonat" : "abonați"}? Acțiunea este ireversibilă.`}
+        confirmLabel="Șterge definitiv"
+        variant="destructive"
+        confirmDisabled={selectedIds.size === 0}
+        onConfirm={handleBulkDelete}
+      />
     </div>
   );
 }

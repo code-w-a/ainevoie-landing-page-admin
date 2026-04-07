@@ -1,6 +1,11 @@
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 
+/**
+ * Server-side Firestore uses the service account from FIREBASE_PROJECT_ID,
+ * FIREBASE_CLIENT_EMAIL and FIREBASE_PRIVATE_KEY (same JSON as on Vercel).
+ * If Firestore returns UNAUTHENTICATED locally, the private key or project id is wrong or truncated in .env.local.
+ */
 function getPrivateKey() {
   const key = process.env.FIREBASE_PRIVATE_KEY;
   if (!key) {

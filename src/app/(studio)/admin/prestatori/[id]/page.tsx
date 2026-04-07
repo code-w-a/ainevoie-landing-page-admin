@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { adminFetch } from "@/components/admin/adminApi";
 import { providerLegalStatusLabel, providerStatusLabel } from "@/lib/providers";
+import { formatAdminDateTime } from "@/lib/formatAdminDateTime";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -293,7 +294,8 @@ export default function ProviderDetailPage() {
                     })()}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {event.createdAt || "-"} • actor: {event.actorUid || "necunoscut"}
+                    {formatAdminDateTime(event.createdAt)} • actor:{" "}
+                    {event.actorUid || "necunoscut"}
                   </p>
                   {event.note && <p className="mt-2 text-sm">{event.note}</p>}
                 </div>

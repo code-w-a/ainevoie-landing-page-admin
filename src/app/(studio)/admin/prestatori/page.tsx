@@ -9,6 +9,7 @@ import {
   providerStatusLabel,
   providerStatusVariant,
 } from "@/lib/providers";
+import { formatAdminDateTime } from "@/lib/formatAdminDateTime";
 import {
   Card,
   CardContent,
@@ -203,7 +204,7 @@ export default function AdminProvidersPage() {
                       {providerStatusLabel[item.onboardingStatus] || item.onboardingStatus}
                     </Badge>
                   </TableCell>
-                  <TableCell>{item.createdAt ? new Date(item.createdAt).toLocaleString("ro-RO") : "-"}</TableCell>
+                  <TableCell>{formatAdminDateTime(item.createdAt)}</TableCell>
                   <TableCell className="text-right">
                     <Button variant="outline" size="sm" asChild>
                       <Link href={`/admin/prestatori/${item.id}`}>Vezi fișa</Link>

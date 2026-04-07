@@ -26,6 +26,7 @@ import {
   campaignStatusLabel,
   logLevelLabel,
 } from "@/lib/adminLabels";
+import { formatAdminDateTime } from "@/lib/formatAdminDateTime";
 
 type OverviewResponse = {
   stats: {
@@ -195,7 +196,7 @@ export default function AdminOverviewPage() {
                 </div>
                 <p className="mt-2 text-xs text-muted-foreground">{log.message}</p>
                 <p className="mt-1 text-[11px] text-muted-foreground">
-                  {log.createdAt || ""}
+                  {formatAdminDateTime(log.createdAt, { includeSeconds: true })}
                 </p>
               </div>
             ))}
