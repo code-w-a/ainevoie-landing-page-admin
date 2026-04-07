@@ -24,7 +24,9 @@ export function imageBuilder(source: string) {
   } as unknown as { url: () => string };
 }
 
-export const getPosts = async () => {
+/** When Sanity is enabled, add an optional `locale` filter in GROQ for EN-only posts. */
+export const getPosts = async (_locale?: string) => {
+  void _locale;
   return [] as Blog[];
 };
 

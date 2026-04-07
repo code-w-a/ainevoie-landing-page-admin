@@ -1,12 +1,27 @@
 "use client";
 
-import React, { useState } from "react";
 import Graphics from "@/components/Faq/Graphics";
-import faqData from "./faqData";
+import { FAQ } from "@/types/faq";
+import { useTranslations } from "next-intl";
+import React, { useMemo, useState } from "react";
 import FAQItem from "./FAQItem";
 
 const Faq = () => {
+  const t = useTranslations("Faq");
   const [activeFaq, setActiveFaq] = useState(0);
+
+  const faqItems: FAQ[] = useMemo(
+    () =>
+      Array.from({ length: 12 }, (_, i) => {
+        const n = i + 1;
+        return {
+          id: n,
+          title: t(`q${n}t`),
+          details: t(`q${n}d`),
+        };
+      }),
+    [t]
+  );
 
   const handleFaqToggle = (index: number) => {
     activeFaq === index ? setActiveFaq(0) : setActiveFaq(index);
@@ -24,11 +39,9 @@ const Faq = () => {
             data-wow-delay=".2s"
           >
             <h2 className="mb-4 text-3xl font-bold text-black dark:text-white sm:text-4xl md:text-[44px] md:leading-tight">
-              Întrebări frecvente
+              {t("title")}
             </h2>
-            <p className="text-base text-body">
-              Răspunsuri rapide, ca să începi fără dubii.
-            </p>
+            <p className="text-base text-body">{t("subtitle")}</p>
           </div>
 
           <div
@@ -36,7 +49,7 @@ const Faq = () => {
             data-wow-delay=".3s"
           >
             <div className="grid grid-cols-1 gap-x-6 lg:grid-cols-2">
-              {faqData.map((faq) => (
+              {faqItems.map((faq) => (
                 <FAQItem
                   key={faq.id}
                   faqData={{ ...faq, activeFaq, handleFaqToggle }}
@@ -46,7 +59,6 @@ const Faq = () => {
           </div>
         </div>
 
-        {/*Graphics*/}
         <Graphics />
       </section>
     </>

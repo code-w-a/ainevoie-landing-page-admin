@@ -1,10 +1,69 @@
+import type { AppLocale } from "@/lib/apiLocale";
+
 type ProviderWelcomeTemplateInput = {
   fullName: string;
+  locale?: AppLocale;
 };
 
 export function getProviderWelcomeTemplate({
   fullName,
+  locale = "ro",
 }: ProviderWelcomeTemplateInput) {
+  if (locale === "en") {
+    const html = `
+    <div style="background:#f8fafb;padding:24px 0;font-family:Arial,sans-serif;color:#111827;">
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+        <tr>
+          <td align="center">
+            <table width="600" cellpadding="0" cellspacing="0" role="presentation" style="max-width:600px;background:#ffffff;border-radius:12px;overflow:hidden;">
+              <tr>
+                <td style="background:#d35400;padding:20px 24px;color:#ffffff;">
+                  <h1 style="margin:0;font-size:22px;line-height:1.3;">Welcome to AInevoie</h1>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:24px;">
+                  <p style="margin:0 0 12px;">Hi <strong>${fullName}</strong>,</p>
+                  <p style="margin:0 0 12px;">
+                    Thank you for signing up as a provider. Your account is created and your details are on file with AInevoie — they will carry through to the mobile app when we launch.
+                  </p>
+                  <p style="margin:0 0 18px;">
+                    What happens next:
+                  </p>
+                  <ol style="margin:0 0 18px 20px;padding:0;">
+                    <li style="margin-bottom:8px;">Our team reviews the information you submitted.</li>
+                    <li style="margin-bottom:8px;">If we need anything else, we will contact you.</li>
+                    <li>When the app goes live, sign in with this same account.</li>
+                  </ol>
+                  <p style="margin:0;">Kind regards,<br/>The AInevoie team</p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </div>
+  `;
+
+    const text = [
+      `Hi ${fullName},`,
+      "",
+      "Thank you for signing up as a provider. Your AInevoie account is created and your details are on file — they will carry through to the mobile app when we launch.",
+      "",
+      "What happens next:",
+      "1) Our team reviews the information you submitted.",
+      "2) If we need anything else, we will contact you.",
+      "3) When the app goes live, sign in with this account.",
+      "",
+      "Support: contact@ainevoie.ro",
+      "",
+      "Kind regards,",
+      "The AInevoie team",
+    ].join("\n");
+
+    return { html, text };
+  }
+
   const html = `
     <div style="background:#f8fafb;padding:24px 0;font-family:Arial,sans-serif;color:#111827;">
       <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
@@ -20,14 +79,14 @@ export function getProviderWelcomeTemplate({
                 <td style="padding:24px;">
                   <p style="margin:0 0 12px;">Salut, <strong>${fullName}</strong>!</p>
                   <p style="margin:0 0 12px;">
-                    Contul tau de prestator a fost creat cu succes si este salvat in baza noastra comuna.
+                    Contul tău de prestator a fost creat cu succes și este salvat în baza noastră comună.
                   </p>
                   <p style="margin:0 0 18px;">
-                    Urmatorii pasi:
+                    Următorii pași:
                   </p>
                   <ol style="margin:0 0 18px 20px;padding:0;">
-                    <li style="margin-bottom:8px;">Echipa verifica datele trimise.</li>
-                    <li style="margin-bottom:8px;">Daca e nevoie, primesti cereri de completare.</li>
+                    <li style="margin-bottom:8px;">Echipa verifică datele trimise.</li>
+                    <li style="margin-bottom:8px;">Dacă e nevoie, primești cereri de completare.</li>
                     <li>La lansare, te autentifici direct cu acest cont.</li>
                   </ol>
                   <p style="margin:0;">Cu drag,<br/>Echipa AInevoie</p>
@@ -43,12 +102,12 @@ export function getProviderWelcomeTemplate({
   const text = [
     `Salut, ${fullName}!`,
     "",
-    "Contul tau de prestator AInevoie a fost creat cu succes.",
-    "Datele tale sunt deja salvate in baza comuna, compatibila cu aplicatia mobila.",
+    "Contul tău de prestator AInevoie a fost creat cu succes.",
+    "Datele tale sunt deja salvate în baza comună, compatibilă cu aplicația mobilă.",
     "",
-    "Urmatorii pasi:",
-    "1) Echipa verifica datele trimise.",
-    "2) Daca lipsesc informatii, te contactam pentru completare.",
+    "Următorii pași:",
+    "1) Echipa verifică datele trimise.",
+    "2) Dacă lipsesc informații, te contactăm pentru completare.",
     "3) La lansare, te autentifici direct cu acest cont.",
     "",
     "Suport: contact@ainevoie.ro",
@@ -58,4 +117,8 @@ export function getProviderWelcomeTemplate({
   ].join("\n");
 
   return { html, text };
+}
+
+export function getProviderWelcomeEmailSubject(locale: AppLocale): string {
+  return locale === "en" ? "Welcome to AInevoie" : "Bine ai venit pe AInevoie";
 }

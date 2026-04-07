@@ -2,57 +2,39 @@
 
 import Graphics from "@/components/Screens/Graphics";
 import Image from "next/image";
+import { useTranslations } from "next-intl";
 import "swiper/css";
 import "swiper/css/navigation";
 import { Navigation } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/react";
 
-const appScreenshots = [
-  {
-    src: "/images/screenshots/splash.jpg",
-    alt: "Ecran splash AInevoie",
-  },
-  {
-    src: "/images/screenshots/Onboarding_unu.jpg",
-    alt: "Primul ecran de onboarding",
-  },
-  {
-    src: "/images/screenshots/Onboarding_doi.jpg",
-    alt: "Al doilea ecran de onboarding",
-  },
-  {
-    src: "/images/screenshots/Onboarding_trei.jpg",
-    alt: "Al treilea ecran de onboarding",
-  },
-  {
-    src: "/images/screenshots/utilizator_ecran_home.jpg",
-    alt: "Ecranul principal pentru utilizator",
-  },
-  {
-    src: "/images/screenshots/utilizator_ecran_prestator.jpg",
-    alt: "Ecran cu profilul prestatorului",
-  },
-  {
-    src: "/images/screenshots/utilizator_ecran_confirmare_rezervare.jpg",
-    alt: "Ecran de confirmare rezervare",
-  },
-  {
-    src: "/images/screenshots/utilizator_ecran_chat.jpg",
-    alt: "Ecran de chat între utilizator și prestator",
-  },
-  {
-    src: "/images/screenshots/Prestator_cereri.jpg",
-    alt: "Ecran cu cereri pentru prestator",
-  },
-  {
-    src: "/images/screenshots/Prestator_calendar.jpg",
-    alt: "Ecran calendar pentru prestator",
-  },
-  {
-    src: "/images/screenshots/Prestator_ecran_recenzii.jpg",
-    alt: "Ecran cu recenzii pentru prestator",
-  },
-];
+const SCREEN_SRCS = [
+  "/images/screenshots/splash.jpg",
+  "/images/screenshots/Onboarding_unu.jpg",
+  "/images/screenshots/Onboarding_doi.jpg",
+  "/images/screenshots/Onboarding_trei.jpg",
+  "/images/screenshots/utilizator_ecran_home.jpg",
+  "/images/screenshots/utilizator_ecran_prestator.jpg",
+  "/images/screenshots/utilizator_ecran_confirmare_rezervare.jpg",
+  "/images/screenshots/utilizator_ecran_chat.jpg",
+  "/images/screenshots/Prestator_cereri.jpg",
+  "/images/screenshots/Prestator_calendar.jpg",
+  "/images/screenshots/Prestator_ecran_recenzii.jpg",
+] as const;
+
+const ALT_KEYS = [
+  "alt0",
+  "alt1",
+  "alt2",
+  "alt3",
+  "alt4",
+  "alt5",
+  "alt6",
+  "alt7",
+  "alt8",
+  "alt9",
+  "alt10",
+] as const;
 
 const PhoneFrameOverlay = () => {
   return (
@@ -76,6 +58,8 @@ const PhoneFrameOverlay = () => {
 };
 
 const Screens = () => {
+  const t = useTranslations("Screens");
+
   return (
     <>
       <section id="screens" className="relative z-20 pt-[110px]">
@@ -85,11 +69,9 @@ const Screens = () => {
             data-wow-delay=".2s"
           >
             <h2 className="mb-4 text-3xl font-bold text-black sm:text-4xl md:text-[44px] md:leading-tight dark:text-white">
-              Arată bine. Se folosește ușor.
+              {t("title")}
             </h2>
-            <p className="text-body text-base">
-              De la căutare și programare, până la plăți și recenzii — totul e gândit să fie intuitiv.
-            </p>
+            <p className="text-body text-base">{t("subtitle")}</p>
           </div>
         </div>
 
@@ -123,15 +105,15 @@ const Screens = () => {
             >
               <PhoneFrameOverlay />
 
-              {appScreenshots.map((screenshot) => (
-                <SwiperSlide key={screenshot.src}>
+              {SCREEN_SRCS.map((src, i) => (
+                <SwiperSlide key={src}>
                   <div className="mx-auto w-[272px] max-w-full px-[12px] pt-[45px] pb-[15px]">
                     <div className="overflow-hidden rounded-[2.25rem] bg-black">
                       <Image
                         width={1080}
                         height={2316}
-                        src={screenshot.src}
-                        alt={screenshot.alt}
+                        src={src}
+                        alt={t(ALT_KEYS[i])}
                         sizes="248px"
                         className="h-auto w-full"
                       />

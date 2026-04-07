@@ -2,12 +2,16 @@
 
 import { Checkbox } from "@/components/ui/checkbox";
 import { InputGroup } from "@/components/ui/input-group";
-import { providerCityOptions, providerServiceOptions } from "@/lib/providers";
+import {
+  PROVIDER_CITY_ENTRIES,
+  PROVIDER_SERVICE_ENTRIES,
+} from "@/lib/providers";
 import { PROVIDER_LEGAL_STATUSES, type ProviderLegalStatus } from "@/types/provider";
 import axios from "axios";
 import { Eye, EyeOff } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Link, useRouter } from "@/i18n/navigation";
+import { useLocale, useTranslations } from "next-intl";
+import { useEffect, useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 
@@ -34,13 +38,6 @@ type ProviderOnboardingFormWizardProps = {
   onStepChange: (step: number) => void;
 };
 
-const legalStatusOptions: Array<{ value: ProviderLegalStatus; label: string }> = [
-  { value: "pfa_ready", label: "Am PFA" },
-  { value: "srl_ready", label: "Am SRL" },
-  { value: "in_progress", label: "Sunt în curs de înființare" },
-  { value: "need_guidance", label: "Am nevoie de ghidaj" },
-];
-
 function isValidEmail(value: string) {
   return value.includes("@");
 }
@@ -49,9 +46,23 @@ export default function ProviderOnboardingFormWizard({
   currentStep,
   onStepChange,
 }: ProviderOnboardingFormWizardProps) {
+  const t = useTranslations("ProviderWizard");
+  const locale = useLocale();
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  const legalStatusOptions = useMemo(
+    () =>
+      [
+        { value: "pfa_ready" as const, label: t("legalPfa") },
+        { value: "srl_ready" as const, label: t("legalSrl") },
+        { value: "in_progress" as const, label: t("legalInProgress") },
+        { value: "need_guidance" as const, label: t("legalGuidance") },
+      ],
+    [t]
+  );
+
   const {
     register,
     handleSubmit,
@@ -71,8 +82,8 @@ export default function ProviderOnboardingFormWizard({
       estimatedSetupTimeline: "",
       hasAccountant: "unsure",
       newsletterOptIn: false,
-      city: providerCityOptions[0],
-      serviceType: providerServiceOptions[0],
+      city: PROVIDER_CITY_ENTRIES[0].value,
+      serviceType: PROVIDER_SERVICE_ENTRIES[0].value,
       acceptTerms: false,
     },
   });
@@ -101,9 +112,13 @@ export default function ProviderOnboardingFormWizard({
     let isCancelled = false;
     const timerId = window.setTimeout(async () => {
       try {
-        const response = await axios.get<{ isActiveSubscriber?: boolean }>("/api/newsletter/status", {
-          params: { email: normalizedEmail },
-        });
+        const response = await axios.get<{ isActiveSubscriber?: boolean }>(
+          "/api/newsletter/status",
+          {
+            params: { email: normalizedEmail },
+            headers: { "x-next-intl-locale": locale },
+          }
+        );
 
         if (isCancelled) {
           return;
@@ -115,15 +130,13 @@ export default function ProviderOnboardingFormWizard({
         if (isActive) {
           setValue("newsletterOptIn", false);
         }
-      } catch (error) {
+      } catch {
         if (isCancelled) {
           return;
         }
 
         setIsActiveNewsletterSubscriber(false);
-        setNewsletterStatusError(
-          "Nu am putut verifica statusul newsletter. Poți alege manual."
-        );
+        setNewsletterStatusError(t("newsletterCheckError"));
       } finally {
         if (!isCancelled) {
           setNewsletterStatusLoading(false);
@@ -135,7 +148,7 @@ export default function ProviderOnboardingFormWizard({
       isCancelled = true;
       window.clearTimeout(timerId);
     };
-  }, [hasValidEmailForNewsletter, normalizedEmail, setValue]);
+  }, [hasValidEmailForNewsletter, locale, normalizedEmail, setValue, t]);
 
   async function goNextStep() {
     const stepFields: Record<number, Array<keyof FormValues>> = {
@@ -164,14 +177,25 @@ export default function ProviderOnboardingFormWizard({
   async function onSubmit(values: FormValues) {
     const { confirmPassword, ...payload } = values;
     try {
-      const res = await axios.post("/api/providers/onboarding", payload);
+      const res = await axios.post("/api/providers/onboarding", {
+        ...payload,
+        locale,
+      }, {
+        headers: { "x-next-intl-locale": locale },
+      });
       if (res.status === 200) {
-        toast.success("Cont creat cu succes.");
+        toast.success(t("toastSuccess"));
         router.push("/providers/onboarding/success");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const ax = error as {
+        response?: { data?: { error?: string; code?: string } };
+      };
+      const data = ax.response?.data;
       const message =
-        error?.response?.data?.error || "Nu am putut finaliza înregistrarea. Încearcă din nou.";
+        typeof data?.error === "string" && data.error.length > 0
+          ? data.error
+          : t("toastGenericError");
       toast.error(message);
     }
   }
@@ -182,36 +206,36 @@ export default function ProviderOnboardingFormWizard({
         <>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <InputGroup
-              label="Nume complet"
-              placeholder="Ex: Andrei Popescu"
-              {...register("fullName", { required: "Numele este obligatoriu." })}
+              label={t("fullNameLabel")}
+              placeholder={t("fullNamePh")}
+              {...register("fullName", { required: t("fullNameRequired") })}
               errorMessages={errors.fullName?.message}
             />
             <InputGroup
               type="email"
-              label="Email"
-              placeholder="Ex: andrei@email.ro"
+              label={t("emailLabel")}
+              placeholder={t("emailPh")}
               {...register("email", {
-                required: "Emailul este obligatoriu.",
-                validate: (value) => value.includes("@") || "Email invalid.",
+                required: t("emailRequired"),
+                validate: (value) => value.includes("@") || t("emailInvalid"),
               })}
               errorMessages={errors.email?.message}
             />
             <fieldset>
               <label htmlFor="provider-password" className="mb-2.5 inline-block text-sm">
-                Parolă
+                {t("passwordLabel")}
               </label>
               <div className="relative">
                 <input
                   id="provider-password"
                   type={showPassword ? "text" : "password"}
-                  placeholder="Minim 8 caractere"
+                  placeholder={t("passwordPh")}
                   className="border-stroke text-body focus:border-primary focus:shadow-input dark:border-stroke-dark dark:focus:border-primary w-full rounded-md border bg-white px-6 py-3 pr-12 text-base font-medium outline-hidden dark:bg-black dark:text-white"
                   {...register("password", {
-                    required: "Parola este obligatorie.",
+                    required: t("passwordRequired"),
                     minLength: {
                       value: 8,
-                      message: "Parola trebuie să aibă minim 8 caractere.",
+                      message: t("passwordMin"),
                     },
                   })}
                 />
@@ -219,7 +243,7 @@ export default function ProviderOnboardingFormWizard({
                   type="button"
                   onClick={() => setShowPassword((prev) => !prev)}
                   className="text-muted-foreground hover:text-foreground absolute inset-y-0 right-3 flex items-center"
-                  aria-label={showPassword ? "Ascunde parola" : "Arată parola"}
+                  aria-label={showPassword ? t("hidePassword") : t("showPassword")}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
@@ -230,18 +254,18 @@ export default function ProviderOnboardingFormWizard({
             </fieldset>
             <fieldset>
               <label htmlFor="provider-confirm-password" className="mb-2.5 inline-block text-sm">
-                Confirmă parola
+                {t("confirmPasswordLabel")}
               </label>
               <div className="relative">
                 <input
                   id="provider-confirm-password"
                   type={showConfirmPassword ? "text" : "password"}
-                  placeholder="Reintrodu parola"
+                  placeholder={t("confirmPasswordPh")}
                   className="border-stroke text-body focus:border-primary focus:shadow-input dark:border-stroke-dark dark:focus:border-primary w-full rounded-md border bg-white px-6 py-3 pr-12 text-base font-medium outline-hidden dark:bg-black dark:text-white"
                   {...register("confirmPassword", {
-                    required: "Confirmarea parolei este obligatorie.",
+                    required: t("confirmPasswordRequired"),
                     validate: (value) =>
-                      value === getValues("password") || "Parolele nu se potrivesc.",
+                      value === getValues("password") || t("passwordMismatch"),
                   })}
                 />
                 <button
@@ -249,9 +273,7 @@ export default function ProviderOnboardingFormWizard({
                   onClick={() => setShowConfirmPassword((prev) => !prev)}
                   className="text-muted-foreground hover:text-foreground absolute inset-y-0 right-3 flex items-center"
                   aria-label={
-                    showConfirmPassword
-                      ? "Ascunde confirmarea parolei"
-                      : "Arată confirmarea parolei"
+                    showConfirmPassword ? t("hideConfirmPassword") : t("showConfirmPassword")
                   }
                 >
                   {showConfirmPassword ? (
@@ -269,16 +291,14 @@ export default function ProviderOnboardingFormWizard({
             </fieldset>
             <div className="md:col-span-2">
               <InputGroup
-                label="Telefon"
-                placeholder="07xx xxx xxx"
-                {...register("phone", { required: "Telefonul este obligatoriu." })}
+                label={t("phoneLabel")}
+                placeholder={t("phonePh")}
+                {...register("phone", { required: t("phoneRequired") })}
                 errorMessages={errors.phone?.message}
               />
             </div>
           </div>
-          <p className="text-xs text-muted-foreground">
-            Folosim aceste date doar pentru activarea contului și comunicări operaționale.
-          </p>
+          <p className="text-xs text-muted-foreground">{t("step1Footnote")}</p>
         </>
       )}
 
@@ -286,17 +306,17 @@ export default function ProviderOnboardingFormWizard({
         <div className="grid gap-3 sm:gap-4 md:grid-cols-2">
           <fieldset>
             <label htmlFor="provider-city" className="mb-2.5 inline-block text-sm">
-              Oraș
+              {t("cityLabel")}
             </label>
             <select
               id="provider-city"
-              aria-label="Oraș"
+              aria-label={t("cityAria")}
               className="border-stroke text-body focus:border-primary focus:shadow-input dark:border-stroke-dark dark:focus:border-primary w-full rounded-md border bg-white px-6 py-3 text-base font-medium outline-hidden dark:bg-black dark:text-white"
-              {...register("city", { required: "Orașul este obligatoriu." })}
+              {...register("city", { required: t("cityRequired") })}
             >
-              {providerCityOptions.map((option) => (
-                <option key={option} value={option}>
-                  {option}
+              {PROVIDER_CITY_ENTRIES.map((entry) => (
+                <option key={entry.value} value={entry.value}>
+                  {t(entry.messageKey)}
                 </option>
               ))}
             </select>
@@ -306,19 +326,19 @@ export default function ProviderOnboardingFormWizard({
           </fieldset>
           <fieldset>
             <label htmlFor="provider-service" className="mb-2.5 inline-block text-sm">
-              Tip serviciu
+              {t("serviceLabel")}
             </label>
             <select
               id="provider-service"
-              aria-label="Tip serviciu"
+              aria-label={t("serviceAria")}
               className="border-stroke text-body focus:border-primary focus:shadow-input dark:border-stroke-dark dark:focus:border-primary w-full rounded-md border bg-white px-6 py-3 text-base font-medium outline-hidden dark:bg-black dark:text-white"
               {...register("serviceType", {
-                required: "Tipul serviciului este obligatoriu.",
+                required: t("serviceRequired"),
               })}
             >
-              {providerServiceOptions.map((option) => (
-                <option key={option} value={option}>
-                  {option}
+              {PROVIDER_SERVICE_ENTRIES.map((entry) => (
+                <option key={entry.value} value={entry.value}>
+                  {t(entry.messageKey)}
                 </option>
               ))}
             </select>
@@ -333,13 +353,13 @@ export default function ProviderOnboardingFormWizard({
         <>
           <fieldset>
             <label htmlFor="provider-legal-status" className="mb-2.5 inline-block text-sm">
-              Status juridic
+              {t("legalStatusLabel")}
             </label>
             <select
               id="provider-legal-status"
-              aria-label="Status juridic"
+              aria-label={t("legalStatusAria")}
               className="border-stroke text-body focus:border-primary focus:shadow-input dark:border-stroke-dark dark:focus:border-primary w-full rounded-md border bg-white px-6 py-3 text-base font-medium outline-hidden dark:bg-black dark:text-white"
-              {...register("legalStatus", { required: "Selectează statusul juridic." })}
+              {...register("legalStatus", { required: t("legalStatusRequired") })}
             >
               {legalStatusOptions.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -356,27 +376,27 @@ export default function ProviderOnboardingFormWizard({
             <div className="grid gap-3 sm:gap-4 md:grid-cols-2">
               <div className="md:col-span-2">
                 <InputGroup
-                  label="Nume companie / PFA"
-                  placeholder="Ex: SC Curat Expert SRL"
+                  label={t("companyLabel")}
+                  placeholder={t("companyPh")}
                   {...register("companyName", {
                     validate: (value) =>
-                      !isLegalEntityReady || value.trim().length > 1 || "Numele companiei este obligatoriu.",
+                      !isLegalEntityReady || value.trim().length > 1 || t("companyRequired"),
                   })}
                   errorMessages={errors.companyName?.message}
                 />
               </div>
               <InputGroup
-                label="CUI"
-                placeholder="Ex: RO12345678"
+                label={t("cuiLabel")}
+                placeholder={t("cuiPh")}
                 {...register("cui", {
                   validate: (value) =>
-                    !isLegalEntityReady || value.trim().length > 1 || "CUI este obligatoriu.",
+                    !isLegalEntityReady || value.trim().length > 1 || t("cuiRequired"),
                 })}
                 errorMessages={errors.cui?.message}
               />
               <InputGroup
-                label="Nr. Registrul Comerțului (opțional)"
-                placeholder="Ex: J40/1234/2024"
+                label={t("tradeRegisterLabel")}
+                placeholder={t("tradeRegisterPh")}
                 {...register("tradeRegisterNumber")}
                 errorMessages={errors.tradeRegisterNumber?.message}
               />
@@ -387,24 +407,24 @@ export default function ProviderOnboardingFormWizard({
             <div className="grid gap-3 sm:gap-4 md:grid-cols-2">
               <fieldset>
                 <label htmlFor="setup-timeline" className="mb-2.5 inline-block text-sm">
-                  Estimare finalizare înființare
+                  {t("timelineLabel")}
                 </label>
                 <select
                   id="setup-timeline"
-                  aria-label="Estimare finalizare înființare"
+                  aria-label={t("timelineAria")}
                   className="border-stroke text-body focus:border-primary focus:shadow-input dark:border-stroke-dark dark:focus:border-primary w-full rounded-md border bg-white px-6 py-3 text-base font-medium outline-hidden dark:bg-black dark:text-white"
                   {...register("estimatedSetupTimeline", {
                     validate: (value) =>
                       !isEntityInProgress ||
                       value.trim().length > 0 ||
-                      "Alege un interval estimativ.",
+                      t("timelineRequired"),
                   })}
                 >
-                  <option value="">Selectează intervalul</option>
-                  <option value="1_2_weeks">1-2 săptămâni</option>
-                  <option value="2_4_weeks">2-4 săptămâni</option>
-                  <option value="1_2_months">1-2 luni</option>
-                  <option value="over_2_months">Peste 2 luni</option>
+                  <option value="">{t("timelinePlaceholder")}</option>
+                  <option value="1_2_weeks">{t("timeline1_2_weeks")}</option>
+                  <option value="2_4_weeks">{t("timeline2_4_weeks")}</option>
+                  <option value="1_2_months">{t("timeline1_2_months")}</option>
+                  <option value="over_2_months">{t("timelineOver2")}</option>
                 </select>
                 {errors.estimatedSetupTimeline?.message && (
                   <p className="mt-2 text-xs text-red-500">{errors.estimatedSetupTimeline.message}</p>
@@ -412,17 +432,17 @@ export default function ProviderOnboardingFormWizard({
               </fieldset>
               <fieldset>
                 <label htmlFor="has-accountant" className="mb-2.5 inline-block text-sm">
-                  Ai contabil/partener pentru înființare?
+                  {t("accountantLabel")}
                 </label>
                 <select
                   id="has-accountant"
-                  aria-label="Ai contabil"
+                  aria-label={t("accountantAria")}
                   className="border-stroke text-body focus:border-primary focus:shadow-input dark:border-stroke-dark dark:focus:border-primary w-full rounded-md border bg-white px-6 py-3 text-base font-medium outline-hidden dark:bg-black dark:text-white"
                   {...register("hasAccountant")}
                 >
-                  <option value="unsure">Încă nu știu</option>
-                  <option value="yes">Da</option>
-                  <option value="no">Nu</option>
+                  <option value="unsure">{t("accountantUnsure")}</option>
+                  <option value="yes">{t("accountantYes")}</option>
+                  <option value="no">{t("accountantNo")}</option>
                 </select>
               </fieldset>
             </div>
@@ -430,16 +450,12 @@ export default function ProviderOnboardingFormWizard({
 
           {hasValidEmailForNewsletter && (
             <div className="rounded-md border border-border p-3 sm:p-4">
-              <p className="mb-2 text-sm font-medium">Newsletter AInevoie</p>
+              <p className="mb-2 text-sm font-medium">{t("newsletterTitle")}</p>
 
               {newsletterStatusLoading ? (
-                <p className="text-xs text-muted-foreground">
-                  Verificăm dacă emailul este deja abonat la newsletter...
-                </p>
+                <p className="text-xs text-muted-foreground">{t("newsletterChecking")}</p>
               ) : isActiveNewsletterSubscriber ? (
-                <p className="text-xs text-muted-foreground">
-                  Email deja abonat la newsletter.
-                </p>
+                <p className="text-xs text-muted-foreground">{t("newsletterSubscribed")}</p>
               ) : (
                 <Controller
                   control={control}
@@ -449,12 +465,7 @@ export default function ProviderOnboardingFormWizard({
                       name={field.name}
                       checked={field.value}
                       onChange={(event) => field.onChange(event.target.checked)}
-                      label={
-                        <>
-                          Vreau să primesc newsletter cu noutăți, oferte și update-uri de
-                          produs.
-                        </>
-                      }
+                      label={t("newsletterOptIn")}
                     />
                   )}
                 />
@@ -470,7 +481,7 @@ export default function ProviderOnboardingFormWizard({
             control={control}
             name="acceptTerms"
             rules={{
-              required: "Trebuie să accepți termenii și politica de confidențialitate.",
+              required: t("termsRequired"),
             }}
             render={({ field, fieldState }) => (
               <div>
@@ -480,7 +491,15 @@ export default function ProviderOnboardingFormWizard({
                   defaultChecked={field.value}
                   label={
                     <>
-                      Sunt de acord cu termenii și condițiile și cu politica de confidențialitate.
+                      {t("termsAgree")}{" "}
+                      <Link href="/terms" className="text-primary hover:underline">
+                        {t("termsLink")}
+                      </Link>{" "}
+                      {t("termsAnd")}{" "}
+                      <Link href="/privacy" className="text-primary hover:underline">
+                        {t("privacyLink")}
+                      </Link>
+                      {t("termsEnd")}
                     </>
                   }
                 />
@@ -500,7 +519,7 @@ export default function ProviderOnboardingFormWizard({
           disabled={currentStep === 1 || isSubmitting}
           className="border-stroke dark:border-stroke-dark hover:border-primary rounded-md border px-5 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Înapoi
+          {t("back")}
         </button>
         {currentStep < 3 ? (
           <button
@@ -509,7 +528,7 @@ export default function ProviderOnboardingFormWizard({
             disabled={isSubmitting}
             className="bg-primary hover:bg-primary/90 rounded-md px-5 py-2 text-sm font-medium text-white disabled:opacity-60"
           >
-            Continuă la pasul următor
+            {t("next")}
           </button>
         ) : (
           <button
@@ -517,7 +536,7 @@ export default function ProviderOnboardingFormWizard({
             disabled={isSubmitting}
             className="bg-primary hover:bg-primary/90 rounded-md px-5 py-2 text-sm font-medium text-white disabled:opacity-60"
           >
-            {isSubmitting ? "Se trimite..." : "Finalizează înregistrarea"}
+            {isSubmitting ? t("submitting") : t("submit")}
           </button>
         )}
       </div>

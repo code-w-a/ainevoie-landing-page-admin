@@ -1,90 +1,53 @@
 "use client";
-import React, { useState } from "react";
-import Link from "next/link";
-import Image from "next/image";
+
 import FooterBottom from "@/components/Footer/FooterBottom";
+import { Link } from "@/i18n/navigation";
 import { FooterMenu } from "@/types/footerMenu";
+import Image from "next/image";
+import { useLocale, useTranslations } from "next-intl";
+import React, { useMemo, useState } from "react";
 import toast from "react-hot-toast";
 
-const footerNavData: FooterMenu[] = [
-  {
-    title: "Produs",
-    navItems: [
-      {
-        label: "Produs",
-        route: "/#home",
-      },
-      {
-        label: "Beneficii",
-        route: "/#features",
-      },
-      {
-        label: "Cum funcționează",
-        route: "/#work-process",
-      },
-      {
-        label: "Planuri",
-        route: "/#pricing",
-      },
-      {
-        label: "Capturi",
-        route: "/#screens",
-      },
-    ],
-  },
-  {
-    title: "Pentru clienți",
-    navItems: [
-      {
-        label: "Pentru clienți",
-        route: "/#home",
-      },
-      {
-        label: "Cum alegi un furnizor",
-        route: "/#faq",
-      },
-      {
-        label: "Siguranță & recenzii",
-        route: "/#testimonials",
-      },
-      {
-        label: "Întrebări frecvente",
-        route: "/#faq",
-      },
-      {
-        label: "Contact",
-        route: "/#support",
-      },
-    ],
-  },
-  {
-    title: "Pentru furnizori",
-    navItems: [
-      {
-        label: "Devino prestator",
-        route: "/providers/onboarding",
-      },
-      {
-        label: "Începe onboardingul",
-        route: "/providers/onboarding/form",
-      },
-      {
-        label: "Primește cereri",
-        route: "/#work-process",
-      },
-      {
-        label: "Gestionare programări",
-        route: "/#work-process",
-      },
-      {
-        label: "Planuri",
-        route: "/#pricing",
-      },
-    ],
-  },
-];
-
 const Footer = () => {
+  const t = useTranslations("Footer");
+  const locale = useLocale();
+
+  const footerNavData: FooterMenu[] = useMemo(
+    () => [
+      {
+        title: t("colProduct"),
+        navItems: [
+          { label: t("navProduct"), route: "/#home" },
+          { label: t("navBenefits"), route: "/#features" },
+          { label: t("navHow"), route: "/#work-process" },
+          { label: t("navPlans"), route: "/#pricing" },
+          { label: t("navScreens"), route: "/#screens" },
+        ],
+      },
+      {
+        title: t("colClients"),
+        navItems: [
+          { label: t("navClients"), route: "/#home" },
+          { label: t("navChooseProvider"), route: "/#faq" },
+          { label: t("navSafety"), route: "/#testimonials" },
+          { label: t("navFaq"), route: "/#faq" },
+          { label: t("navContact"), route: "/#support" },
+        ],
+      },
+      {
+        title: t("colProviders"),
+        navItems: [
+          { label: t("navBecome"), route: "/providers/onboarding" },
+          { label: t("navOnboarding"), route: "/providers/onboarding/form" },
+          { label: t("navRequests"), route: "/#work-process" },
+          { label: t("navScheduling"), route: "/#work-process" },
+          { label: t("navPlans"), route: "/#pricing" },
+        ],
+      },
+    ],
+    [t]
+  );
+
   const [footerEmail, setFooterEmail] = useState("");
   const [footerStatus, setFooterStatus] = useState<
     "idle" | "loading" | "success" | "error"
@@ -98,7 +61,7 @@ const Footer = () => {
     const email = footerEmail.trim();
     if (!email) {
       setFooterStatus("error");
-      toast.error("Scrie adresa de email ca să te înscrii.");
+      toast.error(t("toastEmailRequired"));
       return;
     }
 
@@ -107,7 +70,10 @@ const Footer = () => {
 
       const res = await fetch("/api/newsletter", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-next-intl-locale": locale,
+        },
         body: JSON.stringify({ email }),
       });
 
@@ -117,26 +83,28 @@ const Footer = () => {
           | null;
         const isAlready = payload?.status === "already_subscribed";
         toast.success(
-          isAlready
-            ? "Ești deja pe listă. Îți dăm un semn la lansare."
-            : "Super! Ești pe listă. Îți scriem când lansăm în zona ta."
+          isAlready ? t("toastAlready") : t("toastSubscribed")
         );
         setFooterStatus("success");
         setFooterEmail("");
         return;
       }
 
-      if (res.status === 503) {
-        setFooterStatus("error");
-        toast.error("Înscrierea la newsletter e indisponibilă momentan.");
-        return;
-      }
-
+      const errBody = (await res.json().catch(() => null)) as
+        | { error?: string }
+        | null;
+      const serverMsg =
+        typeof errBody?.error === "string" ? errBody.error : null;
       setFooterStatus("error");
-      toast.error("Nu am reușit să te înscriem. Încearcă din nou.");
+      toast.error(
+        serverMsg ??
+          (res.status === 503
+            ? t("toastNewsletterDown")
+            : t("toastSubscribeFail"))
+      );
     } catch {
       setFooterStatus("error");
-      toast.error("Eroare de rețea. Încearcă din nou.");
+      toast.error(t("toastNetwork"));
     }
   }
 
@@ -168,9 +136,7 @@ const Footer = () => {
                       style={{ width: "auto", height: "auto" }}
                     />
                   </Link>
-                  <p className="mb-6 text-base text-body">
-                    AInevoie conectează clienții cu furnizori de servicii locali. Simplu, rapid și transparent: cerere, programare, plată și feedback.
-                  </p>
+                  <p className="mb-6 text-base text-body">{t("tagline")}</p>
                 </div>
               </div>
 
@@ -203,11 +169,10 @@ const Footer = () => {
                     </div>
                   ))}
 
-                  {/* Newsletter column (right-most on desktop) */}
                   <div className="w-full px-4 sm:w-1/2 lg:w-2/5">
                     <div className="mb-11">
                       <h3 className="mb-8 text-[22px] font-medium text-black dark:text-white">
-                        Newsletter
+                        {t("newsletter")}
                       </h3>
 
                       <form onSubmit={handleFooterNewsletterSubmit}>
@@ -217,7 +182,7 @@ const Footer = () => {
                             name="footerEmail"
                             value={footerEmail}
                             onChange={(e) => setFooterEmail(e.target.value)}
-                            placeholder="Email"
+                            placeholder={t("emailPlaceholder")}
                             autoComplete="email"
                             className="border-stroke text-body focus:border-primary dark:focus:border-primary w-full rounded-sm border bg-white px-4 py-3 text-sm outline-hidden dark:border-[#34374A] dark:bg-[#2A2E44]"
                             disabled={footerStatus === "loading"}
@@ -227,7 +192,9 @@ const Footer = () => {
                             disabled={footerStatus === "loading"}
                             className="bg-primary hover:bg-primary/90 w-full rounded-sm px-5 py-3 text-sm font-medium text-white disabled:opacity-60"
                           >
-                            {footerStatus === "loading" ? "..." : "Abonează-te"}
+                            {footerStatus === "loading"
+                              ? t("subscribing")
+                              : t("subscribe")}
                           </button>
                         </div>
                       </form>

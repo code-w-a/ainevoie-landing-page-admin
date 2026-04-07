@@ -1,8 +1,13 @@
+"use client";
+
 import Graphics from "@/components/Cta/Graphics";
 import PhoneMockup from "@/components/PhoneMockup";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
 
 const Cta = () => {
+  const t = useTranslations("Cta");
+
   return (
     <>
       <section id="cta" className="relative z-10 pt-[110px]">
@@ -15,11 +20,9 @@ const Cta = () => {
                   data-wow-delay=".2s"
                 >
                   <h2 className="mb-4 text-3xl font-bold text-black sm:text-4xl md:text-[38px] md:leading-tight dark:text-white">
-                    Instalează AInevoie și rezolvă mai repede
+                    {t("title")}
                   </h2>
-                  <p className="text-body mb-10 text-base">
-                    Cauți servicii sau oferi servicii? Aplicația te ajută să te conectezi, să programezi și să finalizezi fără complicații.
-                  </p>
+                  <p className="text-body mb-10 text-base">{t("subtitle")}</p>
 
                   <div className="-mx-[10px] flex flex-wrap items-center justify-center lg:justify-start">
                     <div className="inline-block px-[10px]">
@@ -43,10 +46,10 @@ const Cta = () => {
                         </span>
                         <span className="text-left">
                           <span className="block text-xs opacity-70">
-                            Disponibil în curând
+                            {t("soon")}
                           </span>
                           <span className="block text-sm font-medium">
-                            Google Play
+                            {t("googlePlay")}
                           </span>
                         </span>
                       </Link>
@@ -73,10 +76,10 @@ const Cta = () => {
                         </span>
                         <span className="text-left">
                           <span className="block text-xs opacity-70">
-                            Disponibil în curând
+                            {t("soon")}
                           </span>
                           <span className="block text-sm font-medium">
-                            App Store
+                            {t("appStore")}
                           </span>
                         </span>
                       </Link>
@@ -93,7 +96,7 @@ const Cta = () => {
                   <div className="absolute inset-x-0 -top-10 z-10 mx-auto w-full max-w-[300px] scale-[0.97] origin-top">
                     <PhoneMockup
                       src="/images/screenshots/Onboarding_unu.jpg"
-                      alt="Ecran de onboarding AInevoie pentru utilizatori"
+                      alt={t("ctaMockupAlt")}
                       sizes="290px"
                     />
                   </div>

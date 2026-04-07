@@ -1,7 +1,12 @@
+"use client";
+
+import { Link } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
 import React from "react";
-import Link from "next/link";
 
 const FooterBottom = () => {
+  const t = useTranslations("Footer");
+
   return (
     <>
       <div className="bg-primary py-7 dark:bg-black">
@@ -9,7 +14,7 @@ const FooterBottom = () => {
           <div className="-mx-3 flex flex-wrap">
             <div className="order-last w-full px-3 lg:order-first lg:w-1/3">
               <p className="mt-4 text-center text-base text-white lg:mt-0 lg:text-left">
-                &copy; 2026 AInevoie. Toate drepturile rezervate
+                {t("copyright")}
               </p>
             </div>
 
@@ -128,10 +133,10 @@ const FooterBottom = () => {
             <div className="w-full px-3 md:w-1/2 lg:w-1/3">
               <div className="flex items-center justify-center space-x-4 sm:space-x-8 md:justify-end lg:justify-end">
                 <Link href="/privacy" className="text-base text-white">
-                  Politica de confidențialitate
+                  {t("privacy")}
                 </Link>
                 <Link href="/terms" className="text-base text-white">
-                  Termeni și condiții
+                  {t("terms")}
                 </Link>
               </div>
             </div>

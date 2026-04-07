@@ -1,8 +1,13 @@
+"use client";
+
 import Graphics from "@/components/About/Graphics";
 import PhoneMockup from "@/components/PhoneMockup";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
 
 const About = () => {
+  const t = useTranslations("About");
+
   return (
     <>
       <section id="about" className="relative pt-[150px]">
@@ -16,7 +21,7 @@ const About = () => {
                 >
                   <PhoneMockup
                     src="/images/screenshots/utilizator_ecran_prestator.jpg"
-                    alt="Detalii prestator și rezervare pentru client"
+                    alt={t("mockupClientAlt")}
                     sizes="(min-width: 1024px) 294px, (min-width: 768px) 280px, 260px"
                   />
 
@@ -91,13 +96,13 @@ const About = () => {
                   data-wow-delay=".3s"
                 >
                   <span className="text-primary mb-4 block text-lg font-medium md:text-[22px]">
-                  Pentru clienți
+                    {t("clientBadge")}
                   </span>
                   <h2 className="mb-4 text-3xl font-bold text-black sm:text-4xl md:text-[44px] md:leading-tight dark:text-white">
-                  Alegi serviciul potrivit, fără să pierzi timp
+                    {t("clientTitle")}
                   </h2>
                   <p className="text-body mb-[30px] text-base leading-relaxed">
-                  Nu mai pierzi timp cu recomandări la întâmplare. Vezi servicii disponibile în zona ta, compari și programezi când îți convine.
+                    {t("clientLead")}
                   </p>
 
                   <div className="mb-[30px] flex items-center">
@@ -106,11 +111,9 @@ const About = () => {
                     </div>
                     <div>
                       <h5 className="text-xl font-medium text-black dark:text-white">
-                        Totul clar din start
+                        {t("clientS1t")}
                       </h5>
-                      <p className="text-body text-base">
-                      Vezi detalii, tarife, recenzii și disponibilitate, ca să iei rapid decizia corectă.
-                      </p>
+                      <p className="text-body text-base">{t("clientS1d")}</p>
                     </div>
                   </div>
 
@@ -120,11 +123,9 @@ const About = () => {
                     </div>
                     <div>
                       <h5 className="text-xl font-medium text-black dark:text-white">
-                        Control total asupra programării
+                        {t("clientS2t")}
                       </h5>
-                      <p className="text-body text-base">
-                      Alegi ziua și ora, primești confirmare, iar tot istoricul rămâne în contul tău.
-                      </p>
+                      <p className="text-body text-base">{t("clientS2d")}</p>
                     </div>
                   </div>
                 </div>
@@ -140,20 +141,20 @@ const About = () => {
                   data-wow-delay=".2s"
                 >
                   <span className="text-primary mb-4 block text-lg font-medium md:text-[22px]">
-                  Pentru furnizori
+                    {t("providerBadge")}
                   </span>
                   <h2 className="mb-4 text-3xl font-bold text-black sm:text-4xl md:text-[44px] md:leading-tight dark:text-white">
-                  Transformi cererile în comenzi, simplu și rapid
+                    {t("providerTitle")}
                   </h2>
                   <p className="text-body mb-[30px] text-base leading-relaxed">
-                  Îți creezi profilul, publici serviciile și primești solicitări cu detalii clare: locație, interval și cerințe. Confirmi ușor și îți organizezi mai bine programul.               
-                     </p>
+                    {t("providerLead")}
+                  </p>
 
                   <Link
                     href="/providers/onboarding"
                     className="bg-primary hover:bg-primary/90 inline-block rounded-md px-8 py-[10px] text-base font-medium text-white"
                   >
-                    Începe onboardingul
+                    {t("ctaOnboarding")}
                   </Link>
                 </div>
               </div>
@@ -165,7 +166,7 @@ const About = () => {
                 >
                   <PhoneMockup
                     src="/images/screenshots/Prestator_cereri.jpg"
-                    alt="Cereri noi pentru prestator"
+                    alt={t("mockupProviderAlt")}
                     sizes="(min-width: 1024px) 294px, (min-width: 768px) 280px, 260px"
                   />
 

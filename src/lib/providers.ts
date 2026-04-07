@@ -32,23 +32,28 @@ export const providerLegalStatusLabel: Record<ProviderLegalStatus, string> = {
   need_guidance: "Am nevoie de ghidaj",
 };
 
-export const providerCityOptions = [
-  "Bucuresti",
-  "Cluj-Napoca",
-  "Timisoara",
-  "Iasi",
-  "Constanta",
-  "Brasov",
-];
+/** Canonical values stored in Firestore / validated by API; labels come from i18n. */
+export const PROVIDER_CITY_ENTRIES = [
+  { value: "Bucuresti", messageKey: "cityBucuresti" },
+  { value: "Cluj-Napoca", messageKey: "cityCluj" },
+  { value: "Timisoara", messageKey: "cityTimisoara" },
+  { value: "Iasi", messageKey: "cityIasi" },
+  { value: "Constanta", messageKey: "cityConstanta" },
+  { value: "Brasov", messageKey: "cityBrasov" },
+] as const;
 
-export const providerServiceOptions = [
-  "Curatenie rezidentiala",
-  "Curatenie birouri",
-  "Curatenie dupa renovare",
-  "Curatenie canapele",
-  "Curatenie geamuri",
-  "Curatenie industriala",
-];
+export const PROVIDER_SERVICE_ENTRIES = [
+  { value: "Curatenie rezidentiala", messageKey: "serviceResidential" },
+  { value: "Curatenie birouri", messageKey: "serviceOffices" },
+  { value: "Curatenie dupa renovare", messageKey: "servicePostRenovation" },
+  { value: "Curatenie canapele", messageKey: "serviceUpholstery" },
+  { value: "Curatenie geamuri", messageKey: "serviceWindows" },
+  { value: "Curatenie industriala", messageKey: "serviceIndustrial" },
+] as const;
+
+export const providerCityOptions = PROVIDER_CITY_ENTRIES.map((e) => e.value);
+
+export const providerServiceOptions = PROVIDER_SERVICE_ENTRIES.map((e) => e.value);
 
 function normalizeOption(value: string) {
   return value.trim().toLowerCase();

@@ -2,7 +2,7 @@ import { formatDate } from "@/lib/format-date";
 import { imageBuilder } from "@/sanity/sanity-utils";
 import { Blog } from "@/types/blog";
 import Image from "next/image";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 
 const BlogItem = ({ blog }: { blog: Blog }) => {
   return (

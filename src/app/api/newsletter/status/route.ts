@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { getRequestLocale } from "@/lib/apiLocale";
+import { jsonApiError } from "@/lib/apiJsonError";
 import { getAdminDb } from "@/lib/firebaseAdmin";
 
 function normalizeEmail(value?: string | null) {
@@ -10,11 +12,16 @@ function isValidEmail(value: string) {
 }
 
 export async function GET(request: Request) {
+  const locale = getRequestLocale(request);
   const { searchParams } = new URL(request.url);
   const normalizedEmail = normalizeEmail(searchParams.get("email"));
 
-  if (!normalizedEmail || !isValidEmail(normalizedEmail)) {
-    return NextResponse.json({ error: "Invalid email" }, { status: 400 });
+  if (!normalizedEmail) {
+    return jsonApiError(locale, "NEWSLETTER_EMAIL_REQUIRED", 400);
+  }
+
+  if (!isValidEmail(normalizedEmail)) {
+    return jsonApiError(locale, "NEWSLETTER_INVALID_EMAIL", 400);
   }
 
   try {
@@ -38,10 +45,7 @@ export async function GET(request: Request) {
       !existingSnap.empty && existingSnap.docs[0].get("status") === "active";
 
     return NextResponse.json({ isActiveSubscriber }, { status: 200 });
-  } catch (error) {
-    return NextResponse.json(
-      { error: "Failed to check newsletter status" },
-      { status: 500 }
-    );
+  } catch {
+    return jsonApiError(locale, "NEWSLETTER_STATUS_CHECK_FAILED", 500);
   }
 }

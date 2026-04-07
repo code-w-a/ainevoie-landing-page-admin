@@ -1,25 +1,21 @@
 import { NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
+import { getRequestLocale } from "@/lib/apiLocale";
+import { jsonApiError } from "@/lib/apiJsonError";
 import { getAdminDb } from "@/lib/firebaseAdmin";
 
 export async function POST(req: Request) {
+  const locale = getRequestLocale(req);
   const { email } = (await req.json()) as { email?: string };
   const normalizedEmail =
     typeof email === "string" ? email.trim().toLowerCase() : "";
 
   if (!normalizedEmail) {
-    return NextResponse.json(
-      { error: "Emailul este obligatoriu." },
-      { status: 400 },
-    );
+    return jsonApiError(locale, "NEWSLETTER_EMAIL_REQUIRED", 400);
   }
 
-  // Minimal email sanity check.
   if (!normalizedEmail.includes("@")) {
-    return NextResponse.json(
-      { error: "Email invalid." },
-      { status: 400 },
-    );
+    return jsonApiError(locale, "NEWSLETTER_INVALID_EMAIL", 400);
   }
 
   try {
@@ -73,10 +69,7 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json({ status: "subscribed" }, { status: 200 });
-  } catch (error) {
-    return NextResponse.json(
-      { error: "Nu am putut finaliza abonarea." },
-      { status: 500 },
-    );
+  } catch {
+    return jsonApiError(locale, "NEWSLETTER_SUBSCRIBE_FAILED", 500);
   }
 }

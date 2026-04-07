@@ -1,40 +1,58 @@
 "use client";
 
+import { useRouter } from "@/i18n/navigation";
 import { passwordValidation } from "@/utils/validations";
 import axios, { AxiosError } from "axios";
-import { useRouter } from "next/navigation";
+import { useLocale, useTranslations } from "next-intl";
 import { useRef, useState } from "react";
 import toast from "react-hot-toast";
 
 const ResetPassword = ({ userEmail }: { userEmail: string }) => {
+  const t = useTranslations("ResetPassword");
+  const tAuth = useTranslations("Auth");
+  const locale = useLocale();
   const inputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState("");
 
   const router = useRouter();
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!inputRef.current) return;
 
     const password = inputRef.current.value;
 
     if (!passwordValidation(password)) {
-      setError(
-        "Parola trebuie să conțină cel puțin o literă mare, o literă mică, o cifră și un caracter special",
-      );
+      setError(tAuth("passwordRule"));
       return;
     }
 
     try {
-      await axios.post("/api/forget-password/update", {
-        email: userEmail,
-        password,
-      });
+      await axios.post(
+        "/api/forget-password/update",
+        {
+          email: userEmail,
+          password,
+        },
+        { headers: { "x-next-intl-locale": locale } }
+      );
 
-      toast.success("Parola a fost actualizată cu succes!");
+      toast.success(t("successToast"));
       router.push("/auth/signin");
-    } catch (error) {
-      if (error instanceof AxiosError) {
-        toast.error(error.response?.data || "A apărut o eroare. Încearcă din nou.");
+    } catch (err) {
+      if (err instanceof AxiosError) {
+        const body = err.response?.data as { error?: string } | string | undefined;
+        const msg =
+          typeof body === "string"
+            ? body
+            : typeof body === "object" && body && "error" in body
+              ? body.error
+              : undefined;
+        toast.error(
+          typeof msg === "string" && msg.length > 0 ? msg : t("errorGeneric")
+        );
+      } else {
+        toast.error(t("errorGeneric"));
       }
     }
   };
@@ -45,10 +63,10 @@ const ResetPassword = ({ userEmail }: { userEmail: string }) => {
         <div className="shadow-card dark:shadow-card-dark mx-auto w-full max-w-[520px] rounded-lg bg-[#F8FAFB] px-6 py-10 sm:p-[50px] dark:bg-[#15182A]">
           <div className="text-center">
             <h3 className="mb-[10px] text-2xl font-bold text-black sm:text-[28px] dark:text-white">
-              Actualizează parola
+              {t("title")}
             </h3>
 
-            <p className="text-body mb-11 text-base">Introdu noua parolă</p>
+            <p className="text-body mb-11 text-base">{t("subtitle")}</p>
           </div>
 
           <form onSubmit={handleSubmit}>
@@ -57,13 +75,13 @@ const ResetPassword = ({ userEmail }: { userEmail: string }) => {
                 htmlFor="password"
                 className="mb-[10px] block text-sm text-black dark:text-white"
               >
-                Parolă
+                {t("passwordLabel")}
               </label>
               <input
                 id="password"
                 ref={inputRef}
                 type="password"
-                placeholder="Parolă"
+                placeholder={t("passwordPh")}
                 required
                 className="border-stroke text-body focus:border-primary focus:shadow-input dark:border-stroke-dark dark:focus:border-primary w-full rounded-md border bg-white px-6 py-3 text-base font-medium outline-hidden dark:bg-black dark:text-white"
               />
@@ -72,11 +90,12 @@ const ResetPassword = ({ userEmail }: { userEmail: string }) => {
             </div>
 
             <button
+              type="submit"
               className={`hover:bg-blackho dark:bg-btndark dark:hover:bg-blackho mx-auto mt-5 inline-flex items-center justify-center gap-2.5 rounded-full bg-black px-6 py-3 font-medium text-white duration-300 ease-in-out ${
                 error ? "bg-gray-600" : "bg-black"
               }`}
             >
-              Salvează parola
+              {t("submit")}
               <svg
                 className="fill-white"
                 width="14"

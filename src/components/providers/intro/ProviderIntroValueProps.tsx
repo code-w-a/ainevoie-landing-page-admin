@@ -1,48 +1,38 @@
-import { CalendarCheck, ClipboardCheck, Compass, Handshake, ShieldCheck, Sparkles } from "lucide-react";
+"use client";
 
-const valueProps = [
-  {
-    title: "Vizibilitate mai bună",
-    description: "Profilul tău intră în fluxul de selecție al clienților.",
-    Icon: Compass,
-  },
-  {
-    title: "Timp economisit",
-    description: "Primești cereri mai clare, cu date esențiale din start.",
-    Icon: ClipboardCheck,
-  },
-  {
-    title: "Program mai predictibil",
-    description: "Organizezi comenzile mai ușor, cu mai puține clarificări.",
-    Icon: CalendarCheck,
-  },
-  {
-    title: "Încredere pentru clienți",
-    description: "Datele validate cresc credibilitatea profilului tău.",
-    Icon: ShieldCheck,
-  },
-  {
-    title: "Pornire simplă",
-    description: "Onboarding rapid, fără pași complicați sau procese greoaie.",
-    Icon: Sparkles,
-  },
-  {
-    title: "Relație directă cu echipa",
-    description: "Primești suport dacă lipsesc informații la activare.",
-    Icon: Handshake,
-  },
-];
+import {
+  CalendarCheck,
+  ClipboardCheck,
+  Compass,
+  Handshake,
+  ShieldCheck,
+  Sparkles,
+} from "lucide-react";
+import { useTranslations } from "next-intl";
+import { useMemo } from "react";
 
 export default function ProviderIntroValueProps() {
+  const t = useTranslations("ProviderIntro");
+
+  const valueProps = useMemo(
+    () => [
+      { title: t("v1t"), description: t("v1d"), Icon: Compass },
+      { title: t("v2t"), description: t("v2d"), Icon: ClipboardCheck },
+      { title: t("v3t"), description: t("v3d"), Icon: CalendarCheck },
+      { title: t("v4t"), description: t("v4d"), Icon: ShieldCheck },
+      { title: t("v5t"), description: t("v5d"), Icon: Sparkles },
+      { title: t("v6t"), description: t("v6d"), Icon: Handshake },
+    ],
+    [t]
+  );
+
   return (
     <section id="beneficii-prestatori" className="pt-12 sm:pt-16">
       <div className="mx-auto max-w-[760px] text-center">
         <h2 className="mb-3 text-2xl font-bold text-black dark:text-white sm:text-3xl">
-          Tot ce îți trebuie pentru a lucra eficient ca prestator
+          {t("valueTitle")}
         </h2>
-        <p className="text-body text-sm sm:text-base">
-          AInevoie simplifică activarea și gestionarea comenzilor dintr-un singur flux.
-        </p>
+        <p className="text-body text-sm sm:text-base">{t("valueSubtitle")}</p>
       </div>
 
       <div className="mt-8 rounded-2xl bg-white px-5 pb-10 pt-10 shadow-card dark:bg-dark dark:shadow-card-dark sm:px-8 sm:pt-12">

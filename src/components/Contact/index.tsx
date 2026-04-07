@@ -1,4 +1,10 @@
+"use client";
+
+import { useTranslations } from "next-intl";
+
 const Contact = () => {
+  const t = useTranslations("Contact");
+
   return (
     <>
       <section id="support" className="pt-[100px] pb-[110px]">
@@ -8,11 +14,9 @@ const Contact = () => {
             data-wow-delay=".2s"
           >
             <h2 className="mb-4 text-3xl font-bold text-black sm:text-4xl md:text-[44px] md:leading-tight dark:text-white">
-              Ai întrebări? Îți răspundem rapid.
+              {t("title")}
             </h2>
-            <p className="text-body text-base">
-              Spune-ne dacă ești client sau furnizor și ce ai nevoie. Revenim cu un răspuns cât mai repede.
-            </p>
+            <p className="text-body text-base">{t("subtitle")}</p>
           </div>
         </div>
 
@@ -29,7 +33,7 @@ const Contact = () => {
                       type="text"
                       name="name"
                       id="name"
-                      placeholder="Numele tău"
+                      placeholder={t("namePh")}
                       className="border-stroke text-body focus:border-primary dark:focus:border-primary w-full rounded-sm border bg-white px-[30px] py-4 text-base outline-hidden dark:border-[#34374A] dark:bg-[#2A2E44]"
                     />
                   </div>
@@ -41,7 +45,7 @@ const Contact = () => {
                       type="text"
                       name="company"
                       id="company"
-                      placeholder="Companie (opțional)"
+                      placeholder={t("companyPh")}
                       className="border-stroke text-body focus:border-primary dark:focus:border-primary w-full rounded-sm border bg-white px-[30px] py-4 text-base outline-hidden dark:border-[#34374A] dark:bg-[#2A2E44]"
                     />
                   </div>
@@ -53,7 +57,7 @@ const Contact = () => {
                       type="email"
                       name="email"
                       id="email"
-                      placeholder="email@exemplu.ro"
+                      placeholder={t("emailPh")}
                       className="border-stroke text-body focus:border-primary dark:focus:border-primary w-full rounded-sm border bg-white px-[30px] py-4 text-base outline-hidden dark:border-[#34374A] dark:bg-[#2A2E44]"
                     />
                   </div>
@@ -65,7 +69,7 @@ const Contact = () => {
                       type="text"
                       name="phone"
                       id="phone"
-                      placeholder="Telefon (opțional)"
+                      placeholder={t("phonePh")}
                       className="border-stroke text-body focus:border-primary dark:focus:border-primary w-full rounded-sm border bg-white px-[30px] py-4 text-base outline-hidden dark:border-[#34374A] dark:bg-[#2A2E44]"
                     />
                   </div>
@@ -77,7 +81,7 @@ const Contact = () => {
                       rows={6}
                       name="message"
                       id="message"
-                      placeholder="Scrie pe scurt ce ai nevoie…"
+                      placeholder={t("messagePh")}
                       className="border-stroke text-body focus:border-primary dark:focus:border-primary w-full rounded-sm border bg-white px-[30px] py-4 text-base outline-hidden dark:border-[#34374A] dark:bg-[#2A2E44]"
                     ></textarea>
                   </div>
@@ -86,13 +90,13 @@ const Contact = () => {
                 <div className="w-full px-[22px]">
                   <div className="text-center">
                     <p className="text-body mb-5 text-center text-base">
-                      Prin trimiterea mesajului ești de acord să te contactăm pentru a răspunde solicitării. Nu trimitem spam.
+                      {t("consent")}
                     </p>
                     <button
                       type="submit"
                       className="bg-primary hover:bg-primary/90 inline-block rounded-md px-11 py-[14px] text-base font-medium text-white"
                     >
-                      Trimite mesajul
+                      {t("submit")}
                     </button>
                   </div>
                 </div>

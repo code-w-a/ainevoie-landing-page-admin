@@ -1,29 +1,42 @@
+"use client";
+
 import { Check } from "lucide-react";
+import { useTranslations } from "next-intl";
+import { useMemo } from "react";
 
 type HorizontalTimelineStepperProps = {
   currentStep: number;
 };
 
-const steps = [
-  { id: 1, label: "Contact" },
-  { id: 2, label: "Servicii" },
-  { id: 3, label: "Confirmare" },
-];
-
 export default function HorizontalTimelineStepper({
   currentStep,
 }: HorizontalTimelineStepperProps) {
+  const t = useTranslations("ProviderForm");
+
+  const steps = useMemo(
+    () => [
+      { id: 1, label: t("stepContact") },
+      { id: 2, label: t("stepServices") },
+      { id: 3, label: t("stepConfirm") },
+    ],
+    [t]
+  );
+
   const safeStep = Math.min(Math.max(currentStep, 1), steps.length);
   const progress = ((safeStep - 1) / (steps.length - 1)) * 100;
+  const currentLabel = steps[safeStep - 1]?.label ?? "";
 
   return (
     <div className="w-full rounded-xl border border-border bg-background/60 p-3 sm:p-4">
       <p className="mb-3 text-xs font-medium text-muted-foreground sm:hidden">
-        Pasul {safeStep}/3 — {steps[safeStep - 1].label}
+        {t("stepperMobile", { step: safeStep, label: currentLabel })}
       </p>
 
       <div className="relative">
-        <div className="absolute top-3 left-0 right-0 h-0.5 bg-border sm:top-3.5" aria-hidden="true" />
+        <div
+          className="absolute top-3 left-0 right-0 h-0.5 bg-border sm:top-3.5"
+          aria-hidden="true"
+        />
         <div
           className="bg-primary absolute top-3 left-0 h-0.5 transition-all duration-300 sm:top-3.5"
           style={{ width: `${progress}%` }}

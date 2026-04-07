@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
+import { type AppLocale, getRequestLocale } from "@/lib/apiLocale";
+import { getApiErrorMessage } from "@/lib/apiMessages";
 import { getAdminDb } from "@/lib/firebaseAdmin";
 import { sendEmail } from "@/lib/email";
 import {
@@ -8,7 +10,10 @@ import {
   isProviderLegalStatus,
   isProviderServiceOption,
 } from "@/lib/providers";
-import { getProviderWelcomeTemplate } from "@/lib/emailTemplates/providerWelcome";
+import {
+  getProviderWelcomeEmailSubject,
+  getProviderWelcomeTemplate,
+} from "@/lib/emailTemplates/providerWelcome";
 import type {
   ProviderLegalStatus,
   ProviderNewsletterStatusAtSignup,
@@ -29,6 +34,7 @@ type OnboardingPayload = {
   hasAccountant?: "yes" | "no" | "unsure";
   newsletterOptIn?: boolean;
   acceptTerms?: boolean;
+  locale?: string;
 };
 
 const MIN_PASSWORD_LENGTH = 8;
@@ -48,13 +54,14 @@ type WelcomeEmailResult = {
 
 async function sendWelcomeEmail(
   email: string,
-  fullName: string
+  fullName: string,
+  locale: AppLocale
 ): Promise<WelcomeEmailResult> {
   try {
-    const template = getProviderWelcomeTemplate({ fullName });
+    const template = getProviderWelcomeTemplate({ fullName, locale });
     await sendEmail({
       to: email,
-      subject: "Bine ai venit pe AInevoie",
+      subject: getProviderWelcomeEmailSubject(locale),
       html: template.html,
       text: template.text,
     });
@@ -66,9 +73,24 @@ async function sendWelcomeEmail(
   }
 }
 
+function jsonError(locale: AppLocale, code: string, status: number) {
+  return NextResponse.json(
+    { error: getApiErrorMessage(locale, code), code },
+    { status }
+  );
+}
+
+function resolveLocale(body: OnboardingPayload, request: Request): AppLocale {
+  if (body.locale === "en" || body.locale === "ro") {
+    return body.locale;
+  }
+  return getRequestLocale(request);
+}
+
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as OnboardingPayload;
+    const locale = resolveLocale(body, request);
     const fullName = normalize(body.fullName);
     const email = normalizeEmail(body.email);
     const password = normalize(body.password);
@@ -85,62 +107,38 @@ export async function POST(request: Request) {
     const acceptTerms = body.acceptTerms === true;
 
     if (!fullName || !email || !password || !phone || !city || !serviceType || !legalStatus) {
-      return NextResponse.json(
-        { error: "Toate campurile sunt obligatorii." },
-        { status: 400 }
-      );
+      return jsonError(locale, "MISSING_FIELDS", 400);
     }
 
     if (!email.includes("@")) {
-      return NextResponse.json({ error: "Email invalid." }, { status: 400 });
+      return jsonError(locale, "INVALID_EMAIL", 400);
     }
 
     if (password.length < MIN_PASSWORD_LENGTH) {
-      return NextResponse.json(
-        { error: "Parola trebuie sa aiba cel putin 8 caractere." },
-        { status: 400 }
-      );
+      return jsonError(locale, "PASSWORD_TOO_SHORT", 400);
     }
 
     if (!isProviderLegalStatus(legalStatus)) {
-      return NextResponse.json(
-        { error: "Status juridic invalid." },
-        { status: 400 }
-      );
+      return jsonError(locale, "INVALID_LEGAL_STATUS", 400);
     }
     if (
       (legalStatus === "pfa_ready" || legalStatus === "srl_ready") &&
       (!companyName || !cui)
     ) {
-      return NextResponse.json(
-        { error: "Pentru PFA/SRL, numele companiei și CUI sunt obligatorii." },
-        { status: 400 }
-      );
+      return jsonError(locale, "COMPANY_DETAILS_REQUIRED", 400);
     }
     if (legalStatus === "in_progress" && !estimatedSetupTimeline) {
-      return NextResponse.json(
-        { error: "Te rugăm să selectezi un interval estimativ de înființare." },
-        { status: 400 }
-      );
+      return jsonError(locale, "SETUP_TIMELINE_REQUIRED", 400);
     }
     if (!isProviderCityOption(city)) {
-      return NextResponse.json(
-        { error: "Orasul selectat nu este valid." },
-        { status: 400 }
-      );
+      return jsonError(locale, "INVALID_CITY", 400);
     }
     if (!isProviderServiceOption(serviceType)) {
-      return NextResponse.json(
-        { error: "Tipul de serviciu selectat nu este valid." },
-        { status: 400 }
-      );
+      return jsonError(locale, "INVALID_SERVICE", 400);
     }
 
     if (!acceptTerms) {
-      return NextResponse.json(
-        { error: "Trebuie sa accepti termenii si politica de confidentialitate." },
-        { status: 400 }
-      );
+      return jsonError(locale, "TERMS_NOT_ACCEPTED", 400);
     }
 
     const db = getAdminDb();
@@ -152,10 +150,7 @@ export async function POST(request: Request) {
       .get();
 
     if (!existingProvider.empty) {
-      return NextResponse.json(
-        { error: "Exista deja un cont pentru acest email." },
-        { status: 409 }
-      );
+      return jsonError(locale, "PROVIDER_EMAIL_EXISTS", 409);
     }
 
     let userRecord;
@@ -168,15 +163,12 @@ export async function POST(request: Request) {
     } catch (error) {
       const message = error instanceof Error ? error.message : "create_user_failed";
       if (message.includes("email-already-exists")) {
-        return NextResponse.json(
-          { error: "Emailul este deja folosit." },
-          { status: 409 }
-        );
+        return jsonError(locale, "AUTH_EMAIL_EXISTS", 409);
       }
       throw error;
     }
 
-    const welcomeEmailResult = await sendWelcomeEmail(email, fullName);
+    const welcomeEmailResult = await sendWelcomeEmail(email, fullName, locale);
 
     let newsletterStatusAtSignup: ProviderNewsletterStatusAtSignup = "skipped";
     let newsletterError: string | null = null;
@@ -286,10 +278,8 @@ export async function POST(request: Request) {
       welcomeEmailSent: welcomeEmailResult.sent,
       newsletterStatusAtSignup,
     });
-  } catch (error) {
-    return NextResponse.json(
-      { error: "Nu am putut finaliza inregistrarea. Incearca din nou." },
-      { status: 500 }
-    );
+  } catch {
+    const locale = getRequestLocale(request);
+    return jsonError(locale, "SERVER_ERROR", 500);
   }
 }

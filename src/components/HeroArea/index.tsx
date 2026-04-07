@@ -1,7 +1,8 @@
 "use client";
 // import dynamic from "next/dynamic";
 import PhoneMockup from "@/components/PhoneMockup";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
+import { useLocale, useTranslations } from "next-intl";
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 // Temporar: video demo — repune importul + VideoModal când există video real.
@@ -10,6 +11,8 @@ import toast from "react-hot-toast";
 // });
 
 const HeroArea = () => {
+  const t = useTranslations("Hero");
+  const locale = useLocale();
   // Temporar: folosit de linkul video — repune împreună cu VideoModal.
   // const [toggler, setToggler] = useState(false);
   const [showNewsletterDialog, setShowNewsletterDialog] = useState(false);
@@ -34,7 +37,7 @@ const HeroArea = () => {
     const email = newsletterEmail.trim();
     if (!email) {
       setNewsletterStatus("error");
-      toast.error("Scrie adresa de email ca să te înscrii.");
+      toast.error(t("toastEmailRequired"));
       return;
     }
 
@@ -43,7 +46,10 @@ const HeroArea = () => {
 
       const res = await fetch("/api/newsletter", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-next-intl-locale": locale,
+        },
         body: JSON.stringify({ email }),
       });
 
@@ -53,9 +59,7 @@ const HeroArea = () => {
           | null;
         const isAlready = payload?.status === "already_subscribed";
         toast.success(
-          isAlready
-            ? "Ești deja pe listă. Îți dăm un semn la lansare."
-            : "Super! Ești pe listă. Îți scriem când lansăm în zona ta."
+          isAlready ? t("toastAlreadyList") : t("toastSubscribed")
         );
         setNewsletterStatus("success");
         setNewsletterEmail("");
@@ -66,17 +70,21 @@ const HeroArea = () => {
         return;
       }
 
-      if (res.status === 503) {
-        setNewsletterStatus("error");
-        toast.error("Înscrierea la newsletter e indisponibilă momentan.");
-        return;
-      }
-
+      const errBody = (await res.json().catch(() => null)) as
+        | { error?: string }
+        | null;
+      const serverMsg =
+        typeof errBody?.error === "string" ? errBody.error : null;
       setNewsletterStatus("error");
-      toast.error("Nu am reușit să te înscriem. Încearcă din nou.");
+      toast.error(
+        serverMsg ??
+          (res.status === 503
+            ? t("toastNewsletterDown")
+            : t("toastSubscribeFail"))
+      );
     } catch {
       setNewsletterStatus("error");
-      toast.error("Eroare de rețea. Încearcă din nou.");
+      toast.error(t("toastNetwork"));
     }
   }
 
@@ -91,18 +99,18 @@ const HeroArea = () => {
                 data-wow-delay=".3s"
               >
                 <span className="mb-5 block text-lg leading-tight font-medium text-black sm:text-[22px] xl:text-[22px] dark:text-white">
-                  AInevoie • Market Servicii
+                  {t("badge")}
                 </span>
                 <h1 className="mb-4 text-3xl leading-tight font-bold text-black sm:text-[40px] md:text-[50px] lg:text-[42px] xl:text-[50px] dark:text-white">
-                  De la{" "}
+                  {t("titleBefore")}{" "}
                   <span className="bg-gradient-1 inline bg-clip-text text-transparent">
-                    nevoie
+                    {t("titleHighlight")}
                   </span>{" "}
-                  la rezolvare.
+                  {t("titleAfter")}
                 </h1>
 
                 <p className="text-body mb-8 text-base leading-relaxed sm:text-[17px]">
-                Găsești servicii sau primești comenzi, într-o singură aplicație.
+                  {t("subtitle")}
                 </p>
                
 
@@ -112,16 +120,14 @@ const HeroArea = () => {
                     onClick={() => setShowNewsletterDialog(true)}
                     className="mr-6 mb-6 inline-flex h-[60px] items-center rounded-lg bg-black px-[30px] py-[14px] text-white hover:bg-black/90 dark:bg-white dark:text-black dark:hover:bg-white/90"
                   >
-                    <span className="leading-relaxed">
-                      Înscrie-te pe lista de lansare
-                    </span>
+                    <span className="leading-relaxed">{t("ctaNewsletter")}</span>
                   </button>
 
                   <Link
                     href="/providers/onboarding"
                     className="border-stroke dark:border-stroke-dark hover:border-primary hover:text-primary mr-6 mb-6 inline-flex h-[60px] items-center rounded-lg border px-[28px] py-[14px] text-black dark:text-white dark:hover:text-white"
                   >
-                    Devino prestator
+                    {t("ctaProvider")}
                   </Link>
 
                   {/*
@@ -164,7 +170,7 @@ const HeroArea = () => {
               >
                 <PhoneMockup
                   src="/images/screenshots/utilizator_ecran_home.jpg"
-                  alt="Ecranul principal al aplicației AInevoie"
+                  alt={t("mockupAlt")}
                   priority={true}
                   sizes="(min-width: 1280px) 360px, (min-width: 1024px) 320px, 280px"
                 />
@@ -254,7 +260,7 @@ const HeroArea = () => {
               type="button"
               onClick={() => setShowNewsletterDialog(false)}
               className="absolute top-4 right-4 text-body hover:text-black dark:hover:text-white"
-              aria-label="Închide"
+              aria-label={t("dialogClose")}
             >
               <svg
                 width="24"
@@ -274,11 +280,9 @@ const HeroArea = () => {
             </button>
 
             <h3 className="mb-2 text-2xl font-bold text-black dark:text-white">
-              Înscrie-te pe lista de lansare
+              {t("dialogTitle")}
             </h3>
-            <p className="text-body mb-6 text-base">
-              Fii printre primii care află când lansăm aplicația. Fără spam, doar update-uri importante.
-            </p>
+            <p className="text-body mb-6 text-base">{t("dialogBody")}</p>
 
             <form onSubmit={handleNewsletterSubmit}>
               <input
@@ -286,7 +290,7 @@ const HeroArea = () => {
                 name="newsletterEmail"
                 value={newsletterEmail}
                 onChange={(e) => setNewsletterEmail(e.target.value)}
-                placeholder="Email-ul tău"
+                placeholder={t("dialogEmailPh")}
                 autoComplete="email"
                 className="border-stroke text-body focus:border-primary dark:focus:border-primary mb-4 w-full rounded-sm border bg-white px-[22px] py-4 text-base outline-hidden dark:border-[#34374A] dark:bg-[#2A2E44]"
                 disabled={newsletterStatus === "loading"}
@@ -298,7 +302,9 @@ const HeroArea = () => {
                 disabled={newsletterStatus === "loading"}
                 className="bg-primary hover:bg-primary/90 w-full rounded-md px-8 py-4 text-base font-medium text-white disabled:opacity-60"
               >
-                {newsletterStatus === "loading" ? "Se trimite…" : "Înscrie-te"}
+                {newsletterStatus === "loading"
+                  ? t("dialogSubmitting")
+                  : t("dialogSubmit")}
               </button>
             </form>
           </div>

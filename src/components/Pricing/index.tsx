@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
-import { Price } from "@/types/priceItem";
-
 import { pricingData } from "../../stripe/pricingData";
 import { PricingItem } from "./PricingItem";
+import { useTranslations } from "next-intl";
+import React, { useState } from "react";
 
 const Pricing = () => {
   const [planType, setPlanType] = useState(false);
+  const t = useTranslations("Pricing");
 
   return (
     <>
@@ -18,11 +18,9 @@ const Pricing = () => {
             data-wow-delay=".2s"
           >
             <h2 className="mb-4 text-3xl font-bold text-black dark:text-white sm:text-4xl md:text-[44px] md:leading-tight">
-              Planuri simple. Fără surprize.
+              {t("title")}
             </h2>
-            <p className="text-base text-body">
-              Alege planul potrivit în funcție de cât folosești aplicația. Poți schimba oricând.
-            </p>
+            <p className="text-base text-body">{t("subtitle")}</p>
           </div>
         </div>
 
@@ -40,7 +38,7 @@ const Pricing = () => {
                 onClick={() => setPlanType(!planType)}
               />
               <span className="monthly text-sm font-medium text-black dark:text-white">
-                Lunar
+                {t("monthly")}
               </span>
               <span className="mx-5 flex h-[34px] w-[60px] cursor-pointer items-center rounded-full bg-primary p-[3px]">
                 <span
@@ -48,7 +46,7 @@ const Pricing = () => {
                 ></span>
               </span>
               <span className="yearly text-sm font-medium text-black dark:text-white">
-                Anual
+                {t("yearly")}
               </span>
             </label>
           </div>

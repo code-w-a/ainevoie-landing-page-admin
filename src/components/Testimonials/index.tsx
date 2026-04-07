@@ -1,43 +1,47 @@
-import React from "react";
+"use client";
+
 import { Testimonial } from "@/types/testimonial";
 import Image from "next/image";
-
-const testimonialData: Testimonial[] = [
-  {
-    quote:
-      "Am găsit rapid un instalator disponibil în aceeași zi. Programarea a fost simplă și totul a fost clar din start.",
-    authorImage: "/images/testimonials/author-1.png",
-    authorName: "Andreea M.",
-    authorRole: "Client",
-    review: 5.0,
-  },
-  {
-    quote:
-      "Cereri mai bine organizate și mult mai puține apeluri. Confirm programările din aplicație și am o evidență curată.",
-    authorImage: "/images/testimonials/author-2.png",
-    authorName: "Marius I.",
-    authorRole: "Furnizor servicii",
-    review: 5.0,
-  },
-  {
-    quote:
-      "Mi-a plăcut că am văzut recenziile și tarifele înainte. Am ales repede și am economisit timp.",
-    authorImage: "/images/testimonials/author-3.png",
-    authorName: "Elena P.",
-    authorRole: "Client",
-    review: 4.9,
-  },
-  {
-    quote:
-      "Profilul meu arată profesionist, iar clienții vin cu cereri clare. Asta face diferența.",
-    authorImage: "/images/testimonials/author-04.png",
-    authorName: "Cristian D.",
-    authorRole: "Furnizor",
-    review: 4.8,
-  },
-];
+import { useTranslations } from "next-intl";
+import React, { useMemo } from "react";
 
 const Testimonials = () => {
+  const t = useTranslations("Testimonials");
+
+  const testimonialData: Testimonial[] = useMemo(
+    () => [
+      {
+        quote: t("t1"),
+        authorImage: "/images/testimonials/author-1.png",
+        authorName: t("t1name"),
+        authorRole: t("t1role"),
+        review: 5.0,
+      },
+      {
+        quote: t("t2"),
+        authorImage: "/images/testimonials/author-2.png",
+        authorName: t("t2name"),
+        authorRole: t("t2role"),
+        review: 5.0,
+      },
+      {
+        quote: t("t3"),
+        authorImage: "/images/testimonials/author-3.png",
+        authorName: t("t3name"),
+        authorRole: t("t3role"),
+        review: 4.9,
+      },
+      {
+        quote: t("t4"),
+        authorImage: "/images/testimonials/author-04.png",
+        authorName: t("t4name"),
+        authorRole: t("t4role"),
+        review: 4.8,
+      },
+    ],
+    [t]
+  );
+
   return (
     <>
       <section id="testimonials" className="relative z-10 pb-[60px] pt-[110px]">
@@ -47,11 +51,9 @@ const Testimonials = () => {
             data-wow-delay=".2s"
           >
             <h2 className="mb-4 text-3xl font-bold text-black dark:text-white sm:text-4xl md:text-[44px] md:leading-tight">
-              Ce spun utilizatorii
+              {t("title")}
             </h2>
-            <p className="text-base text-body">
-              Feedback real de la clienți și furnizori.
-            </p>
+            <p className="text-base text-body">{t("subtitle")}</p>
           </div>
         </div>
 
@@ -74,7 +76,7 @@ const Testimonials = () => {
                           width={56}
                           height={56}
                           src={item.authorImage}
-                          alt="author"
+                          alt=""
                           className="h-full w-full object-cover object-center"
                         />
                       </div>
