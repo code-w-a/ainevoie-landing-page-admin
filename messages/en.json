@@ -469,6 +469,7 @@
     "newsletterSubscribed": "This email is already subscribed to the newsletter.",
     "newsletterOptIn": "I would like the newsletter with news, offers and product updates.",
     "newsletterCheckError": "We could not verify your newsletter status. You can still choose manually.",
+    "launchContactOptIn": "I agree that the AInevoie team may contact me about launch updates and onboarding steps.",
     "termsRequired": "You must accept the terms and privacy policy.",
     "termsAgree": "I agree to the",
     "termsLink": "terms & conditions",

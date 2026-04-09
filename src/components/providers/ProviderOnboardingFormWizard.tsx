@@ -30,6 +30,7 @@ type FormValues = {
   estimatedSetupTimeline: string;
   hasAccountant: "yes" | "no" | "unsure";
   newsletterOptIn: boolean;
+  launchContactConsent: boolean;
   acceptTerms: boolean;
 };
 
@@ -82,6 +83,7 @@ export default function ProviderOnboardingFormWizard({
       estimatedSetupTimeline: "",
       hasAccountant: "unsure",
       newsletterOptIn: false,
+      launchContactConsent: false,
       city: PROVIDER_CITY_ENTRIES[0].value,
       serviceType: PROVIDER_SERVICE_ENTRIES[0].value,
       acceptTerms: false,
@@ -479,6 +481,19 @@ export default function ProviderOnboardingFormWizard({
 
           <Controller
             control={control}
+            name="launchContactConsent"
+            render={({ field }) => (
+              <Checkbox
+                name={field.name}
+                checked={field.value}
+                onChange={(event) => field.onChange(event.target.checked)}
+                label={t("launchContactOptIn")}
+              />
+            )}
+          />
+
+          <Controller
+            control={control}
             name="acceptTerms"
             rules={{
               required: t("termsRequired"),
@@ -487,8 +502,8 @@ export default function ProviderOnboardingFormWizard({
               <div>
                 <Checkbox
                   name={field.name}
+                  checked={field.value}
                   onChange={(event) => field.onChange(event.target.checked)}
-                  defaultChecked={field.value}
                   label={
                     <>
                       {t("termsAgree")}{" "}

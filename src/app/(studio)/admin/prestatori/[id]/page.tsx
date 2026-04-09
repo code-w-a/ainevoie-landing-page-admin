@@ -1,10 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { adminFetch } from "@/components/admin/adminApi";
-import { providerLegalStatusLabel, providerStatusLabel } from "@/lib/providers";
+import {
+  getProviderLaunchContactConsentState,
+  getProviderLegalConsentState,
+  providerLegalStatusLabel,
+  providerStatusLabel,
+} from "@/lib/providers";
 import { formatAdminDateTime } from "@/lib/formatAdminDateTime";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,6 +30,13 @@ type ProviderDetails = {
   tradeRegisterNumber?: string | null;
   estimatedSetupTimeline?: string | null;
   hasAccountant?: "yes" | "no" | "unsure" | null;
+  termsAcceptedAt?: string | null;
+  termsVersion?: string | null;
+  privacyAcceptedAt?: string | null;
+  privacyVersion?: string | null;
+  launchContactConsent?: boolean;
+  launchContactConsentAt?: string | null;
+  launchContactConsentVersion?: string | null;
   onboardingStatus: keyof typeof providerStatusLabel;
   internalNotes?: string;
   createdAt?: string;
@@ -69,6 +81,30 @@ function getStatusMeta(status?: string | null) {
   }
 }
 
+function getLegalConsentMeta(data: ProviderDetails) {
+  switch (getProviderLegalConsentState(data)) {
+    case "accepted":
+      return { label: "Acceptat", variant: "success" as const };
+    case "partial":
+      return { label: "Parțial", variant: "warning" as const };
+    case "missing":
+    default:
+      return { label: "Lipsă", variant: "outline" as const };
+  }
+}
+
+function getLaunchContactMeta(data: ProviderDetails) {
+  switch (getProviderLaunchContactConsentState(data)) {
+    case "accepted":
+      return { label: "Da", variant: "success" as const };
+    case "declined":
+      return { label: "Nu", variant: "secondary" as const };
+    case "missing":
+    default:
+      return { label: "Lipsă", variant: "outline" as const };
+  }
+}
+
 export default function ProviderDetailPage() {
   const params = useParams<{ id: string }>();
   const id = Array.isArray(params?.id) ? params.id[0] : params?.id;
@@ -81,7 +117,7 @@ export default function ProviderDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [events, setEvents] = useState<ProviderEvent[]>([]);
 
-  async function loadDetails() {
+  const loadDetails = useCallback(async () => {
     if (!id) return;
     setLoading(true);
     setError(null);
@@ -104,11 +140,11 @@ export default function ProviderDetailPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [id]);
 
   useEffect(() => {
-    loadDetails();
-  }, [id]);
+    void loadDetails();
+  }, [loadDetails]);
 
   async function saveChanges() {
     if (!id) return;
@@ -224,6 +260,52 @@ export default function ProviderDetailPage() {
                 </Badge>
               );
             })()}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Consimțăminte</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-2">
+          <div>
+            <p className="text-xs uppercase text-muted-foreground">Termeni / politică</p>
+            {(() => {
+              const consentMeta = getLegalConsentMeta(data);
+              return <Badge variant={consentMeta.variant}>{consentMeta.label}</Badge>;
+            })()}
+          </div>
+          <div>
+            <p className="text-xs uppercase text-muted-foreground">Contact lansare</p>
+            {(() => {
+              const contactMeta = getLaunchContactMeta(data);
+              return <Badge variant={contactMeta.variant}>{contactMeta.label}</Badge>;
+            })()}
+          </div>
+          <div>
+            <p className="text-xs uppercase text-muted-foreground">Termeni acceptați la</p>
+            <p className="text-sm">{formatAdminDateTime(data.termsAcceptedAt)}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase text-muted-foreground">Versiune termeni</p>
+            <p className="text-sm">{data.termsVersion || "-"}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase text-muted-foreground">Politică acceptată la</p>
+            <p className="text-sm">{formatAdminDateTime(data.privacyAcceptedAt)}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase text-muted-foreground">Versiune politică</p>
+            <p className="text-sm">{data.privacyVersion || "-"}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase text-muted-foreground">Contact lansare la</p>
+            <p className="text-sm">{formatAdminDateTime(data.launchContactConsentAt)}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase text-muted-foreground">Versiune contact</p>
+            <p className="text-sm">{data.launchContactConsentVersion || "-"}</p>
           </div>
         </CardContent>
       </Card>

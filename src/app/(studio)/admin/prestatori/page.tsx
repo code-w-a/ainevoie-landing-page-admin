@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useAdminData } from "@/components/admin/useAdminData";
 import {
+  getProviderLaunchContactConsentState,
+  getProviderLegalConsentState,
   providerCityOptions,
   providerServiceOptions,
   providerStatusLabel,
@@ -37,6 +39,13 @@ type ProviderItem = {
   city: string;
   serviceType: string;
   onboardingStatus: keyof typeof providerStatusLabel;
+  termsAcceptedAt?: string | null;
+  termsVersion?: string | null;
+  privacyAcceptedAt?: string | null;
+  privacyVersion?: string | null;
+  launchContactConsent?: boolean;
+  launchContactConsentAt?: string | null;
+  launchContactConsentVersion?: string | null;
   createdAt?: string;
 };
 
@@ -49,6 +58,30 @@ type ProvidersResponse = {
     totalPages: number;
   };
 };
+
+function getLegalConsentMeta(item: ProviderItem) {
+  switch (getProviderLegalConsentState(item)) {
+    case "accepted":
+      return { label: "Acceptat", variant: "success" as const };
+    case "partial":
+      return { label: "Parțial", variant: "warning" as const };
+    case "missing":
+    default:
+      return { label: "Lipsă", variant: "outline" as const };
+  }
+}
+
+function getLaunchContactMeta(item: ProviderItem) {
+  switch (getProviderLaunchContactConsentState(item)) {
+    case "accepted":
+      return { label: "Da", variant: "success" as const };
+    case "declined":
+      return { label: "Nu", variant: "secondary" as const };
+    case "missing":
+    default:
+      return { label: "Lipsă", variant: "outline" as const };
+  }
+}
 
 export default function AdminProvidersPage() {
   const [q, setQ] = useState("");
@@ -181,6 +214,8 @@ export default function AdminProvidersPage() {
                 <TableHead>Oraș</TableHead>
                 <TableHead>Serviciu</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Termeni / Politică</TableHead>
+                <TableHead>Contact lansare</TableHead>
                 <TableHead>Creat la</TableHead>
                 <TableHead></TableHead>
               </TableRow>
@@ -188,7 +223,7 @@ export default function AdminProvidersPage() {
             <TableBody>
               {!loading && items.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={9} className="text-center text-sm text-muted-foreground">
                     Nu există prestatori pentru filtrele curente.
                   </TableCell>
                 </TableRow>
@@ -203,6 +238,18 @@ export default function AdminProvidersPage() {
                     <Badge variant={providerStatusVariant(item.onboardingStatus)}>
                       {providerStatusLabel[item.onboardingStatus] || item.onboardingStatus}
                     </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {(() => {
+                      const consentMeta = getLegalConsentMeta(item);
+                      return <Badge variant={consentMeta.variant}>{consentMeta.label}</Badge>;
+                    })()}
+                  </TableCell>
+                  <TableCell>
+                    {(() => {
+                      const contactMeta = getLaunchContactMeta(item);
+                      return <Badge variant={contactMeta.variant}>{contactMeta.label}</Badge>;
+                    })()}
                   </TableCell>
                   <TableCell>{formatAdminDateTime(item.createdAt)}</TableCell>
                   <TableCell className="text-right">

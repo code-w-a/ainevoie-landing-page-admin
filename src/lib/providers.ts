@@ -2,6 +2,7 @@ import {
   PROVIDER_LEGAL_STATUSES,
   PROVIDER_STATUSES,
   type ProviderLegalStatus,
+  type ProviderRecord,
   type ProviderStatus,
 } from "@/types/provider";
 
@@ -31,6 +32,56 @@ export const providerLegalStatusLabel: Record<ProviderLegalStatus, string> = {
   in_progress: "Sunt in curs de infiintare",
   need_guidance: "Am nevoie de ghidaj",
 };
+
+export const PROVIDER_TERMS_VERSION = "v1";
+export const PROVIDER_PRIVACY_VERSION = "v1";
+export const PROVIDER_LAUNCH_CONTACT_CONSENT_VERSION = "v1";
+
+type ProviderConsentSnapshot = Pick<
+  ProviderRecord,
+  | "termsAcceptedAt"
+  | "termsVersion"
+  | "privacyAcceptedAt"
+  | "privacyVersion"
+  | "launchContactConsent"
+  | "launchContactConsentAt"
+  | "launchContactConsentVersion"
+>;
+
+export type ProviderLegalConsentState = "accepted" | "partial" | "missing";
+
+export function getProviderLegalConsentState(
+  provider: ProviderConsentSnapshot
+): ProviderLegalConsentState {
+  const hasTermsConsent = Boolean(provider.termsAcceptedAt || provider.termsVersion);
+  const hasPrivacyConsent = Boolean(provider.privacyAcceptedAt || provider.privacyVersion);
+
+  if (hasTermsConsent && hasPrivacyConsent) {
+    return "accepted";
+  }
+  if (hasTermsConsent || hasPrivacyConsent) {
+    return "partial";
+  }
+  return "missing";
+}
+
+export type ProviderLaunchContactConsentState = "accepted" | "declined" | "missing";
+
+export function getProviderLaunchContactConsentState(
+  provider: ProviderConsentSnapshot
+): ProviderLaunchContactConsentState {
+  if (
+    provider.launchContactConsent === true ||
+    Boolean(provider.launchContactConsentAt) ||
+    Boolean(provider.launchContactConsentVersion)
+  ) {
+    return "accepted";
+  }
+  if (provider.launchContactConsent === false) {
+    return "declined";
+  }
+  return "missing";
+}
 
 /** Canonical values stored in Firestore / validated by API; labels come from i18n. */
 export const PROVIDER_CITY_ENTRIES = [

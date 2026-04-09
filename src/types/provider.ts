@@ -37,6 +37,13 @@ export type ProviderRecord = {
   newsletterOptIn?: boolean;
   newsletterStatusAtSignup?: ProviderNewsletterStatusAtSignup | null;
   newsletterError?: string | null;
+  termsAcceptedAt?: string | null;
+  termsVersion?: string | null;
+  privacyAcceptedAt?: string | null;
+  privacyVersion?: string | null;
+  launchContactConsent?: boolean;
+  launchContactConsentAt?: string | null;
+  launchContactConsentVersion?: string | null;
   onboardingStatus: ProviderStatus;
   source: "landing_onboarding";
   internalNotes?: string;

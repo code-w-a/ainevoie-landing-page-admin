@@ -6,6 +6,9 @@ import { getApiErrorMessage } from "@/lib/apiMessages";
 import { getAdminDb } from "@/lib/firebaseAdmin";
 import { sendEmail } from "@/lib/email";
 import {
+  PROVIDER_LAUNCH_CONTACT_CONSENT_VERSION,
+  PROVIDER_PRIVACY_VERSION,
+  PROVIDER_TERMS_VERSION,
   isProviderCityOption,
   isProviderLegalStatus,
   isProviderServiceOption,
@@ -33,6 +36,7 @@ type OnboardingPayload = {
   estimatedSetupTimeline?: string;
   hasAccountant?: "yes" | "no" | "unsure";
   newsletterOptIn?: boolean;
+  launchContactConsent?: boolean;
   acceptTerms?: boolean;
   locale?: string;
 };
@@ -104,6 +108,7 @@ export async function POST(request: Request) {
     const estimatedSetupTimeline = normalize(body.estimatedSetupTimeline);
     const hasAccountant = body.hasAccountant || null;
     const newsletterOptIn = body.newsletterOptIn === true;
+    const launchContactConsent = body.launchContactConsent === true;
     const acceptTerms = body.acceptTerms === true;
 
     if (!fullName || !email || !password || !phone || !city || !serviceType || !legalStatus) {
@@ -256,6 +261,15 @@ export async function POST(request: Request) {
       newsletterOptIn,
       newsletterStatusAtSignup,
       newsletterError,
+      termsAcceptedAt: FieldValue.serverTimestamp(),
+      termsVersion: PROVIDER_TERMS_VERSION,
+      privacyAcceptedAt: FieldValue.serverTimestamp(),
+      privacyVersion: PROVIDER_PRIVACY_VERSION,
+      launchContactConsent,
+      launchContactConsentAt: launchContactConsent ? FieldValue.serverTimestamp() : null,
+      launchContactConsentVersion: launchContactConsent ?
+        PROVIDER_LAUNCH_CONTACT_CONSENT_VERSION
+      : null,
       onboardingStatus: "new",
       source: "landing_onboarding",
       welcomeEmailSent: welcomeEmailResult.sent,
