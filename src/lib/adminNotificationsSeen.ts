@@ -1,5 +1,7 @@
 const STORAGE_KEY = "ainevoid-admin-notifications-seen";
-const MAX_IDS_PER_CATEGORY = 300;
+
+/** Max IDs kept per category (FIFO trim). Same cap on server merge. */
+export const MAX_IDS_PER_CATEGORY = 300;
 
 export type AdminNotificationsSeen = {
   subscriberIds: string[];
@@ -32,6 +34,37 @@ function parseStored(raw: string | null): AdminNotificationsSeen {
   }
 }
 
+export function normalizeSeenFromUnknown(input: {
+  subscriberIds?: unknown;
+  providerIds?: unknown;
+}): AdminNotificationsSeen {
+  const subscriberIds =
+    Array.isArray(input.subscriberIds) ?
+      input.subscriberIds.filter((x): x is string => typeof x === "string" && x.length > 0)
+    : [];
+  const providerIds =
+    Array.isArray(input.providerIds) ?
+      input.providerIds.filter((x): x is string => typeof x === "string" && x.length > 0)
+    : [];
+  return { subscriberIds, providerIds };
+}
+
+/** Merge server (or any) state with new ids; FIFO cap per list. */
+export function mergeSeenDocument(
+  prev: AdminNotificationsSeen,
+  patch: { subscriberIds?: string[]; providerIds?: string[] }
+): AdminNotificationsSeen {
+  return {
+    subscriberIds: appendIdsOrdered([...prev.subscriberIds], patch.subscriberIds ?? []),
+    providerIds: appendIdsOrdered([...prev.providerIds], patch.providerIds ?? []),
+  };
+}
+
+/** Union of two seen maps (e.g. server + localStorage) for display until local is cleared. */
+export function mergeSeenStates(a: AdminNotificationsSeen, b: AdminNotificationsSeen): AdminNotificationsSeen {
+  return mergeSeenDocument(a, { subscriberIds: b.subscriberIds, providerIds: b.providerIds });
+}
+
 /** Append unique ids in order; drop oldest when over cap (FIFO). */
 function appendIdsOrdered(current: string[], additions: string[]): string[] {
   const next = [...current];
@@ -61,6 +94,17 @@ export function saveSeen(seen: AdminNotificationsSeen): void {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(seen));
   } catch {
     // quota / private mode
+  }
+}
+
+export function clearSeenLocal(): void {
+  if (!isBrowser()) {
+    return;
+  }
+  try {
+    window.localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // ignore
   }
 }
 

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Bell } from "lucide-react";
+import toast from "react-hot-toast";
 
 import { adminFetch } from "@/components/admin/adminApi";
 import { Badge } from "@/components/ui/badge";
@@ -15,7 +16,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { subscriberStatusLabel } from "@/lib/adminLabels";
-import { markAllSeen, loadSeen } from "@/lib/adminNotificationsSeen";
+import {
+  clearSeenLocal,
+  loadSeen,
+  mergeSeenStates,
+  normalizeSeenFromUnknown,
+  type AdminNotificationsSeen,
+} from "@/lib/adminNotificationsSeen";
 import { formatAdminDateTime } from "@/lib/formatAdminDateTime";
 import {
   isProviderStatus,
@@ -60,7 +67,9 @@ export function AdminNotificationsMenu() {
   const [raw, setRaw] = useState<SignupsFeedResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [seenVersion, setSeenVersion] = useState(0);
+  const [remoteSeen, setRemoteSeen] = useState<AdminNotificationsSeen | null>(null);
+  const [seenSyncError, setSeenSyncError] = useState<string | null>(null);
+  const [markingRead, setMarkingRead] = useState(false);
 
   const fetchSignups = useCallback(async () => {
     setLoading(true);
@@ -87,20 +96,78 @@ export function AdminNotificationsMenu() {
     }
   }, []);
 
+  const fetchSeen = useCallback(async () => {
+    setSeenSyncError(null);
+    try {
+      const res = await adminFetch("/api/admin/notifications-seen", { cache: "no-store" });
+      if (res.status === 401) {
+        setRemoteSeen(null);
+        return;
+      }
+      if (!res.ok) {
+        throw new Error("failed");
+      }
+      const json = (await res.json()) as unknown;
+      const server = normalizeSeenFromUnknown(
+        json && typeof json === "object" ? (json as Record<string, unknown>) : {}
+      );
+      const local = loadSeen();
+      const needsMigrate =
+        local.subscriberIds.some((id) => id && !server.subscriberIds.includes(id)) ||
+        local.providerIds.some((id) => id && !server.providerIds.includes(id));
+
+      if (needsMigrate) {
+        const mRes = await adminFetch("/api/admin/notifications-seen", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            subscriberIds: local.subscriberIds,
+            providerIds: local.providerIds,
+          }),
+        });
+        if (!mRes.ok) {
+          setRemoteSeen(null);
+          setSeenSyncError("Starea citit din browser nu a putut fi sincronizată cu serverul.");
+          return;
+        }
+        const mergedJson = (await mRes.json()) as unknown;
+        setRemoteSeen(
+          normalizeSeenFromUnknown(
+            mergedJson && typeof mergedJson === "object" ?
+              (mergedJson as Record<string, unknown>)
+            : {}
+          )
+        );
+        clearSeenLocal();
+        return;
+      }
+
+      setRemoteSeen(server);
+      clearSeenLocal();
+    } catch {
+      setSeenSyncError("Nu am putut încărca starea citit de pe server (folosim temporar browserul).");
+      setRemoteSeen(null);
+    }
+  }, []);
+
   useEffect(() => {
     void fetchSignups();
-  }, [fetchSignups]);
+    void fetchSeen();
+  }, [fetchSignups, fetchSeen]);
 
   useEffect(() => {
     if (open) {
       void fetchSignups();
+      void fetchSeen();
     }
-  }, [open, fetchSignups]);
+  }, [open, fetchSignups, fetchSeen]);
 
   const seen = useMemo(() => {
-    void seenVersion;
-    return loadSeen();
-  }, [seenVersion]);
+    if (!remoteSeen) {
+      return loadSeen();
+    }
+    return mergeSeenStates(remoteSeen, loadSeen());
+  }, [remoteSeen]);
 
   const { unreadSubscribers, unreadProviders } = useMemo(() => {
     const subSeen = new Set(seen.subscriberIds);
@@ -121,16 +188,39 @@ export function AdminNotificationsMenu() {
     unreadSubscribers.length + unreadProviders.length;
   const hasUnread = unreadCount > 0;
 
-  function handleMarkAllRead() {
-    markAllSeen({
-      subscriberIds: unreadSubscribers
-        .map((s) => s.id)
-        .filter((id): id is string => Boolean(id)),
-      providerIds: unreadProviders
-        .map((p) => p.id)
-        .filter((id): id is string => Boolean(id)),
-    });
-    setSeenVersion((v) => v + 1);
+  async function handleMarkAllRead() {
+    if (!hasUnread || markingRead) {
+      return;
+    }
+    const subscriberIds = unreadSubscribers
+      .map((s) => s.id)
+      .filter((id): id is string => Boolean(id));
+    const providerIds = unreadProviders
+      .map((p) => p.id)
+      .filter((id): id is string => Boolean(id));
+    setMarkingRead(true);
+    try {
+      const res = await adminFetch("/api/admin/notifications-seen", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subscriberIds, providerIds }),
+      });
+      if (!res.ok) {
+        toast.error("Nu am putut salva „citit” pe server. Încearcă din nou.");
+        return;
+      }
+      const json = (await res.json()) as unknown;
+      setRemoteSeen(
+        normalizeSeenFromUnknown(
+          json && typeof json === "object" ? (json as Record<string, unknown>) : {}
+        )
+      );
+      clearSeenLocal();
+    } catch {
+      toast.error("Nu am putut salva „citit” pe server. Încearcă din nou.");
+    } finally {
+      setMarkingRead(false);
+    }
   }
 
   return (
@@ -170,9 +260,12 @@ export function AdminNotificationsMenu() {
         <div className="border-b border-border px-3 py-2.5">
           <p className="text-sm font-semibold">Înregistrări noi</p>
           <p className="text-xs text-muted-foreground">
-            Abonați și prestatori înscriși recent. Marchează ca citite ca să nu
-            mai apară aici.
+            Abonați și prestatori înscriși recent. Marchează ca citite — starea se salvează în
+            cont și se sincronizează între dispozitive.
           </p>
+          {seenSyncError ?
+            <p className="mt-1 text-xs text-amber-700 dark:text-amber-500">{seenSyncError}</p>
+          : null}
         </div>
 
         <div className="max-h-[min(70vh,440px)] overflow-y-auto overscroll-contain px-2 py-2">
@@ -272,13 +365,13 @@ export function AdminNotificationsMenu() {
             variant="secondary"
             size="sm"
             className="w-full"
-            disabled={!hasUnread}
+            disabled={!hasUnread || markingRead}
             onClick={(e) => {
               e.preventDefault();
-              handleMarkAllRead();
+              void handleMarkAllRead();
             }}
           >
-            Marchează ca citite
+            {markingRead ? "Se salvează…" : "Marchează ca citite"}
           </Button>
         </div>
 

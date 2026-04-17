@@ -21,6 +21,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useAdminData } from "@/components/admin/useAdminData";
+import { AdminTableSkeleton } from "@/components/admin/AdminSkeletonLayouts";
 import { adminCommonLabels, logLevelLabel } from "@/lib/adminLabels";
 import { formatAdminDateTime } from "@/lib/formatAdminDateTime";
 
@@ -118,22 +119,19 @@ export default function LogsPage() {
           <CardDescription>Mesaje de status și erori.</CardDescription>
         </CardHeader>
         <CardContent>
-          {loading && (
-            <p className="text-sm text-muted-foreground">
-              {adminCommonLabels.loadingLogs}
-            </p>
-          )}
-          {error && <p className="text-sm text-rose-500">{error}</p>}
+          {error && <p className="mb-4 text-sm text-rose-500">{error}</p>}
           <div className="mb-4 flex flex-wrap items-center gap-3">
             <Input
               className="max-w-xs"
               placeholder="Caută în loguri"
               value={search}
+              disabled={loading}
               onChange={(event) => setSearch(event.target.value)}
             />
             <select
-              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm disabled:opacity-60"
               value={levelFilter}
+              disabled={loading}
               onChange={(event) => setLevelFilter(event.target.value)}
             >
               <option value="all">Toate nivelele</option>
@@ -142,54 +140,59 @@ export default function LogsPage() {
               <option value="error">Eroare</option>
             </select>
             <select
-              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm disabled:opacity-60"
               value={sortBy}
+              disabled={loading}
               onChange={(event) => setSortBy(event.target.value)}
             >
               <option value="createdAt">{adminCommonLabels.newest}</option>
               <option value="level">Nivel</option>
             </select>
             <select
-              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm disabled:opacity-60"
               value={sortDir}
+              disabled={loading}
               onChange={(event) => setSortDir(event.target.value)}
             >
               <option value="desc">{adminCommonLabels.descending}</option>
               <option value="asc">{adminCommonLabels.ascending}</option>
             </select>
           </div>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nivel</TableHead>
-                <TableHead>Mesaj</TableHead>
-                <TableHead>Campanie</TableHead>
-                <TableHead>Timp</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredLogs.map((log, index) => (
-                <TableRow key={`${log.message || log.id}-${index}`}>
-                  <TableCell>
-                    <Badge variant={log.level === "error" ? "danger" : "secondary"}>
-                      {logLevelLabel(log.level)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="max-w-[360px] truncate">
-                    {log.message}
-                  </TableCell>
-                  <TableCell>
-                    {log.campaignId ?
-                      campaignNameById.get(log.campaignId) || log.campaignId
-                    : "-"}
-                  </TableCell>
-                  <TableCell>
-                    {formatAdminDateTime(log.createdAt, { includeSeconds: true })}
-                  </TableCell>
+          {loading ?
+            <AdminTableSkeleton rows={10} columns={4} />
+          : <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nivel</TableHead>
+                  <TableHead>Mesaj</TableHead>
+                  <TableHead>Campanie</TableHead>
+                  <TableHead>Timp</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {filteredLogs.map((log, index) => (
+                  <TableRow key={`${log.message || log.id}-${index}`}>
+                    <TableCell>
+                      <Badge variant={log.level === "error" ? "danger" : "secondary"}>
+                        {logLevelLabel(log.level)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="max-w-[360px] truncate">
+                      {log.message}
+                    </TableCell>
+                    <TableCell>
+                      {log.campaignId ?
+                        campaignNameById.get(log.campaignId) || log.campaignId
+                      : "-"}
+                    </TableCell>
+                    <TableCell>
+                      {formatAdminDateTime(log.createdAt, { includeSeconds: true })}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          }
 
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm">
             <span className="text-muted-foreground">
@@ -197,8 +200,9 @@ export default function LogsPage() {
             </span>
             <div className="flex items-center gap-2">
               <select
-                className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+                className="h-8 rounded-md border border-input bg-background px-2 text-xs disabled:opacity-60"
                 value={pageSize}
+                disabled={loading}
                 onChange={(event) => setPageSize(Number(event.target.value))}
               >
                 {PAGE_SIZE_OPTIONS.map((size) => (
@@ -210,7 +214,7 @@ export default function LogsPage() {
               <Button
                 size="sm"
                 variant="outline"
-                disabled={pageIndex <= 0}
+                disabled={loading || pageIndex <= 0}
                 onClick={() => setPageIndex((prev) => Math.max(0, prev - 1))}
               >
                 {adminCommonLabels.previous}
@@ -218,7 +222,7 @@ export default function LogsPage() {
               <Button
                 size="sm"
                 variant="outline"
-                disabled={!nextCursor}
+                disabled={loading || !nextCursor}
                 onClick={() => setPageIndex((prev) => prev + 1)}
               >
                 {adminCommonLabels.next}

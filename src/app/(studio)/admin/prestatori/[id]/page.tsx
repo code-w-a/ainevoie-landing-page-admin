@@ -13,6 +13,12 @@ import {
 import { formatAdminDateTime } from "@/lib/formatAdminDateTime";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AdminFormGridSkeleton,
+  AdminLogStackSkeleton,
+  AdminPageHeaderSkeleton,
+} from "@/components/admin/AdminSkeletonLayouts";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, Clock3, FileSearch, XCircle } from "lucide-react";
 
@@ -175,7 +181,45 @@ export default function ProviderDetailPage() {
   }
 
   if (loading) {
-    return <p className="text-sm text-muted-foreground">Se încarcă prestatorul...</p>;
+    return (
+      <div className="space-y-6">
+        <AdminPageHeaderSkeleton />
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-40" />
+          </CardHeader>
+          <CardContent>
+            <AdminFormGridSkeleton fields={10} />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-36" />
+          </CardHeader>
+          <CardContent>
+            <AdminFormGridSkeleton fields={4} />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-40" />
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Skeleton className="h-9 w-full max-w-xs" />
+            <Skeleton className="min-h-[140px] w-full rounded-md" />
+            <Skeleton className="h-9 w-44" />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-36" />
+          </CardHeader>
+          <CardContent>
+            <AdminLogStackSkeleton lines={4} />
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   if (!data) {

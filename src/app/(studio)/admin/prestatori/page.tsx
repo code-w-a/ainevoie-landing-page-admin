@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { FileText } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useAdminData } from "@/components/admin/useAdminData";
+import { AdminTableSkeleton } from "@/components/admin/AdminSkeletonLayouts";
 import {
   getProviderLaunchContactConsentState,
   getProviderLegalConsentState,
@@ -140,14 +142,16 @@ export default function AdminProvidersPage() {
           <Input
             placeholder="Căutare nume/email"
             value={q}
+            disabled={loading}
             onChange={(event) => {
               setPage(1);
               setQ(event.target.value);
             }}
           />
           <select
-            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm disabled:opacity-60"
             value={status}
+            disabled={loading}
             onChange={(event) => {
               setPage(1);
               setStatus(event.target.value);
@@ -160,8 +164,9 @@ export default function AdminProvidersPage() {
             <option value="rejected">Respins</option>
           </select>
           <select
-            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm disabled:opacity-60"
             value={countyCode}
+            disabled={loading}
             onChange={(event) => {
               setPage(1);
               setCountyCode(event.target.value);
@@ -178,7 +183,7 @@ export default function AdminProvidersPage() {
           <select
             className="h-9 rounded-md border border-input bg-background px-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
             value={cityCode}
-            disabled={!countyCode}
+            disabled={loading || !countyCode}
             onChange={(event) => {
               setPage(1);
               setCityCode(event.target.value);
@@ -192,8 +197,9 @@ export default function AdminProvidersPage() {
             ))}
           </select>
           <select
-            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm disabled:opacity-60"
             value={serviceType}
+            disabled={loading}
             onChange={(event) => {
               setPage(1);
               setServiceType(event.target.value);
@@ -208,6 +214,7 @@ export default function AdminProvidersPage() {
           </select>
           <Button
             variant="outline"
+            disabled={loading}
             onClick={() => {
               setPage(1);
               setQ("");
@@ -228,71 +235,80 @@ export default function AdminProvidersPage() {
           <CardDescription>{pagination?.total || 0} rezultate</CardDescription>
         </CardHeader>
         <CardContent>
-          {loading && (
-            <p className="text-sm text-muted-foreground">
-              Se încarcă prestatorii...
-            </p>
-          )}
-          {error && <p className="text-sm text-rose-500">{error}</p>}
+          {error && <p className="mb-4 text-sm text-rose-500">{error}</p>}
 
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nume</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Județ / Oraș</TableHead>
-                <TableHead>Serviciu</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Termeni / Politică</TableHead>
-                <TableHead>Contact lansare</TableHead>
-                <TableHead>Creat la</TableHead>
-                <TableHead></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {!loading && items.length === 0 && (
+          {loading ?
+            <AdminTableSkeleton rows={12} columns={9} />
+          : <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center text-sm text-muted-foreground">
-                    Nu există prestatori pentru filtrele curente.
-                  </TableCell>
+                  <TableHead>Nume</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Județ / Oraș</TableHead>
+                  <TableHead>Serviciu</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Termeni / Politică</TableHead>
+                  <TableHead>Contact lansare</TableHead>
+                  <TableHead>Creat la</TableHead>
+                  <TableHead></TableHead>
                 </TableRow>
-              )}
-              {items.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell className="font-medium">{item.fullName}</TableCell>
-                  <TableCell>{item.email}</TableCell>
-                  <TableCell>
-                    {[item.countyName, item.cityName || item.city].filter(Boolean).join(" / ") ||
-                      "-"}
-                  </TableCell>
-                  <TableCell>{item.serviceType}</TableCell>
-                  <TableCell>
-                    <Badge variant={providerStatusVariant(item.onboardingStatus)}>
-                      {providerStatusLabel[item.onboardingStatus] || item.onboardingStatus}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {(() => {
-                      const consentMeta = getLegalConsentMeta(item);
-                      return <Badge variant={consentMeta.variant}>{consentMeta.label}</Badge>;
-                    })()}
-                  </TableCell>
-                  <TableCell>
-                    {(() => {
-                      const contactMeta = getLaunchContactMeta(item);
-                      return <Badge variant={contactMeta.variant}>{contactMeta.label}</Badge>;
-                    })()}
-                  </TableCell>
-                  <TableCell>{formatAdminDateTime(item.createdAt)}</TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="outline" size="sm" asChild>
-                      <Link href={`/admin/prestatori/${item.id}`}>Vezi fișa</Link>
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {items.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center text-sm text-muted-foreground">
+                      Nu există prestatori pentru filtrele curente.
+                    </TableCell>
+                  </TableRow>
+                )}
+                {items.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell className="font-medium">{item.fullName}</TableCell>
+                    <TableCell>{item.email}</TableCell>
+                    <TableCell>
+                      {[item.countyName, item.cityName || item.city].filter(Boolean).join(" / ") ||
+                        "-"}
+                    </TableCell>
+                    <TableCell>{item.serviceType}</TableCell>
+                    <TableCell>
+                      <Badge variant={providerStatusVariant(item.onboardingStatus)}>
+                        {providerStatusLabel[item.onboardingStatus] || item.onboardingStatus}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {(() => {
+                        const consentMeta = getLegalConsentMeta(item);
+                        return <Badge variant={consentMeta.variant}>{consentMeta.label}</Badge>;
+                      })()}
+                    </TableCell>
+                    <TableCell>
+                      {(() => {
+                        const contactMeta = getLaunchContactMeta(item);
+                        return <Badge variant={contactMeta.variant}>{contactMeta.label}</Badge>;
+                      })()}
+                    </TableCell>
+                    <TableCell>{formatAdminDateTime(item.createdAt)}</TableCell>
+                    <TableCell className="text-right align-middle">
+                      <Button
+                        variant="outline"
+                        size="default"
+                        className="h-9 min-w-[9.25rem] shrink-0 gap-2 px-4 font-medium shadow-sm hover:bg-muted/80"
+                        asChild
+                      >
+                        <Link
+                          href={`/admin/prestatori/${item.id}`}
+                          className="inline-flex items-center justify-center"
+                        >
+                          <FileText className="h-4 w-4 shrink-0 opacity-90" aria-hidden />
+                          <span className="whitespace-nowrap">Vezi fișa</span>
+                        </Link>
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          }
 
           <div className="mt-4 flex items-center justify-between">
             <span className="text-sm text-muted-foreground">
@@ -303,7 +319,7 @@ export default function AdminProvidersPage() {
                 variant="outline"
                 size="sm"
                 onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-                disabled={(pagination?.page || 1) <= 1}
+                disabled={loading || (pagination?.page || 1) <= 1}
               >
                 Anterior
               </Button>
@@ -311,7 +327,9 @@ export default function AdminProvidersPage() {
                 variant="outline"
                 size="sm"
                 onClick={() => setPage((prev) => prev + 1)}
-                disabled={(pagination?.page || 1) >= (pagination?.totalPages || 1)}
+                disabled={
+                  loading || (pagination?.page || 1) >= (pagination?.totalPages || 1)
+                }
               >
                 Următor
               </Button>

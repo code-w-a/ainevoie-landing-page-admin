@@ -24,6 +24,15 @@ const LOG_LEVEL_LABELS: Record<string, string> = {
   warning: "Avertisment",
 };
 
+/** Status document `jobs` sub campanie (trimitere per destinatar). */
+const CAMPAIGN_JOB_STATUS_LABELS: Record<string, string> = {
+  queued: "În coadă",
+  sending: "În trimitere",
+  sent: "Trimis",
+  failed: "Eșuat",
+  skipped: "Ignorat",
+};
+
 function normalizeLabelKey(value: string): string {
   return value.trim().toLowerCase();
 }
@@ -50,6 +59,14 @@ export function logLevelLabel(level?: string | null): string {
   }
   const normalized = normalizeLabelKey(level);
   return LOG_LEVEL_LABELS[normalized] || level;
+}
+
+export function campaignJobStatusLabel(status?: string | null): string {
+  if (!status) {
+    return "-";
+  }
+  const normalized = normalizeLabelKey(status);
+  return CAMPAIGN_JOB_STATUS_LABELS[normalized] || status;
 }
 
 export const adminCommonLabels = {

@@ -24,6 +24,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { TabContent, TabList, Tabs, TabTrigger } from "@/components/ui/tabs";
 import { AdminConfirmDialog } from "@/components/admin/AdminConfirmDialog";
 import { useAdminData } from "@/components/admin/useAdminData";
+import { AdminTableSkeleton } from "@/components/admin/AdminSkeletonLayouts";
 import { adminFetch } from "@/components/admin/adminApi";
 import { adminCommonLabels, subscriberStatusLabel } from "@/lib/adminLabels";
 import { formatAdminDateTime } from "@/lib/formatAdminDateTime";
@@ -290,11 +291,6 @@ export default function SubscribersPage() {
   function renderListSegment() {
     return (
       <>
-        {loading && (
-          <p className="text-sm text-muted-foreground">
-            {adminCommonLabels.loadingSubscribers}
-          </p>
-        )}
         {error && <p className="text-sm text-rose-500">{error}</p>}
 
         <div className="mb-4 flex flex-wrap items-center gap-3">
@@ -302,11 +298,13 @@ export default function SubscribersPage() {
             className="max-w-xs"
             placeholder="Caută email, etichete sau motiv"
             value={search}
+            disabled={loading}
             onChange={(event) => setSearch(event.target.value)}
           />
           <select
-            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm disabled:opacity-60"
             value={sortBy}
+            disabled={loading}
             onChange={(event) => setSortBy(event.target.value)}
           >
             <option value="createdAt">{adminCommonLabels.newest}</option>
@@ -314,8 +312,9 @@ export default function SubscribersPage() {
             <option value="status">Status</option>
           </select>
           <select
-            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm disabled:opacity-60"
             value={sortDir}
+            disabled={loading}
             onChange={(event) => setSortDir(event.target.value)}
           >
             <option value="desc">{adminCommonLabels.descending}</option>
@@ -326,14 +325,14 @@ export default function SubscribersPage() {
               <Button
                 variant="outline"
                 onClick={() => handleBulkStatus("active")}
-                disabled={selectedIds.size === 0}
+                disabled={loading || selectedIds.size === 0}
               >
                 Setează activ
               </Button>
               <Button
                 variant="outline"
                 onClick={() => handleBulkStatus("unsubscribed")}
-                disabled={selectedIds.size === 0}
+                disabled={loading || selectedIds.size === 0}
               >
                 Setează dezabonat
               </Button>
@@ -342,79 +341,82 @@ export default function SubscribersPage() {
           <Button
             variant="destructive"
             onClick={() => setBulkDeleteConfirmOpen(true)}
-            disabled={selectedIds.size === 0}
+            disabled={loading || selectedIds.size === 0}
           >
             Șterge selecția
           </Button>
         </div>
 
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>
-                <Checkbox
-                  checked={allSelected}
-                  onChange={(event) => toggleSelectAll(event.target.checked)}
-                />
-              </TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Consimțământ</TableHead>
-              <TableHead>Motiv status</TableHead>
-              <TableHead>Etichete</TableHead>
-              <TableHead>Ultima trimitere</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredSubscribers.map((subscriber) => {
-              const id = subscriber.id as string | undefined;
-              const statusValue =
-                typeof subscriber.status === "string" ?
-                  subscriber.status.toLowerCase()
-                : "";
-              const isActive = statusValue === "active";
-              const hasConsent = subscriber.consentGranted === true;
+        {loading ?
+          <AdminTableSkeleton rows={10} columns={7} />
+        : <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>
+                  <Checkbox
+                    checked={allSelected}
+                    onChange={(event) => toggleSelectAll(event.target.checked)}
+                  />
+                </TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Consimțământ</TableHead>
+                <TableHead>Motiv status</TableHead>
+                <TableHead>Etichete</TableHead>
+                <TableHead>Ultima trimitere</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredSubscribers.map((subscriber) => {
+                const id = subscriber.id as string | undefined;
+                const statusValue =
+                  typeof subscriber.status === "string" ?
+                    subscriber.status.toLowerCase()
+                  : "";
+                const isActive = statusValue === "active";
+                const hasConsent = subscriber.consentGranted === true;
 
-              return (
-                <TableRow key={id || subscriber.email}>
-                  <TableCell>
-                    <Checkbox
-                      checked={id ? selectedIds.has(id) : false}
-                      onChange={(event) =>
-                        id ? toggleRow(id, event.target.checked) : undefined
-                      }
-                      disabled={!id}
-                    />
-                  </TableCell>
-                  <TableCell className="font-medium">{subscriber.email}</TableCell>
-                  <TableCell>
-                    <Badge variant={isActive ? "success" : "outline"}>
-                      {subscriberStatusLabel(subscriber.status)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={hasConsent ? "success" : "danger"}>
-                      {hasConsent ? "Acordat" : "Retras"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{subscriber.statusReason || "-"}</TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-2">
-                      {(subscriber.tags || []).map((tag: string) => (
-                        <Badge key={tag} variant="secondary">
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {formatAdminDateTime(subscriber.lastSentAt)}
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
+                return (
+                  <TableRow key={id || subscriber.email}>
+                    <TableCell>
+                      <Checkbox
+                        checked={id ? selectedIds.has(id) : false}
+                        onChange={(event) =>
+                          id ? toggleRow(id, event.target.checked) : undefined
+                        }
+                        disabled={!id}
+                      />
+                    </TableCell>
+                    <TableCell className="font-medium">{subscriber.email}</TableCell>
+                    <TableCell>
+                      <Badge variant={isActive ? "success" : "outline"}>
+                        {subscriberStatusLabel(subscriber.status)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={hasConsent ? "success" : "danger"}>
+                        {hasConsent ? "Acordat" : "Retras"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{subscriber.statusReason || "-"}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-2">
+                        {(subscriber.tags || []).map((tag: string) => (
+                          <Badge key={tag} variant="secondary">
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {formatAdminDateTime(subscriber.lastSentAt)}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        }
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm">
           <span className="text-muted-foreground">
@@ -422,8 +424,9 @@ export default function SubscribersPage() {
           </span>
           <div className="flex items-center gap-2">
             <select
-              className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+              className="h-8 rounded-md border border-input bg-background px-2 text-xs disabled:opacity-60"
               value={pageSize}
+              disabled={loading}
               onChange={(event) => setPageSize(Number(event.target.value))}
             >
               {PAGE_SIZE_OPTIONS.map((size) => (
@@ -435,7 +438,7 @@ export default function SubscribersPage() {
             <Button
               size="sm"
               variant="outline"
-              disabled={pageIndex <= 0}
+              disabled={loading || pageIndex <= 0}
               onClick={() => setPageIndex((prev) => Math.max(0, prev - 1))}
             >
               {adminCommonLabels.previous}
@@ -443,7 +446,7 @@ export default function SubscribersPage() {
             <Button
               size="sm"
               variant="outline"
-              disabled={!nextCursor}
+              disabled={loading || !nextCursor}
               onClick={() => setPageIndex((prev) => prev + 1)}
             >
               {adminCommonLabels.next}

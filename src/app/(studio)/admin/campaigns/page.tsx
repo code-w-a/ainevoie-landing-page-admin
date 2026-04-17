@@ -1,8 +1,17 @@
 "use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { BarChart3, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  BarChart3,
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  MoreHorizontal,
+  Trash2,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -22,9 +31,22 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TabContent, TabList, Tabs, TabTrigger } from "@/components/ui/tabs";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { AdminConfirmDialog } from "@/components/admin/AdminConfirmDialog";
+import {
+  AdminFormGridSkeleton,
+  AdminKpiRowSkeleton,
+  AdminTableSkeleton,
+} from "@/components/admin/AdminSkeletonLayouts";
 import { useAdminData } from "@/components/admin/useAdminData";
 import { adminFetch } from "@/components/admin/adminApi";
 import {
@@ -38,6 +60,7 @@ import {
 } from "@/lib/emailTemplates/campaignTemplates";
 import {
   adminCommonLabels,
+  campaignJobStatusLabel,
   campaignStatusLabel,
   logLevelLabel,
 } from "@/lib/adminLabels";
@@ -50,6 +73,10 @@ const ONE_HOUR_MS = 60 * 60 * 1000;
 const MIN_SCHEDULE_DELAY_MS = 60 * 1000;
 const MIN_SCHEDULE_DELAY_ERROR =
   "Programarea trebuie să fie cu cel puțin 60s în viitor.";
+
+const REPORT_JOBS_PAGE_SIZE = 5;
+const REPORT_JOBS_FETCH_CHUNK = 200;
+const REPORT_JOBS_MAX_FETCH = 10000;
 
 type CampaignTabValue = "create" | "list";
 type CreateActionType = "draft" | "send_now" | "schedule";
@@ -70,6 +97,20 @@ type NewsletterSettingsResponse = {
     baseUrl?: string;
   } | null;
 };
+
+type CampaignJobsPageResponse = {
+  items: Record<string, unknown>[];
+  nextCursor: string | null;
+};
+
+type ReportJobsStatusFilter =
+  | "all"
+  | "failed"
+  | "with_errors"
+  | "sent"
+  | "skipped"
+  | "queued"
+  | "sending";
 
 type CampaignReportResponse = {
   campaign: any;
@@ -262,6 +303,55 @@ function campaignBadgeVariant(status: string): "success" | "warning" | "danger" 
   return "outline";
 }
 
+function campaignJobBadgeVariant(
+  status: string
+): "success" | "warning" | "danger" | "outline" {
+  if (status === "sent") {
+    return "success";
+  }
+  if (status === "failed") {
+    return "danger";
+  }
+  if (status === "skipped") {
+    return "warning";
+  }
+  if (status === "sending" || status === "queued") {
+    return "outline";
+  }
+  return "outline";
+}
+
+function jobTimestampForSort(job: Record<string, unknown>): number {
+  const raw = job.updatedAt ?? job.sentAt ?? job.createdAt ?? "";
+  if (typeof raw !== "string" || !raw.trim()) {
+    return 0;
+  }
+  const t = new Date(raw).getTime();
+  return Number.isFinite(t) ? t : 0;
+}
+
+function formatCampaignJobMotif(job: Record<string, unknown>): string {
+  const last =
+    typeof job.lastError === "string" && job.lastError.trim() ? job.lastError.trim() : "";
+  const code =
+    typeof job.errorCode === "string" && job.errorCode.trim() ? job.errorCode.trim() : "";
+  const kind =
+    typeof job.errorKind === "string" && job.errorKind.trim() ? job.errorKind.trim() : "";
+  if (last && code) {
+    return `${last} (${code})`;
+  }
+  if (last) {
+    return last;
+  }
+  if (code && kind) {
+    return `${code} (${kind})`;
+  }
+  if (code) {
+    return code;
+  }
+  return "—";
+}
+
 function isScheduleTooSoon(utcIso: string): boolean {
   const scheduleDate = new Date(utcIso);
   if (Number.isNaN(scheduleDate.getTime())) {
@@ -275,6 +365,7 @@ function isMinScheduleDelayMessage(message: string): boolean {
 }
 
 export default function CampaignsPage() {
+  const router = useRouter();
   const [subject, setSubject] = useState("");
   const [previewText, setPreviewText] = useState("");
   const [templateId, setTemplateId] = useState<CampaignTemplateId>("updates");
@@ -310,11 +401,23 @@ export default function CampaignsPage() {
     null
   );
   const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
+  const [deleteRowTargetId, setDeleteRowTargetId] = useState<string | null>(null);
   const [reportCampaignId, setReportCampaignId] = useState<string | null>(null);
   const [reportLoading, setReportLoading] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
   const [reportData, setReportData] = useState<CampaignReportResponse | null>(null);
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
+  const [reportJobsAll, setReportJobsAll] = useState<Record<string, unknown>[]>([]);
+  const [reportJobsLoading, setReportJobsLoading] = useState(false);
+  const [reportJobsError, setReportJobsError] = useState<string | null>(null);
+  const [reportJobsSearch, setReportJobsSearch] = useState("");
+  const [reportJobsStatusFilter, setReportJobsStatusFilter] =
+    useState<ReportJobsStatusFilter>("all");
+  const [reportJobsSortField, setReportJobsSortField] = useState<"email" | "status" | "updatedAt">(
+    "email"
+  );
+  const [reportJobsSortDir, setReportJobsSortDir] = useState<"asc" | "desc">("asc");
+  const [reportJobsPageIndex, setReportJobsPageIndex] = useState(0);
 
   const cursor = cursors[pageIndex];
   const endpoint = useMemo(() => {
@@ -367,6 +470,94 @@ export default function CampaignsPage() {
     }
     return String(row.subject || row.name || "Campanie");
   }, [unscheduleTargetId, campaigns]);
+
+  const deleteRowTargetLabel = useMemo(() => {
+    if (!deleteRowTargetId) {
+      return "";
+    }
+    const row = campaigns.find(
+      (c) => typeof c.id === "string" && c.id === deleteRowTargetId
+    );
+    if (!row) {
+      return "Campanie";
+    }
+    return String(row.subject || row.name || "Campanie");
+  }, [deleteRowTargetId, campaigns]);
+
+  const reportJobsFilteredSorted = useMemo(() => {
+    let list = [...reportJobsAll];
+    const q = reportJobsSearch.trim().toLowerCase();
+    if (q) {
+      list = list.filter((job) => {
+        const email = typeof job.email === "string" ? job.email.toLowerCase() : "";
+        return email.includes(q);
+      });
+    }
+    if (reportJobsStatusFilter !== "all") {
+      list = list.filter((job) => {
+        const status =
+          typeof job.status === "string" ? job.status.trim().toLowerCase() : "";
+        if (reportJobsStatusFilter === "with_errors") {
+          if (status === "failed") {
+            return true;
+          }
+          const err = typeof job.lastError === "string" ? job.lastError.trim() : "";
+          return Boolean(err);
+        }
+        return status === reportJobsStatusFilter;
+      });
+    }
+    const dir = reportJobsSortDir === "desc" ? -1 : 1;
+    list.sort((a, b) => {
+      if (reportJobsSortField === "email") {
+        return String(a.email || "").localeCompare(String(b.email || ""), "ro", {
+          sensitivity: "base",
+        }) * dir;
+      }
+      if (reportJobsSortField === "status") {
+        return (
+          String(a.status || "").localeCompare(String(b.status || ""), "ro", {
+            sensitivity: "base",
+          }) * dir
+        );
+      }
+      return (jobTimestampForSort(a) - jobTimestampForSort(b)) * dir;
+    });
+    return list;
+  }, [
+    reportJobsAll,
+    reportJobsSearch,
+    reportJobsStatusFilter,
+    reportJobsSortField,
+    reportJobsSortDir,
+  ]);
+
+  const reportJobsProcessedCount = reportJobsFilteredSorted.length;
+  const reportJobsTotalPages =
+    reportJobsProcessedCount === 0 ?
+      0
+    : Math.ceil(reportJobsProcessedCount / REPORT_JOBS_PAGE_SIZE);
+
+  const reportJobsPageItems = useMemo(() => {
+    if (reportJobsTotalPages === 0) {
+      return [];
+    }
+    const safePage = Math.min(
+      reportJobsPageIndex,
+      Math.max(0, reportJobsTotalPages - 1)
+    );
+    const start = safePage * REPORT_JOBS_PAGE_SIZE;
+    return reportJobsFilteredSorted.slice(start, start + REPORT_JOBS_PAGE_SIZE);
+  }, [reportJobsFilteredSorted, reportJobsPageIndex, reportJobsTotalPages]);
+
+  useEffect(() => {
+    if (reportJobsTotalPages <= 0) {
+      setReportJobsPageIndex(0);
+      return;
+    }
+    setReportJobsPageIndex((prev) => Math.min(prev, reportJobsTotalPages - 1));
+  }, [reportJobsTotalPages]);
+
   const nextCursor = data?.nextCursor ?? null;
   const rawBaseUrl =
     typeof settingsData?.item?.baseUrl === "string" ? settingsData.item.baseUrl : "";
@@ -936,6 +1127,33 @@ export default function CampaignsPage() {
     }
   }
 
+  async function handleDuplicateCampaign(id: string) {
+    if (!id) {
+      return;
+    }
+    setRowAction(id, "duplicate");
+    try {
+      const response = await adminFetch(`/api/admin/newsletter/campaigns/${id}/duplicate`, {
+        method: "POST",
+      });
+      if (!response.ok) {
+        toast.error(await readErrorMessage(response, "Nu am putut duplica campania."));
+        return;
+      }
+      const data = (await response.json()) as { campaignId?: string | null };
+      const newId = typeof data?.campaignId === "string" ? data.campaignId.trim() : "";
+      if (!newId) {
+        toast.error("Copie creată, dar lipsește ID-ul noii campanii.");
+        return;
+      }
+      toast.success("Campania a fost copiată ca draft.");
+      reload();
+      router.push(`/admin/campaigns/${newId}`);
+    } finally {
+      setRowAction(id, null);
+    }
+  }
+
   async function handleRequeue(id: string) {
     if (!id) {
       return;
@@ -947,41 +1165,37 @@ export default function CampaignsPage() {
       });
       if (!response.ok) {
         toast.error(
-          await readErrorMessage(response, "Nu am putut recoada joburile eșuate.")
+          await readErrorMessage(response, "Nu am putut repune în coadă trimiterile eșuate.")
         );
         return;
       }
-      toast.success("Joburile eșuate au fost reintroduse în coadă.");
+
+      let requeued = 0;
+      try {
+        const data = (await response.json()) as { result?: { requeued?: number }; requeued?: number };
+        requeued =
+          typeof data?.result?.requeued === "number" ?
+            data.result.requeued
+          : typeof data?.requeued === "number" ?
+            data.requeued
+          : 0;
+      } catch {
+        requeued = 0;
+      }
+
+      if (requeued > 0) {
+        toast.success(
+          requeued === 1 ?
+            "O trimitere eșuată a fost repusă în coadă."
+          : `${requeued} trimiteri eșuate au fost repuse în coadă.`
+        );
+      } else {
+        toast.success("Nu existau trimiteri eșuate de repus în coadă.");
+      }
       reload();
     } finally {
       setRowAction(id, null);
     }
-  }
-
-  async function handleBulkRequeue() {
-    const ids = Array.from(selectedIds);
-    if (!ids.length) {
-      return;
-    }
-
-    const responses = await Promise.all(
-      ids.map((id) =>
-        adminFetch(`/api/admin/newsletter/campaigns/${id}/requeue`, {
-          method: "POST",
-        })
-      )
-    );
-
-    const failed = responses.find((response) => !response.ok);
-    if (failed) {
-      toast.error(
-        await readErrorMessage(failed, "Nu am putut recoada toate campaniile selectate.")
-      );
-      return;
-    }
-
-    toast.success("Campaniile selectate au fost recoadate.");
-    reload();
   }
 
   async function handleBulkDelete(): Promise<boolean> {
@@ -1012,6 +1226,31 @@ export default function CampaignsPage() {
     return true;
   }
 
+  async function handleDeleteRowConfirmed(): Promise<boolean> {
+    const targetId = deleteRowTargetId;
+    if (!targetId) {
+      return false;
+    }
+
+    const response = await adminFetch(`/api/admin/newsletter/campaigns/${targetId}`, {
+      method: "DELETE",
+    });
+
+    if (!response.ok) {
+      toast.error(await readErrorMessage(response, "Nu am putut șterge campania."));
+      return false;
+    }
+
+    toast.success("Campania a fost ștearsă.");
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.delete(targetId);
+      return next;
+    });
+    reload();
+    return true;
+  }
+
   async function handleViewReport(id: string) {
     if (!id) {
       return;
@@ -1022,23 +1261,83 @@ export default function CampaignsPage() {
     setReportLoading(true);
     setReportError(null);
     setReportData(null);
+    setReportJobsAll([]);
+    setReportJobsError(null);
+    setReportJobsLoading(true);
+    setReportJobsPageIndex(0);
+    setReportJobsSearch("");
+    setReportJobsStatusFilter("all");
+    setReportJobsSortField("email");
+    setReportJobsSortDir("asc");
 
     try {
-      const response = await adminFetch(`/api/admin/newsletter/campaigns/${id}/report`, {
+      const reportResponse = await adminFetch(`/api/admin/newsletter/campaigns/${id}/report`, {
         method: "GET",
       });
 
-      if (!response.ok) {
+      if (!reportResponse.ok) {
         setReportError(
-          await readErrorMessage(response, "Nu am putut încărca raportul campaniei.")
+          await readErrorMessage(reportResponse, "Nu am putut încărca raportul campaniei.")
         );
+        setReportJobsAll([]);
         return;
       }
 
-      const json = (await response.json()) as CampaignReportResponse;
+      const json = (await reportResponse.json()) as CampaignReportResponse;
       setReportData(json);
+      setReportLoading(false);
+
+      const collected: Record<string, unknown>[] = [];
+      let cursor: string | null = null;
+      let hitCap = false;
+
+      for (let step = 0; step < 500; step += 1) {
+        const params = new URLSearchParams({
+          limit: String(REPORT_JOBS_FETCH_CHUNK),
+        });
+        if (cursor) {
+          params.set("cursor", cursor);
+        }
+        const jobsResponse = await adminFetch(
+          `/api/admin/newsletter/campaigns/${id}/jobs?${params.toString()}`,
+          { method: "GET" }
+        );
+        if (!jobsResponse.ok) {
+          setReportJobsError(
+            await readErrorMessage(jobsResponse, "Nu am putut încărca lista de destinatari.")
+          );
+          setReportJobsAll([]);
+          return;
+        }
+        const jobsJson = (await jobsResponse.json()) as CampaignJobsPageResponse;
+        const batch = Array.isArray(jobsJson.items) ? jobsJson.items : [];
+        for (const row of batch) {
+          collected.push(row);
+          if (collected.length >= REPORT_JOBS_MAX_FETCH) {
+            hitCap = true;
+            break;
+          }
+        }
+        if (hitCap) {
+          break;
+        }
+        const next = typeof jobsJson.nextCursor === "string" ? jobsJson.nextCursor : null;
+        if (!next) {
+          break;
+        }
+        cursor = next;
+      }
+
+      setReportJobsAll(collected);
+      setReportJobsError(null);
+      if (hitCap) {
+        adminToastWarning(
+          `În tabel sunt încărcate primele ${REPORT_JOBS_MAX_FETCH} de destinatari. Folosește filtrele pentru a restrânge lista.`
+        );
+      }
     } finally {
       setReportLoading(false);
+      setReportJobsLoading(false);
     }
   }
 
@@ -1047,6 +1346,14 @@ export default function CampaignsPage() {
     setReportCampaignId(null);
     setReportData(null);
     setReportError(null);
+    setReportJobsAll([]);
+    setReportJobsError(null);
+    setReportJobsLoading(false);
+    setReportJobsSearch("");
+    setReportJobsStatusFilter("all");
+    setReportJobsSortField("email");
+    setReportJobsSortDir("asc");
+    setReportJobsPageIndex(0);
   }
 
   return (
@@ -1096,6 +1403,22 @@ export default function CampaignsPage() {
             </CardHeader>
             <CardContent className="space-y-5">
               {settingsError && <p className="text-sm text-rose-500">{settingsError}</p>}
+              {settingsLoading ? (
+                <div className="space-y-5">
+                  <div className="flex items-stretch gap-2">
+                    <Skeleton className="h-9 w-9 shrink-0 self-center rounded-md" />
+                    <div className="flex min-h-[5.5rem] flex-1 gap-3 overflow-hidden">
+                      <Skeleton className="h-24 min-w-[200px] shrink-0 rounded-md" />
+                      <Skeleton className="h-24 min-w-[200px] shrink-0 rounded-md" />
+                      <Skeleton className="h-24 min-w-[200px] shrink-0 rounded-md" />
+                    </div>
+                    <Skeleton className="h-9 w-9 shrink-0 self-center rounded-md" />
+                  </div>
+                  <AdminFormGridSkeleton fields={8} />
+                  <Skeleton className="h-[min(420px,60vh)] w-full rounded-md" />
+                </div>
+              ) : (
+                <>
               {!baseUrl && !settingsLoading && (
                 <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
                   Setează câmpul <strong>URL public de bază</strong> în Setări pentru a
@@ -1281,6 +1604,8 @@ export default function CampaignsPage() {
                   {submitting ? "Se procesează..." : "Salvează"}
                 </Button>
               </div>
+                </>
+              )}
             </CardContent>
           </Card>
 
@@ -1295,21 +1620,20 @@ export default function CampaignsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {loading && (
-                <p className="text-sm text-muted-foreground">{adminCommonLabels.loadingCampaigns}</p>
-              )}
-              {error && <p className="text-sm text-rose-500">{error}</p>}
+              {error && <p className="mb-4 text-sm text-rose-500">{error}</p>}
 
               <div className="mb-4 flex flex-wrap items-center gap-3">
                 <Input
                   className="max-w-xs"
                   placeholder="Caută campanii"
                   value={search}
+                  disabled={loading}
                   onChange={(event) => setSearch(event.target.value)}
                 />
                 <select
-                  className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                  className="h-9 rounded-md border border-input bg-background px-3 text-sm disabled:opacity-60"
                   value={statusFilter}
+                  disabled={loading}
                   onChange={(event) => setStatusFilter(event.target.value)}
                 >
                   {STATUS_FILTER_OPTIONS.map((option) => (
@@ -1319,8 +1643,9 @@ export default function CampaignsPage() {
                   ))}
                 </select>
                 <select
-                  className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                  className="h-9 rounded-md border border-input bg-background px-3 text-sm disabled:opacity-60"
                   value={sortBy}
+                  disabled={loading}
                   onChange={(event) => setSortBy(event.target.value)}
                 >
                   <option value="createdAt">{adminCommonLabels.newest}</option>
@@ -1330,30 +1655,26 @@ export default function CampaignsPage() {
                   <option value="total">Total</option>
                 </select>
                 <select
-                  className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                  className="h-9 rounded-md border border-input bg-background px-3 text-sm disabled:opacity-60"
                   value={sortDir}
+                  disabled={loading}
                   onChange={(event) => setSortDir(event.target.value)}
                 >
                   <option value="desc">{adminCommonLabels.descending}</option>
                   <option value="asc">{adminCommonLabels.ascending}</option>
                 </select>
                 <Button
-                  variant="outline"
-                  onClick={handleBulkRequeue}
-                  disabled={selectedIds.size === 0}
-                >
-                  Recoadă selecția
-                </Button>
-                <Button
                   variant="destructive"
                   onClick={() => setBulkDeleteConfirmOpen(true)}
-                  disabled={selectedIds.size === 0}
+                  disabled={loading || selectedIds.size === 0}
                 >
                   Șterge selecția
                 </Button>
               </div>
 
-              <Table>
+              {loading ?
+                <AdminTableSkeleton rows={10} columns={9} />
+              : <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>
@@ -1379,6 +1700,8 @@ export default function CampaignsPage() {
                     const canSendNow = ["draft", "scheduled"].includes(status);
                     const canSchedule = ["draft", "scheduled"].includes(status);
                     const canUnschedule = status === "scheduled";
+                    const failedCount = Number(campaign.stats?.failed ?? campaign.failed ?? 0);
+                    const canRetryFailed = failedCount > 0;
 
                     return (
                       <TableRow key={id || campaign.name}>
@@ -1408,78 +1731,104 @@ export default function CampaignsPage() {
                         <TableCell>
                           {formatAdminDateTime(campaign.createdAt)}
                         </TableCell>
-                        <TableCell className="space-y-2">
-                          <div className="flex flex-wrap gap-2">
-                            {/* <Button
-                              size="sm"
-                              variant="secondary"
-                              onClick={() => (id ? handleRequeue(id) : undefined)}
-                              disabled={!id || isRowActionLoading(id || "")}
-                            >
-                              {id && isRowActionLoading(id, "requeue") ? "Se recoadă..." : "Recoadă eșuate"}
-                            </Button> */}
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="default"
-                              className="min-w-[8.75rem] gap-1.5 font-semibold shadow-sm ring-1 ring-primary/25 transition-[box-shadow,transform] hover:shadow-md active:scale-[0.98]"
-                              onClick={() => (id ? handleViewReport(id) : undefined)}
-                              disabled={
-                                !id ||
-                                isRowActionLoading(id || "") ||
-                                (reportLoading && reportCampaignId === id)
-                              }
-                            >
-                              <BarChart3
-                                className="h-3.5 w-3.5 shrink-0 opacity-95"
-                                aria-hidden
-                              />
-                              {reportLoading && reportCampaignId === id ?
-                                "Se încarcă..."
-                              : "Vezi raport"}
-                            </Button>
-                            {canSendNow && (
+                        <TableCell className="text-right align-middle">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
                               <Button
                                 type="button"
-                                size="sm"
                                 variant="outline"
-                                className="border-primary/60 font-medium text-primary hover:bg-primary/10"
-                                onClick={() => (id ? handleSendNow(id) : undefined)}
-                                disabled={!id || isRowActionLoading(id || "")}
+                                size="icon"
+                                className="h-8 w-8 shrink-0"
+                                disabled={!id}
+                                aria-label="Acțiuni campanie"
                               >
-                                {id && isRowActionLoading(id, "send") ? "Se trimite..." : "Trimite acum"}
+                                <MoreHorizontal className="h-4 w-4" />
                               </Button>
-                            )}
-                            {canUnschedule && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => (id ? setUnscheduleTargetId(id) : undefined)}
-                                disabled={!id || isRowActionLoading(id || "")}
-                              >
-                                {id && isRowActionLoading(id, "unschedule") ? "Se anulează..." : "Anulează programarea"}
-                              </Button>
-                            )}
-                          </div>
-
-                          {canSchedule && id && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => openScheduleRowDialog(id)}
-                              disabled={isRowActionLoading(id)}
-                            >
-                              {isRowActionLoading(id, "schedule") ?
-                                "Se programează..."
-                              : "Programează"}
-                            </Button>
-                          )}
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-52">
+                              {id && (
+                                <DropdownMenuItem asChild>
+                                  <Link href={`/admin/campaigns/${id}`}>Vezi campanie</Link>
+                                </DropdownMenuItem>
+                              )}
+                              {id && (
+                                <DropdownMenuItem
+                                  disabled={isRowActionLoading(id)}
+                                  onSelect={() => handleDuplicateCampaign(id)}
+                                >
+                                  <Copy className="mr-2 h-4 w-4" aria-hidden />
+                                  {isRowActionLoading(id, "duplicate") ?
+                                    "Se copiază..."
+                                  : "Copiază ca draft"}
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuSeparator />
+                              {id && (
+                                <DropdownMenuItem
+                                  disabled={
+                                    isRowActionLoading(id) ||
+                                    (reportLoading && reportCampaignId === id)
+                                  }
+                                  onSelect={() => handleViewReport(id)}
+                                >
+                                  <BarChart3 className="mr-2 h-4 w-4" aria-hidden />
+                                  Vezi raport
+                                </DropdownMenuItem>
+                              )}
+                              {canRetryFailed && id && (
+                                <DropdownMenuItem
+                                  disabled={isRowActionLoading(id)}
+                                  onSelect={() => handleRequeue(id)}
+                                >
+                                  Retrimite eșuate
+                                </DropdownMenuItem>
+                              )}
+                              {canSendNow && id && (
+                                <DropdownMenuItem
+                                  disabled={isRowActionLoading(id)}
+                                  onSelect={() => handleSendNow(id)}
+                                >
+                                  Trimite acum
+                                </DropdownMenuItem>
+                              )}
+                              {canSchedule && id && (
+                                <DropdownMenuItem
+                                  disabled={isRowActionLoading(id)}
+                                  onSelect={() => openScheduleRowDialog(id)}
+                                >
+                                  Programează
+                                </DropdownMenuItem>
+                              )}
+                              {canUnschedule && id && (
+                                <DropdownMenuItem
+                                  disabled={isRowActionLoading(id)}
+                                  onSelect={() => setUnscheduleTargetId(id)}
+                                >
+                                  Anulează programarea
+                                </DropdownMenuItem>
+                              )}
+                              {id && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    disabled={isRowActionLoading(id)}
+                                    className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                                    onSelect={() => setDeleteRowTargetId(id)}
+                                  >
+                                    <Trash2 className="mr-2 h-4 w-4" aria-hidden />
+                                    Șterge
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                       </TableRow>
                     );
                   })}
                 </TableBody>
               </Table>
+              }
 
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm">
                 <span className="text-muted-foreground">
@@ -1487,8 +1836,9 @@ export default function CampaignsPage() {
                 </span>
                 <div className="flex items-center gap-2">
                   <select
-                    className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+                    className="h-8 rounded-md border border-input bg-background px-2 text-xs disabled:opacity-60"
                     value={pageSize}
+                    disabled={loading}
                     onChange={(event) => setPageSize(Number(event.target.value))}
                   >
                     {PAGE_SIZE_OPTIONS.map((size) => (
@@ -1500,7 +1850,7 @@ export default function CampaignsPage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    disabled={pageIndex <= 0}
+                    disabled={loading || pageIndex <= 0}
                     onClick={() => setPageIndex((prev) => Math.max(0, prev - 1))}
                   >
                     {adminCommonLabels.previous}
@@ -1508,7 +1858,7 @@ export default function CampaignsPage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    disabled={!nextCursor}
+                    disabled={loading || !nextCursor}
                     onClick={() => setPageIndex((prev) => prev + 1)}
                   >
                     {adminCommonLabels.next}
@@ -1735,6 +2085,26 @@ export default function CampaignsPage() {
         onConfirm={handleBulkDelete}
       />
 
+      <AdminConfirmDialog
+        open={deleteRowTargetId !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteRowTargetId(null);
+          }
+        }}
+        title="Ștergi această campanie?"
+        description={
+          <>
+            Campanie: <strong>{deleteRowTargetLabel || "—"}</strong>. Acțiunea este
+            ireversibilă.
+          </>
+        }
+        confirmLabel="Șterge definitiv"
+        variant="destructive"
+        confirmDisabled={!deleteRowTargetId}
+        onConfirm={handleDeleteRowConfirmed}
+      />
+
       {reportDialogOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
@@ -1758,8 +2128,20 @@ export default function CampaignsPage() {
               </Button>
             </CardHeader>
             <CardContent className="space-y-4">
-              {reportLoading && <p className="text-sm text-muted-foreground">Se încarcă raportul...</p>}
               {reportError && <p className="text-sm text-rose-500">{reportError}</p>}
+              {reportLoading && !reportData && !reportError ?
+                <div className="space-y-4">
+                  <AdminKpiRowSkeleton count={5} />
+                  <div className="inline-flex w-full max-w-md gap-1 rounded-lg border border-border bg-muted/30 p-1">
+                    <Skeleton className="h-9 flex-1 rounded-md" />
+                    <Skeleton className="h-9 flex-1 rounded-md" />
+                    <Skeleton className="h-9 flex-1 rounded-md" />
+                  </div>
+                  <div className="space-y-2">
+                    <AdminTableSkeleton rows={6} columns={4} />
+                  </div>
+                </div>
+              : null}
 
               {reportData && (
                 <>
@@ -1786,34 +2168,263 @@ export default function CampaignsPage() {
                     </div>
                   </div>
 
-                  <div className="grid gap-4 lg:grid-cols-2">
-                    <div className="space-y-2">
-                      <p className="text-sm font-medium">Joburi eșuate</p>
+                  <Tabs defaultValue="report-destinatari" className="space-y-4">
+                    <TabList className="inline-flex w-full flex-wrap gap-1 rounded-lg border border-border bg-muted/30 p-1 sm:flex-nowrap">
+                      <TabTrigger
+                        value="report-destinatari"
+                        className="min-h-9 flex-1 rounded-md px-2 py-2 text-center text-xs font-medium text-muted-foreground transition data-[active=true]:bg-background data-[active=true]:text-foreground sm:px-3 sm:text-sm"
+                      >
+                        Destinatari
+                        {!reportJobsLoading ?
+                          <span className="ml-1 tabular-nums text-muted-foreground/80">
+                            ({reportJobsAll.length})
+                          </span>
+                        : null}
+                      </TabTrigger>
+                      <TabTrigger
+                        value="report-esuate"
+                        className="min-h-9 flex-1 rounded-md px-2 py-2 text-center text-xs font-medium text-muted-foreground transition data-[active=true]:bg-background data-[active=true]:text-foreground sm:px-3 sm:text-sm"
+                      >
+                        Joburi eșuate
+                        <span className="ml-1 tabular-nums text-muted-foreground/80">
+                          ({reportData.failedJobs.length})
+                        </span>
+                      </TabTrigger>
+                      <TabTrigger
+                        value="report-loguri"
+                        className="min-h-9 flex-1 rounded-md px-2 py-2 text-center text-xs font-medium text-muted-foreground transition data-[active=true]:bg-background data-[active=true]:text-foreground sm:px-3 sm:text-sm"
+                      >
+                        Ultimele loguri
+                        <span className="ml-1 tabular-nums text-muted-foreground/80">
+                          ({reportData.logs.length})
+                        </span>
+                      </TabTrigger>
+                    </TabList>
+
+                    <TabContent value="report-destinatari" className="space-y-2">
+                      <p className="text-xs text-muted-foreground">
+                        Toți destinatarii campaniei (joburi). Folosește filtrele pentru a restrânge lista.
+                      </p>
+                      {reportJobsLoading && (
+                        <AdminTableSkeleton rows={6} columns={4} />
+                      )}
+                      {reportJobsError && (
+                        <p className="text-xs text-rose-600">{reportJobsError}</p>
+                      )}
+                      {!reportJobsLoading && !reportJobsError && reportJobsAll.length === 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          Nu există joburi pentru această campanie.
+                        </p>
+                      )}
+                      {!reportJobsLoading &&
+                        !reportJobsError &&
+                        reportJobsAll.length > 0 &&
+                        reportJobsProcessedCount === 0 && (
+                          <p className="text-xs text-muted-foreground">
+                            Niciun destinatar nu corespunde filtrelor curente.
+                          </p>
+                        )}
+                      {!reportJobsLoading && !reportJobsError && reportJobsProcessedCount > 0 && (
+                        <div className="space-y-3">
+                          <div className="flex flex-wrap items-end gap-2">
+                            <div className="space-y-1">
+                              <label className="text-xs font-medium text-muted-foreground">
+                                Căutare email
+                              </label>
+                              <Input
+                                className="h-9 w-[min(100%,16rem)]"
+                                placeholder="Fragment email…"
+                                value={reportJobsSearch}
+                                onChange={(event) => {
+                                  setReportJobsSearch(event.target.value);
+                                  setReportJobsPageIndex(0);
+                                }}
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-xs font-medium text-muted-foreground">
+                                Filtru status
+                              </label>
+                              <select
+                                className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+                                value={reportJobsStatusFilter}
+                                onChange={(event) => {
+                                  setReportJobsStatusFilter(
+                                    event.target.value as ReportJobsStatusFilter
+                                  );
+                                  setReportJobsPageIndex(0);
+                                }}
+                              >
+                                <option value="all">Toate</option>
+                                <option value="failed">Doar eșuate</option>
+                                <option value="with_errors">Cu erori (eșuate + ignorate cu motiv)</option>
+                                <option value="sent">Trimise</option>
+                                <option value="skipped">Ignorate</option>
+                                <option value="queued">În coadă</option>
+                                <option value="sending">În trimitere</option>
+                              </select>
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-xs font-medium text-muted-foreground">
+                                Sortare
+                              </label>
+                              <select
+                                className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+                                value={`${reportJobsSortField}:${reportJobsSortDir}`}
+                                onChange={(event) => {
+                                  const raw = event.target.value;
+                                  const colon = raw.indexOf(":");
+                                  const field = raw.slice(0, colon) as "email" | "status" | "updatedAt";
+                                  const dir = raw.slice(colon + 1) as "asc" | "desc";
+                                  setReportJobsSortField(field);
+                                  setReportJobsSortDir(dir);
+                                  setReportJobsPageIndex(0);
+                                }}
+                              >
+                                <option value="email:asc">Email A → Z</option>
+                                <option value="email:desc">Email Z → A</option>
+                                <option value="status:asc">Status A → Z</option>
+                                <option value="status:desc">Status Z → A</option>
+                                <option value="updatedAt:desc">Cel mai recent</option>
+                                <option value="updatedAt:asc">Cel mai vechi</option>
+                              </select>
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+                            <span>
+                              {reportJobsProcessedCount} destinatari
+                              {reportJobsTotalPages > 0 ?
+                                <> · pagina {reportJobsPageIndex + 1} din {reportJobsTotalPages}</>
+                              : null}
+                              {" · "}
+                              maxim {REPORT_JOBS_PAGE_SIZE} pe pagină
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={reportJobsPageIndex <= 0}
+                                onClick={() => setReportJobsPageIndex((p) => Math.max(0, p - 1))}
+                              >
+                                Anterior
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={
+                                  reportJobsTotalPages <= 0 ||
+                                  reportJobsPageIndex >= reportJobsTotalPages - 1
+                                }
+                                onClick={() =>
+                                  setReportJobsPageIndex((p) =>
+                                    reportJobsTotalPages > 0 ?
+                                      Math.min(reportJobsTotalPages - 1, p + 1)
+                                    : p
+                                  )
+                                }
+                              >
+                                Următor
+                              </Button>
+                            </div>
+                          </div>
+                          <div className="overflow-x-auto rounded-md border">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Email</TableHead>
+                                  <TableHead>Status</TableHead>
+                                  <TableHead>Motiv / detalii</TableHead>
+                                  <TableHead>Trimis la</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {reportJobsPageItems.map((job) => {
+                                  const jobId = typeof job.id === "string" ? job.id : "";
+                                  const email = typeof job.email === "string" ? job.email : "-";
+                                  const rawStatus =
+                                    typeof job.status === "string" ?
+                                      job.status.trim().toLowerCase()
+                                    : "";
+                                  const motif = formatCampaignJobMotif(job);
+                                  const sentAt =
+                                    job.sentAt != null ?
+                                      formatAdminDateTime(job.sentAt, { includeSeconds: true })
+                                    : "—";
+                                  return (
+                                    <TableRow key={jobId || email}>
+                                      <TableCell className="max-w-[200px] truncate font-mono text-xs">
+                                        {email}
+                                      </TableCell>
+                                      <TableCell>
+                                        <Badge variant={campaignJobBadgeVariant(rawStatus)}>
+                                          {campaignJobStatusLabel(rawStatus)}
+                                        </Badge>
+                                      </TableCell>
+                                      <TableCell className="max-w-md text-xs text-muted-foreground">
+                                        {motif}
+                                      </TableCell>
+                                      <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                                        {rawStatus === "sent" ? sentAt : "—"}
+                                      </TableCell>
+                                    </TableRow>
+                                  );
+                                })}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </div>
+                      )}
+                    </TabContent>
+
+                    <TabContent value="report-esuate" className="space-y-2">
+                      <p className="text-xs text-muted-foreground">
+                        Rezumat din raport pentru trimiterile eșuate (detalii din API).
+                      </p>
                       {reportData.failedJobs.length === 0 ? (
                         <p className="text-xs text-muted-foreground">Nu există joburi eșuate.</p>
                       ) : (
                         <div className="space-y-2">
                           {reportData.failedJobs.map((job) => (
-                            <div key={job.id || `${job.email}-${job.lastError}`} className="rounded-md border p-3 text-xs">
-                              <p><strong>Email:</strong> {job.email || "-"}</p>
-                              <p><strong>Motiv:</strong> {job.lastError || "-"}</p>
-                              <p><strong>Cod:</strong> {job.errorCode || "-"}</p>
-                              <p><strong>Tip:</strong> {job.errorKind || "-"}</p>
+                            <div
+                              key={job.id || `${job.email}-${job.lastError}`}
+                              className="rounded-md border p-3 text-xs"
+                            >
+                              <p>
+                                <strong>Email:</strong> {job.email || "-"}
+                              </p>
+                              <p>
+                                <strong>Motiv:</strong> {job.lastError || "-"}
+                              </p>
+                              <p>
+                                <strong>Cod:</strong> {job.errorCode || "-"}
+                              </p>
+                              <p>
+                                <strong>Tip:</strong> {job.errorKind || "-"}
+                              </p>
                             </div>
                           ))}
                         </div>
                       )}
-                    </div>
+                    </TabContent>
 
-                    <div className="space-y-2">
-                      <p className="text-sm font-medium">Ultimele loguri</p>
+                    <TabContent value="report-loguri" className="space-y-2">
+                      <p className="text-xs text-muted-foreground">
+                        Evenimente recente înregistrate pentru această campanie.
+                      </p>
                       {reportData.logs.length === 0 ? (
-                        <p className="text-xs text-muted-foreground">Nu există loguri pentru această campanie.</p>
+                        <p className="text-xs text-muted-foreground">
+                          Nu există loguri pentru această campanie.
+                        </p>
                       ) : (
                         <div className="space-y-2">
                           {reportData.logs.map((log, index) => (
-                            <div key={`${log.id || index}-${log.message || ""}`} className="rounded-md border p-3 text-xs">
-                              <div className="flex items-center justify-between">
+                            <div
+                              key={`${log.id || index}-${log.message || ""}`}
+                              className="rounded-md border p-3 text-xs"
+                            >
+                              <div className="flex items-center justify-between gap-2">
                                 <span className="font-medium">
                                   {formatAdminDateTime(log.createdAt, {
                                     includeSeconds: true,
@@ -1828,8 +2439,8 @@ export default function CampaignsPage() {
                           ))}
                         </div>
                       )}
-                    </div>
-                  </div>
+                    </TabContent>
+                  </Tabs>
 
                   <div className="rounded-md border p-3 text-xs text-muted-foreground">
                     <p>
