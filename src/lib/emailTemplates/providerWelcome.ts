@@ -11,11 +11,11 @@ export function getProviderWelcomeTemplate({
 }: ProviderWelcomeTemplateInput) {
   if (locale === "en") {
     const html = `
-    <div style="background:#f8fafb;padding:24px 0;font-family:Arial,sans-serif;color:#111827;">
-      <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+    <div style="margin:0;padding:0;background:#ffffff;font-family:Arial,sans-serif;color:#111827;">
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#ffffff;padding:0;">
         <tr>
           <td align="center">
-            <table width="600" cellpadding="0" cellspacing="0" role="presentation" style="max-width:600px;background:#ffffff;border-radius:12px;overflow:hidden;">
+            <table width="600" cellpadding="0" cellspacing="0" role="presentation" style="max-width:600px;width:100%;background:#ffffff;border:0;border-radius:0;overflow:visible;">
               <tr>
                 <td style="background:#d35400;padding:20px 24px;color:#ffffff;">
                   <h1 style="margin:0;font-size:22px;line-height:1.3;">Welcome to AInevoie</h1>
@@ -55,7 +55,7 @@ export function getProviderWelcomeTemplate({
       "2) If we need anything else, we will contact you.",
       "3) When the app goes live, sign in with this account.",
       "",
-      "Support: contact@ainevoie.ro",
+      "Support: contact@ai-nevoie.ro",
       "",
       "Kind regards,",
       "The AInevoie team",
@@ -65,11 +65,11 @@ export function getProviderWelcomeTemplate({
   }
 
   const html = `
-    <div style="background:#f8fafb;padding:24px 0;font-family:Arial,sans-serif;color:#111827;">
-      <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+    <div style="margin:0;padding:0;background:#ffffff;font-family:Arial,sans-serif;color:#111827;">
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#ffffff;padding:0;">
         <tr>
           <td align="center">
-            <table width="600" cellpadding="0" cellspacing="0" role="presentation" style="max-width:600px;background:#ffffff;border-radius:12px;overflow:hidden;">
+            <table width="600" cellpadding="0" cellspacing="0" role="presentation" style="max-width:600px;width:100%;background:#ffffff;border:0;border-radius:0;overflow:visible;">
               <tr>
                 <td style="background:#d35400;padding:20px 24px;color:#ffffff;">
                   <h1 style="margin:0;font-size:22px;line-height:1.3;">Bine ai venit pe AInevoie</h1>
@@ -110,7 +110,7 @@ export function getProviderWelcomeTemplate({
     "2) Dacă lipsesc informații, te contactăm pentru completare.",
     "3) La lansare, te autentifici direct cu acest cont.",
     "",
-    "Suport: contact@ainevoie.ro",
+    "Suport: contact@ai-nevoie.ro",
     "",
     "Cu drag,",
     "Echipa AInevoie",

@@ -338,14 +338,7 @@ export default function SubscribersPage() {
                 Setează dezabonat
               </Button>
             </>
-          : <Button
-              variant="default"
-              onClick={() => handleBulkStatus("active")}
-              disabled={selectedIds.size === 0}
-            >
-              Reactivează abonarea
-            </Button>
-          }
+          : null}
           <Button
             variant="destructive"
             onClick={() => setBulkDeleteConfirmOpen(true)}
@@ -568,7 +561,7 @@ export default function SubscribersPage() {
                 <CardDescription>
                   {statusFilter === "active" ?
                     "Abonați care primesc newsletterul."
-                  : "Adrese care s-au dezabonat; nu mai primesc trimiteri."}
+                  : "Adrese care s-au dezabonat; nu mai primesc trimiteri. Din motive GDPR, reactivarea nu se face din admin — utilizatorul se poate înscrie din nou doar din site, cu acord explicit."}
                 </CardDescription>
                 <TabList className="mt-4 inline-flex rounded-lg border border-border bg-muted/30 p-1">
                   <TabTrigger

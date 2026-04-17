@@ -103,11 +103,11 @@ function appendFooter(html: string, unsubscribeUrl: string): string {
   const footer = `
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-top:24px;border-top:1px solid #e2e8f0;">
       <tr>
-        <td style="padding-top:14px;font-size:12px;line-height:1.6;color:#64748b;">
+        <td style="padding:14px 20px 0 20px;font-size:12px;line-height:1.6;color:#64748b;">
           Primești acest email deoarece te-ai înscris pe lista AInevoie.
           <br />
           Dacă nu mai dorești să primești mesaje, te poți dezabona:
-          <a href="${unsubscribeUrl}" style="color:#0f172a;font-weight:700;">Dezabonare</a>
+          <a href="${unsubscribeUrl}" style="color:#d35400;font-weight:700;">Dezabonare</a>
         </td>
       </tr>
     </table>

@@ -68,4 +68,4 @@ We may update this Policy. The “Last updated” date will change; material cha
 
 ## 12. Contact
 
-**contact@ainevoie.ro** (or the address published on the site).
+**contact@ai-nevoie.ro** (or the address published on the site).

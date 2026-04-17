@@ -11,12 +11,14 @@ import {
 } from "@/lib/romaniaLocations";
 import { PROVIDER_LEGAL_STATUSES, type ProviderLegalStatus } from "@/types/provider";
 import axios from "axios";
-import { Eye, EyeOff } from "lucide-react";
+import { ChevronDown, Eye, EyeOff } from "lucide-react";
 import { Link, useRouter } from "@/i18n/navigation";
 import { useLocale, useTranslations } from "next-intl";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import toast from "react-hot-toast";
+
+import { cn } from "@/lib/utils";
 
 type FormValues = {
   fullName: string;
@@ -57,6 +59,9 @@ export default function ProviderOnboardingFormWizard({
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [citySearch, setCitySearch] = useState("");
+  const [cityDropdownOpen, setCityDropdownOpen] = useState(false);
+  const cityComboRef = useRef<HTMLDivElement>(null);
+  const citySearchInputRef = useRef<HTMLInputElement>(null);
 
   const legalStatusOptions = useMemo(
     () =>
@@ -98,6 +103,7 @@ export default function ProviderOnboardingFormWizard({
   const emailValue = watch("email");
   const legalStatus = watch("legalStatus");
   const selectedCountyCode = watch("countyCode");
+  const selectedCityCode = watch("cityCode");
   const normalizedEmail = (emailValue || "").trim().toLowerCase();
   const hasValidEmailForNewsletter = isValidEmail(normalizedEmail);
   const isLegalEntityReady = legalStatus === "pfa_ready" || legalStatus === "srl_ready";
@@ -123,7 +129,35 @@ export default function ProviderOnboardingFormWizard({
   useEffect(() => {
     setValue("cityCode", "", { shouldValidate: false });
     setCitySearch("");
+    setCityDropdownOpen(false);
   }, [selectedCountyCode, setValue]);
+
+  useEffect(() => {
+    if (!cityDropdownOpen) {
+      return;
+    }
+    function handlePointerDown(event: MouseEvent) {
+      if (
+        cityComboRef.current &&
+        !cityComboRef.current.contains(event.target as Node)
+      ) {
+        setCityDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [cityDropdownOpen]);
+
+  useEffect(() => {
+    if (cityDropdownOpen) {
+      queueMicrotask(() => citySearchInputRef.current?.focus());
+    }
+  }, [cityDropdownOpen]);
+
+  const selectedCityRecord = useMemo(
+    () => findRomaniaCity(selectedCountyCode, selectedCityCode),
+    [selectedCountyCode, selectedCityCode]
+  );
 
   useEffect(() => {
     if (!hasValidEmailForNewsletter) {
@@ -369,38 +403,115 @@ export default function ProviderOnboardingFormWizard({
             <label htmlFor="provider-city" className="mb-2.5 inline-block text-sm">
               {t("cityLabel")}
             </label>
-            <input
-              id="provider-city-search"
-              type="search"
-              disabled={!selectedCountyCode}
-              value={citySearch}
-              onChange={(event) => setCitySearch(event.target.value)}
-              placeholder={t("citySearchPlaceholder")}
-              className="border-stroke text-body focus:border-primary focus:shadow-input dark:border-stroke-dark dark:focus:border-primary mb-2 w-full rounded-md border bg-white px-6 py-3 text-base font-medium outline-hidden disabled:cursor-not-allowed disabled:opacity-60 dark:bg-black dark:text-white"
-            />
-            <select
-              id="provider-city"
-              aria-label={t("cityAria")}
-              disabled={!selectedCountyCode}
-              className="border-stroke text-body focus:border-primary focus:shadow-input dark:border-stroke-dark dark:focus:border-primary w-full rounded-md border bg-white px-6 py-3 text-base font-medium outline-hidden disabled:cursor-not-allowed disabled:opacity-60 dark:bg-black dark:text-white"
-              {...register("cityCode", {
-                required: t("cityRequired"),
-                validate: (value) =>
-                  Boolean(findRomaniaCity(selectedCountyCode, value)) || t("cityRequired"),
-              })}
-            >
-              <option value="">
-                {selectedCountyCode ? t("cityPlaceholder") : t("cityDisabledPlaceholder")}
-              </option>
-              {filteredCities.map((city) => (
-                <option key={city.cityCode} value={city.cityCode}>
-                  {city.cityName}
-                </option>
-              ))}
-            </select>
-            {selectedCountyCode && filteredCities.length === 0 && (
-              <p className="mt-2 text-xs text-muted-foreground">{t("cityEmpty")}</p>
-            )}
+            <div ref={cityComboRef} className="relative">
+              <input
+                type="hidden"
+                {...register("cityCode", {
+                  required: t("cityRequired"),
+                  validate: (value) =>
+                    Boolean(findRomaniaCity(selectedCountyCode, value)) ||
+                    t("cityRequired"),
+                })}
+              />
+              <button
+                type="button"
+                id="provider-city"
+                disabled={!selectedCountyCode}
+                aria-label={t("cityAria")}
+                aria-haspopup="listbox"
+                aria-expanded={cityDropdownOpen}
+                aria-controls="provider-city-listbox"
+                onClick={() => {
+                  if (!selectedCountyCode) {
+                    return;
+                  }
+                  setCityDropdownOpen((open) => !open);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
+                    setCityDropdownOpen(false);
+                  }
+                }}
+                className={cn(
+                  "border-stroke text-body focus:border-primary focus:shadow-input dark:border-stroke-dark dark:focus:border-primary flex w-full items-center justify-between gap-2 rounded-md border bg-white px-6 py-3 text-left text-base font-medium outline-hidden disabled:cursor-not-allowed disabled:opacity-60 dark:bg-black dark:text-white",
+                  errors.cityCode && "border-red-500"
+                )}
+              >
+                <span
+                  className={
+                    selectedCityRecord ?
+                      "text-body truncate"
+                    : "text-muted-foreground truncate"
+                  }
+                >
+                  {!selectedCountyCode ?
+                    t("cityDisabledPlaceholder")
+                  : selectedCityRecord ?
+                    selectedCityRecord.cityName
+                  : t("cityPlaceholder")}
+                </span>
+                <ChevronDown
+                  className={cn(
+                    "text-muted-foreground h-4 w-4 shrink-0 transition-transform",
+                    cityDropdownOpen && "rotate-180"
+                  )}
+                  aria-hidden
+                />
+              </button>
+
+              {cityDropdownOpen && selectedCountyCode ?
+                <div
+                  className="border-stroke dark:border-stroke-dark absolute left-0 right-0 z-[100] mt-1 overflow-hidden rounded-md border bg-white shadow-lg dark:bg-black"
+                  role="presentation"
+                >
+                  <input
+                    ref={citySearchInputRef}
+                    id="provider-city-search"
+                    type="search"
+                    value={citySearch}
+                    onChange={(event) => setCitySearch(event.target.value)}
+                    placeholder={t("citySearchPlaceholder")}
+                    className="border-stroke text-body focus:border-primary dark:border-stroke-dark w-full border-0 border-b bg-white px-4 py-2.5 text-sm outline-hidden dark:bg-black dark:text-white"
+                    onKeyDown={(event) => {
+                      if (event.key === "Escape") {
+                        event.stopPropagation();
+                        setCityDropdownOpen(false);
+                      }
+                    }}
+                  />
+                  <ul
+                    id="provider-city-listbox"
+                    role="listbox"
+                    className="max-h-60 overflow-y-auto py-1"
+                  >
+                    {filteredCities.map((city) => (
+                      <li key={city.cityCode} role="presentation">
+                        <button
+                          type="button"
+                          role="option"
+                          aria-selected={selectedCityCode === city.cityCode}
+                          className="hover:bg-muted/80 dark:hover:bg-muted/20 w-full px-4 py-2.5 text-left text-sm text-body dark:text-white"
+                          onClick={() => {
+                            setValue("cityCode", city.cityCode, {
+                              shouldValidate: true,
+                            });
+                            setCitySearch("");
+                            setCityDropdownOpen(false);
+                          }}
+                        >
+                          {city.cityName}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  {filteredCities.length === 0 ?
+                    <p className="text-muted-foreground px-4 py-3 text-xs">
+                      {t("cityEmpty")}
+                    </p>
+                  : null}
+                </div>
+              : null}
+            </div>
             {errors.cityCode?.message && (
               <p className="mt-2 text-xs text-red-500">{errors.cityCode.message}</p>
             )}

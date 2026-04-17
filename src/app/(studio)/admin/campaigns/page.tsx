@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import toast from "react-hot-toast";
+import { BarChart3, ChevronLeft, ChevronRight } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -40,6 +42,7 @@ import {
   logLevelLabel,
 } from "@/lib/adminLabels";
 import { formatAdminDateTime } from "@/lib/formatAdminDateTime";
+import { adminToastWarning } from "@/lib/adminToast";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50];
 const SCHEDULE_TIMEZONE = "Europe/Bucharest";
@@ -281,10 +284,6 @@ export default function CampaignsPage() {
   const [testEmail, setTestEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [sendingTest, setSendingTest] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
-  const [createSuccess, setCreateSuccess] = useState<string | null>(null);
-  const [testError, setTestError] = useState<string | null>(null);
-  const [testSuccess, setTestSuccess] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<CampaignTabValue>("list");
   const [createActionDialogOpen, setCreateActionDialogOpen] = useState(false);
   const [scheduleActionDialogOpen, setScheduleActionDialogOpen] = useState(false);
@@ -373,6 +372,34 @@ export default function CampaignsPage() {
     typeof settingsData?.item?.baseUrl === "string" ? settingsData.item.baseUrl : "";
   const baseUrl = useMemo(() => normalizePublicBaseUrl(rawBaseUrl), [rawBaseUrl]);
   const selectedTemplate = getCampaignTemplateDefinition(templateId);
+  const templateScrollRef = useRef<HTMLDivElement>(null);
+  const [templateScrollEdges, setTemplateScrollEdges] = useState({
+    atStart: true,
+    atEnd: true,
+  });
+
+  const updateTemplateScrollEdges = useCallback(() => {
+    const el = templateScrollRef.current;
+    if (!el) {
+      return;
+    }
+    const { scrollLeft, scrollWidth, clientWidth } = el;
+    const maxScroll = Math.max(0, scrollWidth - clientWidth);
+    setTemplateScrollEdges({
+      atStart: scrollLeft <= 1,
+      atEnd: scrollLeft >= maxScroll - 1,
+    });
+  }, []);
+
+  const scrollTemplateStrip = useCallback((direction: -1 | 1) => {
+    const el = templateScrollRef.current;
+    if (!el) {
+      return;
+    }
+    const step = Math.max(240, Math.floor(el.clientWidth * 0.75));
+    el.scrollBy({ left: step * direction, behavior: "smooth" });
+  }, []);
+
   const isLocalBaseUrl = useMemo(() => {
     if (!baseUrl) {
       return false;
@@ -388,11 +415,25 @@ export default function CampaignsPage() {
 
   useEffect(() => {
     setTemplateData(getDefaultTemplateData(templateId));
-    setCreateError(null);
-    setCreateSuccess(null);
-    setTestError(null);
-    setTestSuccess(null);
   }, [templateId]);
+
+  useEffect(() => {
+    if (activeTab !== "create") {
+      return;
+    }
+    updateTemplateScrollEdges();
+    const el = templateScrollRef.current;
+    if (!el) {
+      return;
+    }
+    el.addEventListener("scroll", updateTemplateScrollEdges, { passive: true });
+    const ro = new ResizeObserver(updateTemplateScrollEdges);
+    ro.observe(el);
+    return () => {
+      el.removeEventListener("scroll", updateTemplateScrollEdges);
+      ro.disconnect();
+    };
+  }, [activeTab, updateTemplateScrollEdges]);
 
   useEffect(() => {
     if (nextCursor && !cursors[pageIndex + 1]) {
@@ -548,19 +589,16 @@ export default function CampaignsPage() {
   }
 
   function validateCreateForm(): boolean {
-    setCreateError(null);
-    setCreateSuccess(null);
-
     if (!subject.trim()) {
-      setCreateError("Subiectul este obligatoriu.");
+      toast.error("Subiectul este obligatoriu.");
       return false;
     }
     if (!baseUrl) {
-      setCreateError("Setează URL-ul public de bază în Setări newsletter.");
+      toast.error("Setează URL-ul public de bază în Setări newsletter.");
       return false;
     }
     if (templateValidation.errors.length > 0) {
-      setCreateError(templateValidation.errors[0]);
+      toast.error(templateValidation.errors[0]);
       return false;
     }
 
@@ -653,36 +691,34 @@ export default function CampaignsPage() {
     if (action === "schedule") {
       const localValue = (scheduleLocalValue || "").trim();
       if (!localValue) {
-        setCreateError("Selectează data și ora programării.");
+        toast.error("Selectează data și ora programării.");
         return;
       }
       const parsedUtc = bucharestLocalToUtcIso(localValue);
       if (!parsedUtc) {
-        setCreateError("Data programării este invalidă.");
+        toast.error("Data programării este invalidă.");
         return;
       }
       if (isScheduleTooSoon(parsedUtc)) {
-        setCreateError(MIN_SCHEDULE_DELAY_ERROR);
+        adminToastWarning(MIN_SCHEDULE_DELAY_ERROR);
         return;
       }
       scheduleUtcIso = parsedUtc;
     }
 
     setSubmitting(true);
-    setCreateError(null);
-    setCreateSuccess(null);
     try {
       const campaignId = await createDraftCampaign();
       let shouldFinalize = true;
 
       if (action === "draft") {
-        setCreateSuccess("Campania a fost salvată ca draft.");
+        toast.success("Campania a fost salvată ca draft.");
       } else if (action === "send_now") {
         try {
           await sendCampaignNow(campaignId);
-          setCreateSuccess("Campania a fost creată și trimiterea a pornit.");
+          toast.success("Campania a fost creată și trimiterea a pornit.");
         } catch (error) {
-          setCreateError(
+          toast.error(
             `Campania a fost salvată ca draft, dar acțiunea ulterioară a eșuat: ${getActionErrorMessage(
               error,
               "Nu am putut porni trimiterea."
@@ -692,7 +728,7 @@ export default function CampaignsPage() {
       } else if (action === "schedule" && scheduleUtcIso) {
         if (isScheduleTooSoon(scheduleUtcIso)) {
           const deleted = await deleteCampaign(campaignId).catch(() => false);
-          setCreateError(
+          adminToastWarning(
             deleted ?
               MIN_SCHEDULE_DELAY_ERROR :
               `${MIN_SCHEDULE_DELAY_ERROR} Draftul nu a putut fi șters automat.`
@@ -701,7 +737,7 @@ export default function CampaignsPage() {
         } else {
           try {
             await scheduleCampaign(campaignId, scheduleUtcIso);
-            setCreateSuccess("Campania a fost creată și programată.");
+            toast.success("Campania a fost creată și programată.");
           } catch (error) {
             const scheduleError = getActionErrorMessage(
               error,
@@ -710,14 +746,14 @@ export default function CampaignsPage() {
 
             if (isMinScheduleDelayMessage(scheduleError)) {
               const deleted = await deleteCampaign(campaignId).catch(() => false);
-              setCreateError(
+              adminToastWarning(
                 deleted ?
                   scheduleError :
                   `${scheduleError} Draftul nu a putut fi șters automat.`
               );
               shouldFinalize = false;
             } else {
-              setCreateError(
+              toast.error(
                 `Campania a fost salvată ca draft, dar acțiunea ulterioară a eșuat: ${scheduleError}`
               );
             }
@@ -732,7 +768,7 @@ export default function CampaignsPage() {
         reload();
       }
     } catch (error) {
-      setCreateError(getActionErrorMessage(error, "Nu am putut salva draftul."));
+      toast.error(getActionErrorMessage(error, "Nu am putut salva draftul."));
     } finally {
       setSubmitting(false);
     }
@@ -770,23 +806,20 @@ export default function CampaignsPage() {
   }
 
   async function handleSendTest() {
-    setTestError(null);
-    setTestSuccess(null);
-
     if (!testEmail.trim() || !testEmail.includes("@")) {
-      setTestError("Introdu o adresă validă pentru test.");
+      toast.error("Introdu o adresă validă pentru test.");
       return;
     }
     if (!subject.trim()) {
-      setTestError("Subiectul este obligatoriu pentru test.");
+      toast.error("Subiectul este obligatoriu pentru test.");
       return;
     }
     if (!baseUrl) {
-      setTestError("Setează URL-ul public de bază în Setări newsletter.");
+      toast.error("Setează URL-ul public de bază în Setări newsletter.");
       return;
     }
     if (templateValidation.errors.length > 0) {
-      setTestError(templateValidation.errors[0]);
+      toast.error(templateValidation.errors[0]);
       return;
     }
 
@@ -805,13 +838,13 @@ export default function CampaignsPage() {
       });
 
       if (!response.ok) {
-        setTestError(
+        toast.error(
           await readErrorMessage(response, "Nu am putut trimite emailul de test.")
         );
         return;
       }
 
-      setTestSuccess("Emailul de test a fost trimis.");
+      toast.success("Emailul de test a fost trimis.");
     } finally {
       setSendingTest(false);
     }
@@ -821,15 +854,13 @@ export default function CampaignsPage() {
     if (!id) {
       return;
     }
-    setCreateError(null);
-    setCreateSuccess(null);
     setRowAction(id, "send");
     try {
       await sendCampaignNow(id);
-      setCreateSuccess("Trimiterea campaniei a pornit.");
+      toast.success("Trimiterea campaniei a pornit.");
       reload();
     } catch (error) {
-      setCreateError(getActionErrorMessage(error, "Nu am putut porni trimiterea."));
+      toast.error(getActionErrorMessage(error, "Nu am putut porni trimiterea."));
     } finally {
       setRowAction(id, null);
     }
@@ -843,38 +874,35 @@ export default function CampaignsPage() {
     const localValue =
       localValueOverride !== undefined ? localValueOverride : scheduleById[id] || "";
     if (!localValue) {
-      setCreateError("Selectează data și ora programării.");
+      toast.error("Selectează data și ora programării.");
       return;
     }
 
     const utcIso = bucharestLocalToUtcIso(localValue);
     if (!utcIso) {
-      setCreateError("Data programării este invalidă.");
+      toast.error("Data programării este invalidă.");
       return;
     }
     if (isScheduleTooSoon(utcIso)) {
-      setCreateError(MIN_SCHEDULE_DELAY_ERROR);
+      adminToastWarning(MIN_SCHEDULE_DELAY_ERROR);
       return;
     }
 
-    setCreateError(null);
-    setCreateSuccess(null);
     setRowAction(id, "schedule");
     try {
       await scheduleCampaign(id, utcIso);
-      setCreateSuccess("Campania a fost programată.");
+      toast.success("Campania a fost programată.");
       setScheduleById((prev) => ({ ...prev, [id]: localValue }));
       setScheduleRowDialogId((open) => (open === id ? null : open));
       reload();
     } catch (error) {
-      setCreateError(getActionErrorMessage(error, "Nu am putut programa campania."));
+      toast.error(getActionErrorMessage(error, "Nu am putut programa campania."));
     } finally {
       setRowAction(id, null);
     }
   }
 
   function openScheduleRowDialog(id: string) {
-    setCreateError(null);
     setScheduleRowDialogId(id);
     setScheduleRowDialogAtLocal(scheduleById[id] || getDefaultScheduleInput());
   }
@@ -888,8 +916,6 @@ export default function CampaignsPage() {
       return false;
     }
 
-    setCreateError(null);
-    setCreateSuccess(null);
     setRowAction(id, "unschedule");
     try {
       const response = await adminFetch(
@@ -898,13 +924,11 @@ export default function CampaignsPage() {
       );
 
       if (!response.ok) {
-        setCreateError(
-          await readErrorMessage(response, "Nu am putut anula programarea.")
-        );
+        toast.error(await readErrorMessage(response, "Nu am putut anula programarea."));
         return false;
       }
 
-      setCreateSuccess("Programarea campaniei a fost anulată.");
+      toast.success("Programarea campaniei a fost anulată.");
       reload();
       return true;
     } finally {
@@ -916,20 +940,18 @@ export default function CampaignsPage() {
     if (!id) {
       return;
     }
-    setCreateError(null);
-    setCreateSuccess(null);
     setRowAction(id, "requeue");
     try {
       const response = await adminFetch(`/api/admin/newsletter/campaigns/${id}/requeue`, {
         method: "POST",
       });
       if (!response.ok) {
-        setCreateError(
+        toast.error(
           await readErrorMessage(response, "Nu am putut recoada joburile eșuate.")
         );
         return;
       }
-      setCreateSuccess("Joburile eșuate au fost reintroduse în coadă.");
+      toast.success("Joburile eșuate au fost reintroduse în coadă.");
       reload();
     } finally {
       setRowAction(id, null);
@@ -942,8 +964,6 @@ export default function CampaignsPage() {
       return;
     }
 
-    setCreateError(null);
-    setCreateSuccess(null);
     const responses = await Promise.all(
       ids.map((id) =>
         adminFetch(`/api/admin/newsletter/campaigns/${id}/requeue`, {
@@ -954,13 +974,13 @@ export default function CampaignsPage() {
 
     const failed = responses.find((response) => !response.ok);
     if (failed) {
-      setCreateError(
+      toast.error(
         await readErrorMessage(failed, "Nu am putut recoada toate campaniile selectate.")
       );
       return;
     }
 
-    setCreateSuccess("Campaniile selectate au fost recoadate.");
+    toast.success("Campaniile selectate au fost recoadate.");
     reload();
   }
 
@@ -970,8 +990,6 @@ export default function CampaignsPage() {
       return false;
     }
 
-    setCreateError(null);
-    setCreateSuccess(null);
     const responses = await Promise.all(
       ids.map((id) =>
         adminFetch(`/api/admin/newsletter/campaigns/${id}`, {
@@ -982,14 +1000,14 @@ export default function CampaignsPage() {
 
     const failed = responses.find((response) => !response.ok);
     if (failed) {
-      setCreateError(
+      toast.error(
         await readErrorMessage(failed, "Nu am putut șterge toate campaniile selectate.")
       );
       return false;
     }
 
     setSelectedIds(new Set());
-    setCreateSuccess("Campaniile selectate au fost șterse.");
+    toast.success("Campaniile selectate au fost șterse.");
     reload();
     return true;
   }
@@ -1090,27 +1108,52 @@ export default function CampaignsPage() {
                   local, dar imaginile din email nu se vor încărca în inbox extern.
                 </p>
               )}
-              {createError && <p className="text-sm text-rose-500">{createError}</p>}
-              {createSuccess && <p className="text-sm text-emerald-600">{createSuccess}</p>}
 
-              <div className="grid gap-3 md:grid-cols-3">
-                {campaignTemplateList.map((template) => (
-                  <button
-                    key={template.id}
-                    type="button"
-                    onClick={() => setTemplateId(template.id)}
-                    className={`rounded-md border p-3 text-left transition ${
-                      templateId === template.id ?
-                        "border-primary bg-primary/5" :
-                        "border-border hover:border-primary/40"
-                    }`}
-                  >
-                    <p className="text-sm font-semibold">{template.name}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {template.description}
-                    </p>
-                  </button>
-                ))}
+              <div className="flex items-stretch gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="shrink-0 self-center"
+                  aria-label="Derulează template-uri la stânga"
+                  disabled={templateScrollEdges.atStart}
+                  onClick={() => scrollTemplateStrip(-1)}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <div
+                  ref={templateScrollRef}
+                  className="flex min-w-0 flex-1 snap-x snap-mandatory scroll-smooth gap-3 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                >
+                  {campaignTemplateList.map((template) => (
+                    <button
+                      key={template.id}
+                      type="button"
+                      onClick={() => setTemplateId(template.id)}
+                      className={`w-[min(260px,85vw)] shrink-0 snap-start rounded-md border p-3 text-left transition ${
+                        templateId === template.id ?
+                          "border-primary bg-primary/5" :
+                          "border-border hover:border-primary/40"
+                      }`}
+                    >
+                      <p className="text-sm font-semibold">{template.name}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {template.description}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="shrink-0 self-center"
+                  aria-label="Derulează template-uri la dreapta"
+                  disabled={templateScrollEdges.atEnd}
+                  onClick={() => scrollTemplateStrip(1)}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
@@ -1183,8 +1226,8 @@ export default function CampaignsPage() {
                 ))}
               </div>
 
-              <div className="grid gap-5 lg:grid-cols-2">
-                <div className="space-y-2">
+              <div className="flex flex-col gap-6">
+                <div className="w-full space-y-2">
                   <label className="text-sm font-medium">Previzualizare</label>
                   {!baseUrl ? (
                     <p className="rounded-md border border-border px-3 py-2 text-sm text-muted-foreground">
@@ -1197,29 +1240,30 @@ export default function CampaignsPage() {
                   ) : (
                     <iframe
                       title="Previzualizare campanie"
-                      className="h-[420px] w-full rounded-md border border-border bg-white"
+                      className="h-[min(520px,70vh)] w-full rounded-md border border-border bg-white"
                       srcDoc={previewHtml}
                     />
                   )}
                 </div>
-                <div className="space-y-2">
+                <div className="w-full space-y-2 border-t border-border pt-6">
                   <label className="text-sm font-medium">Trimite email test (opțional)</label>
-                  <div className="flex gap-2">
+                  <div className="flex max-w-2xl flex-col gap-3 sm:flex-row sm:items-center">
                     <Input
+                      className="sm:min-w-0 sm:flex-1"
                       placeholder="adresa@test.ro"
                       value={testEmail}
                       onChange={(event) => setTestEmail(event.target.value)}
                     />
                     <Button
+                      type="button"
                       variant="outline"
+                      className="shrink-0 sm:w-auto"
                       onClick={handleSendTest}
                       disabled={sendingTest || submitting || settingsLoading || !baseUrl}
                     >
                       {sendingTest ? "Se trimite..." : "Trimite test"}
                     </Button>
                   </div>
-                  {testError && <p className="text-sm text-rose-500">{testError}</p>}
-                  {testSuccess && <p className="text-sm text-emerald-600">{testSuccess}</p>}
                   <p className="text-xs text-muted-foreground">
                     Template selectat: <strong>{selectedTemplate.name}</strong>
                   </p>
@@ -1243,9 +1287,6 @@ export default function CampaignsPage() {
         </TabContent>
 
         <TabContent value="list" className="space-y-6">
-          {createError && <p className="text-sm text-rose-500">{createError}</p>}
-          {createSuccess && <p className="text-sm text-emerald-600">{createSuccess}</p>}
-
           <Card>
             <CardHeader>
               <CardTitle>Toate campaniile</CardTitle>
@@ -1378,8 +1419,10 @@ export default function CampaignsPage() {
                               {id && isRowActionLoading(id, "requeue") ? "Se recoadă..." : "Recoadă eșuate"}
                             </Button> */}
                             <Button
+                              type="button"
                               size="sm"
-                              variant="outline"
+                              variant="default"
+                              className="min-w-[8.75rem] gap-1.5 font-semibold shadow-sm ring-1 ring-primary/25 transition-[box-shadow,transform] hover:shadow-md active:scale-[0.98]"
                               onClick={() => (id ? handleViewReport(id) : undefined)}
                               disabled={
                                 !id ||
@@ -1387,13 +1430,20 @@ export default function CampaignsPage() {
                                 (reportLoading && reportCampaignId === id)
                               }
                             >
+                              <BarChart3
+                                className="h-3.5 w-3.5 shrink-0 opacity-95"
+                                aria-hidden
+                              />
                               {reportLoading && reportCampaignId === id ?
                                 "Se încarcă..."
                               : "Vezi raport"}
                             </Button>
                             {canSendNow && (
                               <Button
+                                type="button"
                                 size="sm"
+                                variant="outline"
+                                className="border-primary/60 font-medium text-primary hover:bg-primary/10"
                                 onClick={() => (id ? handleSendNow(id) : undefined)}
                                 disabled={!id || isRowActionLoading(id || "")}
                               >

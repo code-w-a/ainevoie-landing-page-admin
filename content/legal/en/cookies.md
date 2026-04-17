@@ -31,4 +31,4 @@ We may update this Policy; the “Last updated” date will reflect changes.
 
 ## 6. Contact
 
-Use the contact details on **ainevoie.ro** or **contact@ainevoie.ro** where published.
+Use the contact details on **ainevoie.ro** or **contact@ai-nevoie.ro** where published.

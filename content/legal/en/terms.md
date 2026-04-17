@@ -56,4 +56,4 @@ These Terms are governed by the laws of Romania, without regard to conflict-of-l
 
 ## 12. Contact
 
-For questions about these Terms, use the contact options on the website (e.g. **contact@ainevoie.ro** where published).
+For questions about these Terms, use the contact options on the website (e.g. **contact@ai-nevoie.ro** where published).

@@ -210,6 +210,18 @@ export async function POST(request: Request) {
     if (!existingSnap.empty) {
       const existingDoc = existingSnap.docs[0];
       const existingData = existingDoc.data() || {};
+      const existingStatus = String(existingData.status || "").toLowerCase();
+
+      if (existingStatus === "unsubscribed" && status === "active") {
+        return NextResponse.json(
+          {
+            error:
+              "Această adresă este dezabonată. Nu o poți reactiva din admin; utilizatorul trebuie să se înscrie din nou cu acord explicit (GDPR).",
+          },
+          { status: 409 }
+        );
+      }
+
       const metadataUpdates = buildStatusMetadataUpdates(
         status,
         existingData,

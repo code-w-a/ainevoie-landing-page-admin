@@ -85,6 +85,31 @@ export async function PATCH(
     }
 
     const existingData = docSnap.data() || {};
+    const existingStatus = String(existingData.status || "").toLowerCase();
+
+    const statusInput = readString(body.status);
+    const hasStatus = Boolean(statusInput);
+    if (existingStatus === "unsubscribed") {
+      if (hasStatus && statusInput === "active") {
+        return NextResponse.json(
+          {
+            error:
+              "Adresa este dezabonată. Nu poate fi reactivată din admin; utilizatorul trebuie să se înscrie din nou cu acord explicit (GDPR).",
+          },
+          { status: 409 }
+        );
+      }
+      if (typeof body.consentGranted === "boolean" && body.consentGranted === true) {
+        return NextResponse.json(
+          {
+            error:
+              "Nu poți restabili consimțământul pentru o adresă dezabonată din admin. Reînscrierea se face doar de utilizator.",
+          },
+          { status: 409 }
+        );
+      }
+    }
+
     const updates: Record<string, unknown> = {};
 
     if (typeof body.email !== "undefined") {
@@ -103,8 +128,6 @@ export async function PATCH(
       updates.tags = parseTags(body.tags) || [];
     }
 
-    const statusInput = readString(body.status);
-    const hasStatus = Boolean(statusInput);
     if (hasStatus && !isSubscriberStatus(statusInput)) {
       return NextResponse.json(
         { error: "Statusul abonatului este invalid." },

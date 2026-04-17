@@ -23,7 +23,11 @@ export default function HorizontalTimelineStepper({
   );
 
   const safeStep = Math.min(Math.max(currentStep, 1), steps.length);
-  const progress = ((safeStep - 1) / (steps.length - 1)) * 100;
+  const n = steps.length;
+  /** Center of step k (1-based) in an equal grid: (2k-1)/(2n) of width; line ends at left edge of that circle. */
+  const circleRadiusRem = 0.875; // sm:h-7 w-7 → half ≈ 0.875rem (h-6 slightly smaller; unificat vizual)
+  const lineEndFraction = (2 * safeStep - 1) / (2 * n);
+  const orangeLineWidth = `calc(${lineEndFraction * 100}% - ${circleRadiusRem}rem)`;
   const currentLabel = steps[safeStep - 1]?.label ?? "";
 
   return (
@@ -38,8 +42,8 @@ export default function HorizontalTimelineStepper({
           aria-hidden="true"
         />
         <div
-          className="bg-primary absolute top-3 left-0 h-0.5 transition-all duration-300 sm:top-3.5"
-          style={{ width: `${progress}%` }}
+          className="bg-primary absolute top-3 left-0 h-0.5 transition-[width] duration-300 sm:top-3.5"
+          style={{ width: orangeLineWidth, maxWidth: "100%" }}
           aria-hidden="true"
         />
 

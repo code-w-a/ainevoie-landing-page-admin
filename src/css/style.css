@@ -95,6 +95,50 @@
   }
 }
 
+/* Admin / Studio toasts (react-hot-toast) — colț dreapta-jos */
+.admin-toast {
+  animation:
+    admin-toast-in 220ms ease-out,
+    admin-toast-out 220ms ease-in 3780ms forwards;
+  will-change: transform, opacity;
+}
+
+.admin-toast.admin-toast--success,
+.admin-toast.admin-toast--error,
+.admin-toast.admin-toast--loading {
+  animation:
+    admin-toast-in 220ms ease-out,
+    admin-toast-out 220ms ease-in 3780ms forwards;
+}
+
+.admin-toast.admin-toast--warning {
+  animation:
+    admin-toast-in 220ms ease-out,
+    admin-toast-out 220ms ease-in 4280ms forwards;
+}
+
+@keyframes admin-toast-in {
+  from {
+    transform: translate(22px, 22px);
+    opacity: 0;
+  }
+  to {
+    transform: translate(0, 0);
+    opacity: 1;
+  }
+}
+
+@keyframes admin-toast-out {
+  from {
+    transform: translate(0, 0);
+    opacity: 1;
+  }
+  to {
+    transform: translate(22px, 22px);
+    opacity: 0;
+  }
+}
+
 @utility container {
   margin-inline: auto;
   padding-inline: 1rem;

@@ -18,7 +18,7 @@ Subject to legal conditions, you may have the right to:
 
 ## How to submit a request
 
-Email **contact@ainevoie.ro** (or use the contact form on the website) with:
+Email **contact@ai-nevoie.ro** (or use the contact form on the website) with:
 
 - your name and contact details;
 - a clear description of the request;

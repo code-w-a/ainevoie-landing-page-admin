@@ -2,6 +2,8 @@
 
 import { ThemeProvider } from "next-themes";
 
+import { AdminToaster } from "@/components/admin/AdminToaster";
+
 export default function StudioProviders({
   children,
 }: {
@@ -9,6 +11,7 @@ export default function StudioProviders({
 }) {
   return (
     <ThemeProvider enableSystem={false} attribute="class" defaultTheme="light">
+      <AdminToaster />
       {children}
     </ThemeProvider>
   );

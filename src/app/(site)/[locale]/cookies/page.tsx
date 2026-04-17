@@ -282,10 +282,10 @@ export default async function CookiesPage({ params }: PageProps) {
               <p className="mt-4">
                 <strong>Email:</strong>{" "}
                 <a
-                  href="mailto:contact@ainevoie.ro"
+                  href="mailto:contact@ai-nevoie.ro"
                   className="text-primary hover:underline"
                 >
-                  contact@ainevoie.ro
+                  contact@ai-nevoie.ro
                 </a>
               </p>
             </section>

@@ -310,10 +310,10 @@ export default async function TermsPage({ params }: PageProps) {
                 abuz grav. Utilizatorii pot solicita ștergerea contului prin
                 secțiunea de setări sau contactându-ne la{" "}
                 <a
-                  href="mailto:contact@ainevoie.ro"
+                  href="mailto:contact@ai-nevoie.ro"
                   className="text-primary hover:underline"
                 >
-                  contact@ainevoie.ro
+                  contact@ai-nevoie.ro
                 </a>
                 .
               </p>
@@ -353,10 +353,10 @@ export default async function TermsPage({ params }: PageProps) {
               <p className="mt-4">
                 <strong>Email:</strong>{" "}
                 <a
-                  href="mailto:contact@ainevoie.ro"
+                  href="mailto:contact@ai-nevoie.ro"
                   className="text-primary hover:underline"
                 >
-                  contact@ainevoie.ro
+                  contact@ai-nevoie.ro
                 </a>
                 <br />
                 <strong>Adresă:</strong> [Adresă operator]
