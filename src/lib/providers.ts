@@ -5,6 +5,10 @@ import {
   type ProviderRecord,
   type ProviderStatus,
 } from "@/types/provider";
+import {
+  ROMANIA_URBAN_LOCALITIES,
+  normalizeRomaniaLocationName,
+} from "@/lib/romaniaLocations";
 
 export const providerStatusLabel: Record<ProviderStatus, string> = {
   new: "Nou",
@@ -83,16 +87,6 @@ export function getProviderLaunchContactConsentState(
   return "missing";
 }
 
-/** Canonical values stored in Firestore / validated by API; labels come from i18n. */
-export const PROVIDER_CITY_ENTRIES = [
-  { value: "Bucuresti", messageKey: "cityBucuresti" },
-  { value: "Cluj-Napoca", messageKey: "cityCluj" },
-  { value: "Timisoara", messageKey: "cityTimisoara" },
-  { value: "Iasi", messageKey: "cityIasi" },
-  { value: "Constanta", messageKey: "cityConstanta" },
-  { value: "Brasov", messageKey: "cityBrasov" },
-] as const;
-
 export const PROVIDER_SERVICE_ENTRIES = [
   { value: "Curatenie rezidentiala", messageKey: "serviceResidential" },
   { value: "Curatenie birouri", messageKey: "serviceOffices" },
@@ -102,7 +96,10 @@ export const PROVIDER_SERVICE_ENTRIES = [
   { value: "Curatenie industriala", messageKey: "serviceIndustrial" },
 ] as const;
 
-export const providerCityOptions = PROVIDER_CITY_ENTRIES.map((e) => e.value);
+/** Legacy compatibility: old admin filters and documents used city names only. */
+export const providerCityOptions = Array.from(
+  new Set(ROMANIA_URBAN_LOCALITIES.map((city) => city.cityName))
+).sort((a, b) => a.localeCompare(b, "ro"));
 
 export const providerServiceOptions = PROVIDER_SERVICE_ENTRIES.map((e) => e.value);
 
@@ -119,7 +116,9 @@ export function isProviderLegalStatus(value: string): value is ProviderLegalStat
 }
 
 export function isProviderCityOption(value: string) {
-  return providerCityOptions.some((option) => normalizeOption(option) === normalizeOption(value));
+  return providerCityOptions.some(
+    (option) => normalizeRomaniaLocationName(option) === normalizeRomaniaLocationName(value)
+  );
 }
 
 export function isProviderServiceOption(value: string) {

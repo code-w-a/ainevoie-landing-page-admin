@@ -6,11 +6,11 @@ import { useAdminData } from "@/components/admin/useAdminData";
 import {
   getProviderLaunchContactConsentState,
   getProviderLegalConsentState,
-  providerCityOptions,
   providerServiceOptions,
   providerStatusLabel,
   providerStatusVariant,
 } from "@/lib/providers";
+import { ROMANIA_COUNTIES, getCitiesByCounty } from "@/lib/romaniaLocations";
 import { formatAdminDateTime } from "@/lib/formatAdminDateTime";
 import {
   Card,
@@ -37,6 +37,10 @@ type ProviderItem = {
   email: string;
   phone: string;
   city: string;
+  cityCode?: string;
+  cityName?: string;
+  countyCode?: string;
+  countyName?: string;
   serviceType: string;
   onboardingStatus: keyof typeof providerStatusLabel;
   termsAcceptedAt?: string | null;
@@ -87,14 +91,20 @@ export default function AdminProvidersPage() {
   const [q, setQ] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
   const [status, setStatus] = useState("all");
-  const [city, setCity] = useState("");
+  const [countyCode, setCountyCode] = useState("");
+  const [cityCode, setCityCode] = useState("");
   const [serviceType, setServiceType] = useState("");
   const [page, setPage] = useState(1);
+  const availableCities = useMemo(() => getCitiesByCounty(countyCode), [countyCode]);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQ(q), 250);
     return () => clearTimeout(timer);
   }, [q]);
+
+  useEffect(() => {
+    setCityCode("");
+  }, [countyCode]);
 
   const endpoint = useMemo(() => {
     const params = new URLSearchParams();
@@ -102,10 +112,11 @@ export default function AdminProvidersPage() {
     params.set("pageSize", "20");
     if (debouncedQ.trim()) params.set("q", debouncedQ.trim());
     if (status !== "all") params.set("status", status);
-    if (city.trim()) params.set("city", city.trim());
+    if (countyCode) params.set("countyCode", countyCode);
+    if (cityCode) params.set("cityCode", cityCode);
     if (serviceType.trim()) params.set("serviceType", serviceType.trim());
     return `/api/admin/providers?${params.toString()}`;
-  }, [page, debouncedQ, status, city, serviceType]);
+  }, [page, debouncedQ, status, countyCode, cityCode, serviceType]);
 
   const { data, loading, error } = useAdminData<ProvidersResponse>(endpoint);
   const items = data?.items || [];
@@ -123,9 +134,9 @@ export default function AdminProvidersPage() {
       <Card>
         <CardHeader>
           <CardTitle>Căutare și filtre</CardTitle>
-          <CardDescription>Filtrează după status, oraș, serviciu sau text.</CardDescription>
+          <CardDescription>Filtrează după status, județ, oraș, serviciu sau text.</CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-2 lg:grid-cols-5">
+        <CardContent className="grid gap-3 md:grid-cols-2 lg:grid-cols-6">
           <Input
             placeholder="Căutare nume/email"
             value={q}
@@ -150,16 +161,33 @@ export default function AdminProvidersPage() {
           </select>
           <select
             className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-            value={city}
+            value={countyCode}
             onChange={(event) => {
               setPage(1);
-              setCity(event.target.value);
+              setCountyCode(event.target.value);
+              setCityCode("");
             }}
           >
-            <option value="">Toate orașele</option>
-            {providerCityOptions.map((option) => (
-              <option key={option} value={option}>
-                {option}
+            <option value="">Toate județele</option>
+            {ROMANIA_COUNTIES.map((county) => (
+              <option key={county.code} value={county.code}>
+                {county.name}
+              </option>
+            ))}
+          </select>
+          <select
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+            value={cityCode}
+            disabled={!countyCode}
+            onChange={(event) => {
+              setPage(1);
+              setCityCode(event.target.value);
+            }}
+          >
+            <option value="">{countyCode ? "Toate orașele" : "Alege județul"}</option>
+            {availableCities.map((city) => (
+              <option key={city.cityCode} value={city.cityCode}>
+                {city.cityName}
               </option>
             ))}
           </select>
@@ -184,7 +212,8 @@ export default function AdminProvidersPage() {
               setPage(1);
               setQ("");
               setStatus("all");
-              setCity("");
+              setCountyCode("");
+              setCityCode("");
               setServiceType("");
             }}
           >
@@ -211,7 +240,7 @@ export default function AdminProvidersPage() {
               <TableRow>
                 <TableHead>Nume</TableHead>
                 <TableHead>Email</TableHead>
-                <TableHead>Oraș</TableHead>
+                <TableHead>Județ / Oraș</TableHead>
                 <TableHead>Serviciu</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Termeni / Politică</TableHead>
@@ -232,7 +261,10 @@ export default function AdminProvidersPage() {
                 <TableRow key={item.id}>
                   <TableCell className="font-medium">{item.fullName}</TableCell>
                   <TableCell>{item.email}</TableCell>
-                  <TableCell>{item.city}</TableCell>
+                  <TableCell>
+                    {[item.countyName, item.cityName || item.city].filter(Boolean).join(" / ") ||
+                      "-"}
+                  </TableCell>
                   <TableCell>{item.serviceType}</TableCell>
                   <TableCell>
                     <Badge variant={providerStatusVariant(item.onboardingStatus)}>

@@ -2,10 +2,13 @@
 
 import { Checkbox } from "@/components/ui/checkbox";
 import { InputGroup } from "@/components/ui/input-group";
+import { PROVIDER_SERVICE_ENTRIES } from "@/lib/providers";
 import {
-  PROVIDER_CITY_ENTRIES,
-  PROVIDER_SERVICE_ENTRIES,
-} from "@/lib/providers";
+  ROMANIA_COUNTIES,
+  findRomaniaCity,
+  getCitiesByCounty,
+  normalizeRomaniaLocationName,
+} from "@/lib/romaniaLocations";
 import { PROVIDER_LEGAL_STATUSES, type ProviderLegalStatus } from "@/types/provider";
 import axios from "axios";
 import { Eye, EyeOff } from "lucide-react";
@@ -21,7 +24,8 @@ type FormValues = {
   password: string;
   confirmPassword: string;
   phone: string;
-  city: string;
+  countyCode: string;
+  cityCode: string;
   serviceType: string;
   legalStatus: ProviderLegalStatus;
   companyName: string;
@@ -52,6 +56,7 @@ export default function ProviderOnboardingFormWizard({
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [citySearch, setCitySearch] = useState("");
 
   const legalStatusOptions = useMemo(
     () =>
@@ -84,20 +89,41 @@ export default function ProviderOnboardingFormWizard({
       hasAccountant: "unsure",
       newsletterOptIn: false,
       launchContactConsent: false,
-      city: PROVIDER_CITY_ENTRIES[0].value,
+      countyCode: "",
+      cityCode: "",
       serviceType: PROVIDER_SERVICE_ENTRIES[0].value,
       acceptTerms: false,
     },
   });
   const emailValue = watch("email");
   const legalStatus = watch("legalStatus");
+  const selectedCountyCode = watch("countyCode");
   const normalizedEmail = (emailValue || "").trim().toLowerCase();
   const hasValidEmailForNewsletter = isValidEmail(normalizedEmail);
   const isLegalEntityReady = legalStatus === "pfa_ready" || legalStatus === "srl_ready";
   const isEntityInProgress = legalStatus === "in_progress";
+  const availableCities = useMemo(
+    () => getCitiesByCounty(selectedCountyCode),
+    [selectedCountyCode]
+  );
+  const normalizedCitySearch = normalizeRomaniaLocationName(citySearch);
+  const filteredCities = useMemo(() => {
+    if (!normalizedCitySearch) {
+      return availableCities;
+    }
+
+    return availableCities.filter((city) =>
+      normalizeRomaniaLocationName(city.cityName).includes(normalizedCitySearch)
+    );
+  }, [availableCities, normalizedCitySearch]);
   const [newsletterStatusLoading, setNewsletterStatusLoading] = useState(false);
   const [isActiveNewsletterSubscriber, setIsActiveNewsletterSubscriber] = useState(false);
   const [newsletterStatusError, setNewsletterStatusError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setValue("cityCode", "", { shouldValidate: false });
+    setCitySearch("");
+  }, [selectedCountyCode, setValue]);
 
   useEffect(() => {
     if (!hasValidEmailForNewsletter) {
@@ -155,7 +181,7 @@ export default function ProviderOnboardingFormWizard({
   async function goNextStep() {
     const stepFields: Record<number, Array<keyof FormValues>> = {
       1: ["fullName", "email", "password", "confirmPassword", "phone"],
-      2: ["city", "serviceType"],
+      2: ["countyCode", "cityCode", "serviceType"],
       3: [
         "legalStatus",
         "companyName",
@@ -177,7 +203,19 @@ export default function ProviderOnboardingFormWizard({
   }
 
   async function onSubmit(values: FormValues) {
-    const { confirmPassword, ...payload } = values;
+    const { confirmPassword, ...formPayload } = values;
+    const selectedCity = findRomaniaCity(values.countyCode, values.cityCode);
+
+    if (!selectedCity) {
+      onStepChange(2);
+      toast.error(t("cityRequired"));
+      return;
+    }
+
+    const payload = {
+      ...formPayload,
+      city: selectedCity.cityName,
+    };
     try {
       const res = await axios.post("/api/providers/onboarding", {
         ...payload,
@@ -307,23 +345,64 @@ export default function ProviderOnboardingFormWizard({
       {currentStep === 2 && (
         <div className="grid gap-3 sm:gap-4 md:grid-cols-2">
           <fieldset>
-            <label htmlFor="provider-city" className="mb-2.5 inline-block text-sm">
-              {t("cityLabel")}
+            <label htmlFor="provider-county" className="mb-2.5 inline-block text-sm">
+              {t("countyLabel")}
             </label>
             <select
-              id="provider-city"
-              aria-label={t("cityAria")}
+              id="provider-county"
+              aria-label={t("countyAria")}
               className="border-stroke text-body focus:border-primary focus:shadow-input dark:border-stroke-dark dark:focus:border-primary w-full rounded-md border bg-white px-6 py-3 text-base font-medium outline-hidden dark:bg-black dark:text-white"
-              {...register("city", { required: t("cityRequired") })}
+              {...register("countyCode", { required: t("countyRequired") })}
             >
-              {PROVIDER_CITY_ENTRIES.map((entry) => (
-                <option key={entry.value} value={entry.value}>
-                  {t(entry.messageKey)}
+              <option value="">{t("countyPlaceholder")}</option>
+              {ROMANIA_COUNTIES.map((county) => (
+                <option key={county.code} value={county.code}>
+                  {county.name}
                 </option>
               ))}
             </select>
-            {errors.city?.message && (
-              <p className="mt-2 text-xs text-red-500">{errors.city.message}</p>
+            {errors.countyCode?.message && (
+              <p className="mt-2 text-xs text-red-500">{errors.countyCode.message}</p>
+            )}
+          </fieldset>
+          <fieldset>
+            <label htmlFor="provider-city" className="mb-2.5 inline-block text-sm">
+              {t("cityLabel")}
+            </label>
+            <input
+              id="provider-city-search"
+              type="search"
+              disabled={!selectedCountyCode}
+              value={citySearch}
+              onChange={(event) => setCitySearch(event.target.value)}
+              placeholder={t("citySearchPlaceholder")}
+              className="border-stroke text-body focus:border-primary focus:shadow-input dark:border-stroke-dark dark:focus:border-primary mb-2 w-full rounded-md border bg-white px-6 py-3 text-base font-medium outline-hidden disabled:cursor-not-allowed disabled:opacity-60 dark:bg-black dark:text-white"
+            />
+            <select
+              id="provider-city"
+              aria-label={t("cityAria")}
+              disabled={!selectedCountyCode}
+              className="border-stroke text-body focus:border-primary focus:shadow-input dark:border-stroke-dark dark:focus:border-primary w-full rounded-md border bg-white px-6 py-3 text-base font-medium outline-hidden disabled:cursor-not-allowed disabled:opacity-60 dark:bg-black dark:text-white"
+              {...register("cityCode", {
+                required: t("cityRequired"),
+                validate: (value) =>
+                  Boolean(findRomaniaCity(selectedCountyCode, value)) || t("cityRequired"),
+              })}
+            >
+              <option value="">
+                {selectedCountyCode ? t("cityPlaceholder") : t("cityDisabledPlaceholder")}
+              </option>
+              {filteredCities.map((city) => (
+                <option key={city.cityCode} value={city.cityCode}>
+                  {city.cityName}
+                </option>
+              ))}
+            </select>
+            {selectedCountyCode && filteredCities.length === 0 && (
+              <p className="mt-2 text-xs text-muted-foreground">{t("cityEmpty")}</p>
+            )}
+            {errors.cityCode?.message && (
+              <p className="mt-2 text-xs text-red-500">{errors.cityCode.message}</p>
             )}
           </fieldset>
           <fieldset>

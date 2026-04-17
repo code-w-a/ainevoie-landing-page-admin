@@ -23,6 +23,10 @@ type ProviderDetails = {
   email: string;
   phone: string;
   city: string;
+  cityCode?: string;
+  cityName?: string;
+  countyCode?: string;
+  countyName?: string;
   serviceType: string;
   legalStatus: keyof typeof providerLegalStatusLabel;
   companyName?: string | null;
@@ -207,8 +211,10 @@ export default function ProviderDetailPage() {
             <p className="text-sm">{data.phone || "-"}</p>
           </div>
           <div>
-            <p className="text-xs uppercase text-muted-foreground">Oraș</p>
-            <p className="text-sm">{data.city || "-"}</p>
+            <p className="text-xs uppercase text-muted-foreground">Județ / Oraș</p>
+            <p className="text-sm">
+              {[data.countyName, data.cityName || data.city].filter(Boolean).join(" / ") || "-"}
+            </p>
           </div>
           <div>
             <p className="text-xs uppercase text-muted-foreground">Serviciu</p>

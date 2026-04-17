@@ -6,9 +6,19 @@ import {
   isProviderCityOption,
   isProviderServiceOption,
   isProviderStatus,
-  providerCityOptions,
   providerServiceOptions,
 } from "@/lib/providers";
+import {
+  ROMANIA_COUNTIES,
+  ROMANIA_URBAN_LOCALITIES,
+  findRomaniaCity,
+  findRomaniaCityByCode,
+  findRomaniaCityByName,
+  getCitiesByCounty,
+  isRomaniaCountyCode,
+  normalizeRomaniaLocationCode,
+  normalizeRomaniaLocationName,
+} from "@/lib/romaniaLocations";
 
 const MAX_SCAN_DOCS = 500;
 const DEFAULT_PAGE_SIZE = 20;
@@ -29,9 +39,25 @@ export async function GET(request: Request) {
     );
 
     const status = normalizeQuery(searchParams.get("status"));
+    const countyCode = normalizeRomaniaLocationCode(searchParams.get("countyCode"));
+    const cityCode = normalizeRomaniaLocationCode(searchParams.get("cityCode"));
     const city = normalizeQuery(searchParams.get("city"));
     const serviceType = normalizeQuery(searchParams.get("serviceType"));
     const q = normalizeQuery(searchParams.get("q"));
+
+    if (countyCode && !isRomaniaCountyCode(countyCode)) {
+      return NextResponse.json({ error: "Filtrul de județ este nevalid." }, { status: 400 });
+    }
+
+    const selectedCity = cityCode
+      ? countyCode
+        ? findRomaniaCity(countyCode, cityCode)
+        : findRomaniaCityByCode(cityCode)
+      : null;
+
+    if (cityCode && !selectedCity) {
+      return NextResponse.json({ error: "Filtrul de oraș este nevalid." }, { status: 400 });
+    }
 
     if (city && !isProviderCityOption(city)) {
       return NextResponse.json({ error: "Filtrul de oraș este nevalid." }, { status: 400 });
@@ -54,23 +80,38 @@ export async function GET(request: Request) {
     const rows = snapshot.docs.map(serializeDoc).filter(Boolean) as Array<Record<string, any>>;
 
     const filtered = rows.filter((row) => {
-      const rowCity = String(row.cityNormalized || row.city || "").toLowerCase();
+      const rowCityValue = String(row.cityName || row.city || "");
+      const legacyLocation = findRomaniaCityByName(rowCityValue);
+      const rowCountyCode =
+        normalizeRomaniaLocationCode(row.countyCode) || legacyLocation?.countyCode || "";
+      const rowCityCode =
+        normalizeRomaniaLocationCode(row.cityCode) || legacyLocation?.cityCode || "";
+      const rowCity = normalizeRomaniaLocationName(
+        row.cityNameNormalized || row.cityName || row.cityNormalized || row.city || ""
+      );
       const rowService = String(
         row.serviceTypeNormalized || row.serviceType || ""
       ).toLowerCase();
       const rowName = String(row.fullName || "").toLowerCase();
       const rowEmail = String(row.email || "").toLowerCase();
+      const rowCounty = normalizeRomaniaLocationName(row.countyName || legacyLocation?.countyName);
 
-      const cityMatch = !city || rowCity.includes(city);
+      const countyMatch = !countyCode || rowCountyCode === countyCode;
+      const selectedCityMatch =
+        !selectedCity ||
+        rowCityCode === selectedCity.cityCode ||
+        rowCity === normalizeRomaniaLocationName(selectedCity.cityName);
+      const legacyCityMatch = !city || rowCity.includes(normalizeRomaniaLocationName(city));
       const serviceMatch = !serviceType || rowService.includes(serviceType);
       const textMatch =
         !q ||
         rowName.includes(q) ||
         rowEmail.includes(q) ||
+        rowCounty.includes(q) ||
         rowCity.includes(q) ||
         rowService.includes(q);
 
-      return cityMatch && serviceMatch && textMatch;
+      return countyMatch && selectedCityMatch && legacyCityMatch && serviceMatch && textMatch;
     });
 
     const total = filtered.length;
@@ -81,7 +122,8 @@ export async function GET(request: Request) {
     return NextResponse.json({
       items,
       filters: {
-        cities: providerCityOptions,
+        counties: ROMANIA_COUNTIES,
+        cities: countyCode ? getCitiesByCounty(countyCode) : ROMANIA_URBAN_LOCALITIES,
         services: providerServiceOptions,
       },
       pagination: {

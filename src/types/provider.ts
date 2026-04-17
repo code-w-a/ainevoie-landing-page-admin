@@ -25,7 +25,15 @@ export type ProviderRecord = {
   emailNormalized: string;
   fullName: string;
   phone: string;
+  countyCode?: string;
+  countyName?: string;
+  countyNameNormalized?: string;
+  cityCode?: string;
+  cityName?: string;
+  cityNameNormalized?: string;
+  coverageAreaText?: string;
   city: string;
+  cityNormalized?: string;
   serviceType: string;
   legalStatus: ProviderLegalStatus;
   companyName?: string | null;

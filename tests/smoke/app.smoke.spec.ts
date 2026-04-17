@@ -36,6 +36,25 @@ test.describe("application smoke checks", () => {
     }
   });
 
+  test("provider onboarding location step supports county and city selection", async ({ page }) => {
+    await expectPageLoads(page, "/ro/providers/onboarding/form");
+
+    await page.locator('input[name="fullName"]').fill("Provider Smoke Test");
+    await page.locator('input[name="email"]').fill("provider-smoke@example.com");
+    await page.locator("#provider-password").fill("Passw0rd!");
+    await page.locator("#provider-confirm-password").fill("Passw0rd!");
+    await page.locator('input[name="phone"]').fill("0700000000");
+    await page.getByRole("button", { name: /Continuă la pasul următor|Continue/ }).click();
+
+    await expect(page.locator("#provider-county")).toBeVisible();
+    await page.locator("#provider-county").selectOption("B");
+    await expect(page.locator("#provider-city-search")).toBeEnabled();
+    await page.locator("#provider-city-search").fill("buc");
+    await page.locator("#provider-city").selectOption("179132");
+
+    await expect(page.locator("#provider-city")).toHaveValue("179132");
+  });
+
   test("auth and admin entry points load", async ({ page }) => {
     for (const path of ["/ro/auth/signin", "/ro/auth/signup", "/admin/login"]) {
       await expectPageLoads(page, path);

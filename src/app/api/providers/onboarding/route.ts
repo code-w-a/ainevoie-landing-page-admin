@@ -10,10 +10,16 @@ import {
   PROVIDER_LAUNCH_CONTACT_CONSENT_VERSION,
   PROVIDER_PRIVACY_VERSION,
   PROVIDER_TERMS_VERSION,
-  isProviderCityOption,
   isProviderLegalStatus,
   isProviderServiceOption,
 } from "@/lib/providers";
+import {
+  findRomaniaCity,
+  findRomaniaCounty,
+  isRomaniaCountyCode,
+  normalizeRomaniaLocationCode,
+  normalizeRomaniaLocationName,
+} from "@/lib/romaniaLocations";
 import {
   getProviderWelcomeEmailSubject,
   getProviderWelcomeTemplate,
@@ -28,6 +34,8 @@ type OnboardingPayload = {
   email?: string;
   password?: string;
   phone?: string;
+  countyCode?: string;
+  cityCode?: string;
   city?: string;
   serviceType?: string;
   legalStatus?: ProviderLegalStatus;
@@ -100,7 +108,8 @@ export async function POST(request: Request) {
     const email = normalizeEmail(body.email);
     const password = normalize(body.password);
     const phone = normalize(body.phone);
-    const city = normalize(body.city);
+    const countyCode = normalizeRomaniaLocationCode(body.countyCode);
+    const cityCode = normalizeRomaniaLocationCode(body.cityCode);
     const serviceType = normalize(body.serviceType);
     const legalStatus = body.legalStatus;
     const companyName = normalize(body.companyName);
@@ -112,7 +121,16 @@ export async function POST(request: Request) {
     const launchContactConsent = body.launchContactConsent === true;
     const acceptTerms = body.acceptTerms === true;
 
-    if (!fullName || !email || !password || !phone || !city || !serviceType || !legalStatus) {
+    if (
+      !fullName ||
+      !email ||
+      !password ||
+      !phone ||
+      !countyCode ||
+      !cityCode ||
+      !serviceType ||
+      !legalStatus
+    ) {
       return jsonError(locale, "MISSING_FIELDS", 400);
     }
 
@@ -136,7 +154,14 @@ export async function POST(request: Request) {
     if (legalStatus === "in_progress" && !estimatedSetupTimeline) {
       return jsonError(locale, "SETUP_TIMELINE_REQUIRED", 400);
     }
-    if (!isProviderCityOption(city)) {
+    if (!isRomaniaCountyCode(countyCode)) {
+      return jsonError(locale, "INVALID_COUNTY", 400);
+    }
+
+    const selectedCounty = findRomaniaCounty(countyCode);
+    const selectedCity = findRomaniaCity(countyCode, cityCode);
+
+    if (!selectedCounty || !selectedCity) {
       return jsonError(locale, "INVALID_CITY", 400);
     }
     if (!isProviderServiceOption(serviceType)) {
@@ -146,6 +171,18 @@ export async function POST(request: Request) {
     if (!acceptTerms) {
       return jsonError(locale, "TERMS_NOT_ACCEPTED", 400);
     }
+
+    const countyName = selectedCounty.name;
+    const cityName = selectedCity.cityName;
+    const countyNameNormalized = normalizeRomaniaLocationName(countyName);
+    const cityNameNormalized = normalizeRomaniaLocationName(cityName);
+    const coverageAreaText = `România, ${countyName}, ${cityName}`;
+    const providerDisplayName = companyName || fullName;
+    const notificationPreferences = {
+      bookings: true,
+      messages: true,
+      promoSystem: true,
+    };
 
     const db = getAdminDb();
 
@@ -243,13 +280,75 @@ export async function POST(request: Request) {
     }
 
     await db.collection("providers").doc(userRecord.uid).set({
+      // Canonical provider document model aligned with docs/AInevoie-Firebase-Document-Model-Schema.md
       uid: userRecord.uid,
+      role: "provider",
+      status: "pre_registered",
+      accountStatus: "active",
       email,
+      phoneNumber: phone,
+      authProviders: ["password"],
+      locale,
+      notificationPreferences,
+      professionalProfile: {
+        businessName: companyName || null,
+        displayName: providerDisplayName,
+        specialization: serviceType,
+        baseRateAmount: 0,
+        baseRateCurrency: "RON",
+        coverageArea: {
+          countryCode: "RO",
+          countryName: "România",
+          countyCode: selectedCounty.code,
+          countyName,
+          cityCode: selectedCity.cityCode,
+          cityName,
+          placeId: null,
+          locationLabel: null,
+          formattedAddress: null,
+          centerLat: null,
+          centerLng: null,
+        },
+        coverageAreaText,
+        shortBio: null,
+        availabilitySummary: null,
+        avatarPath: null,
+      },
+      documents: {
+        identity: {
+          status: "missing",
+          storagePath: null,
+          originalFileName: null,
+          uploadedAt: null,
+        },
+        professional: {
+          status: "missing",
+          storagePath: null,
+          originalFileName: null,
+          uploadedAt: null,
+        },
+      },
+      reviewState: {
+        submittedAt: null,
+        lastReviewedAt: null,
+      },
+      schemaVersion: 1,
+      createdBy: userRecord.uid,
+      updatedBy: userRecord.uid,
+
+      // Legacy fields kept temporarily for landing/admin compatibility.
       emailNormalized: email,
       fullName,
       phone,
-      city,
-      cityNormalized: city.toLowerCase(),
+      countyCode: selectedCounty.code,
+      countyName,
+      countyNameNormalized,
+      cityCode: selectedCity.cityCode,
+      cityName,
+      cityNameNormalized,
+      coverageAreaText,
+      city: cityName,
+      cityNormalized: cityNameNormalized,
       serviceType,
       serviceTypeNormalized: serviceType.toLowerCase(),
       legalStatus,

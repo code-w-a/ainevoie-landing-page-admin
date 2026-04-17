@@ -24,8 +24,9 @@ describe("provider helpers", () => {
 
   it("matches city and service options case-insensitively", () => {
     expect(isProviderCityOption(" bucuresti ")).toBe(true);
+    expect(isProviderCityOption("Oradea")).toBe(true);
     expect(isProviderServiceOption(" curatenie birouri ")).toBe(true);
-    expect(isProviderCityOption("Oradea")).toBe(false);
+    expect(isProviderCityOption("Atlantis")).toBe(false);
     expect(isProviderServiceOption("Instalatii")).toBe(false);
   });
 
