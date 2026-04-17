@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { fetchBnrEurRate } from "@/lib/bnrEurRate";
+import { captureServerException } from "@/lib/sentryServer";
 
 export const revalidate = 3600;
 
@@ -18,7 +19,8 @@ export async function GET() {
         },
       },
     );
-  } catch {
+  } catch (error) {
+    captureServerException(error, { route: "api/fx/bnr-eur/route.ts" });
     return NextResponse.json(
       { error: "BNR_RATE_UNAVAILABLE" },
       { status: 503 },

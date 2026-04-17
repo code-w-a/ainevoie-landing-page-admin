@@ -1,6 +1,7 @@
 import { LegalMarkdown } from "@/components/Legal/LegalMarkdown";
 import { Link } from "@/i18n/navigation";
 import { routing } from "@/i18n/routing";
+import { buildLocalePageMetadata } from "@/lib/seo";
 import { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { notFound } from "next/navigation";
@@ -16,10 +17,10 @@ export async function generateMetadata({
   }
   setRequestLocale(locale);
   const t = await getTranslations({ locale, namespace: "Metadata" });
-  return {
+  return buildLocalePageMetadata(locale, "/terms", {
     title: t("termsMetaTitle"),
     description: t("termsMetaDescription"),
-  };
+  });
 }
 
 export default async function TermsPage({ params }: PageProps) {

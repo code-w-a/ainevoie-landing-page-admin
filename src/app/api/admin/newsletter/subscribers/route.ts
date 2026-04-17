@@ -7,6 +7,7 @@ import {
   type NewsletterSubscriberStatus,
 } from "@/types/newsletter";
 import { sanitizePayload } from "@/lib/newsletterAdmin";
+import { captureServerException } from "@/lib/sentryServer";
 
 const ALLOWED_SORTS: Record<string, string> = {
   createdAt: "createdAt",
@@ -141,6 +142,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ items, nextCursor });
   } catch (error) {
+    captureServerException(error, { route: "api/admin/newsletter/subscribers/route.ts" });
     return NextResponse.json(
       { error: "Nu am putut încărca abonații." },
       { status: 500 }
@@ -272,6 +274,7 @@ export async function POST(request: Request) {
     const docRef = await db.collection("newsletter_subscribers").add(newDoc);
     return NextResponse.json({ id: docRef.id });
   } catch (error) {
+    captureServerException(error, { route: "api/admin/newsletter/subscribers/route.ts" });
     return NextResponse.json(
       { error: "Nu am putut crea abonatul." },
       { status: 500 }

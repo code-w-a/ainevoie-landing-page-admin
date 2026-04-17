@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getRequestLocale } from "@/lib/apiLocale";
 import { jsonApiError } from "@/lib/apiJsonError";
 import { getAdminDb } from "@/lib/firebaseAdmin";
+import { captureServerException } from "@/lib/sentryServer";
 
 function normalizeEmail(value?: string | null) {
   return typeof value === "string" ? value.trim().toLowerCase() : "";
@@ -45,7 +46,8 @@ export async function GET(request: Request) {
       !existingSnap.empty && existingSnap.docs[0].get("status") === "active";
 
     return NextResponse.json({ isActiveSubscriber }, { status: 200 });
-  } catch {
+  } catch (error) {
+    captureServerException(error, { route: "api/newsletter/status/route.ts" });
     return jsonApiError(locale, "NEWSLETTER_STATUS_CHECK_FAILED", 500);
   }
 }

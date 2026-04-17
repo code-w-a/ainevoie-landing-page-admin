@@ -2,6 +2,11 @@ import RenderBodyContent from "@/components/Blog/RenderBodyContent";
 import SocialShare from "@/components/Blog/SocialShare";
 import { structuredAlgoliaHtmlData } from "@/lib/crawlIndex";
 import { routing } from "@/i18n/routing";
+import {
+  buildLocalePageMetadata,
+  getMetadataBase,
+  localizedPath,
+} from "@/lib/seo";
 import { getPostBySlug, imageBuilder, isSanityConfigured } from "@/sanity/sanity-utils";
 import { messages } from "@integrations-config";
 import Image from "next/image";
@@ -26,92 +31,74 @@ export async function generateMetadata(props: Props) {
   const t = await getTranslations({ locale, namespace: "Metadata" });
 
   if (!isSanityConfigured) {
-    return {
+    return buildLocalePageMetadata(locale, "/blog", {
       title: t("blogMetaTitle"),
       description: t("blogUnavailableDescription"),
-    };
+    });
   }
   const post = await getPostBySlug(slug);
-  const siteURL = process.env.SITE_URL;
   const authorName = process.env.AUTHOR_NAME;
 
   if (post) {
+    const slugPart = post?.slug?.current || slug;
+    const path = `/blog/${slugPart}`;
+    const title = `${post.title || t("blogPostDefaultTitle")} | ${authorName || "AInevoie"} — AInevoie`;
+    const description = `${String(post.metadata || "").slice(0, 136)}...`;
+    const base = buildLocalePageMetadata(locale, path, { title, description });
+    const imageUrlRaw = post.mainImage ? imageBuilder(post.mainImage).url() : "";
+    const imageUrl = typeof imageUrlRaw === "string" && imageUrlRaw ? imageUrlRaw : "";
+
     return {
-      title: `${
-        post.title || t("blogPostDefaultTitle")
-      } | ${authorName} — AInevoie`,
-      description: `${post.metadata?.slice(0, 136)}...`,
-      author: authorName,
-      alternates: {
-        canonical: `${siteURL}/blog/${post?.slug?.current}`,
-        languages: {
-          "en-US": "/en-US",
-          "de-DE": "/de-DE",
-        },
-      },
-
-      robots: {
-        index: true,
-        follow: true,
-        nocache: true,
-        googleBot: {
-          index: true,
-          follow: false,
-          "max-video-preview": -1,
-          "max-image-preview": "large",
-          "max-snippet": -1,
-        },
-      },
-
+      ...base,
+      authors: authorName ? [{ name: authorName }] : undefined,
       openGraph: {
-        title: `${post.title} | ${authorName}`,
-        description: post.metadata,
-        url: `${siteURL}/blog/${post?.slug?.current}`,
-        siteName: authorName,
-        images: [
-          {
-            url: imageBuilder(post.mainImage).url(),
-            width: 1800,
-            height: 1600,
-            alt: post.title,
-          },
-        ],
-        locale: "en_US",
+        ...base.openGraph,
         type: "article",
+        ...(imageUrl ?
+          {
+            images: [
+              {
+                url: imageUrl,
+                width: 1200,
+                height: 630,
+                alt: post.title || "",
+              },
+            ],
+          }
+        : {}),
       },
-
       twitter: {
-        card: "summary_large_image",
-        title: `${post.title} | ${authorName}`,
-        description: `${post.metadata?.slice(0, 136)}...`,
-        creator: `@${authorName}`,
-        site: `@${authorName}`,
-        images: [imageBuilder(post?.mainImage).url()],
-        url: `${siteURL}/blog/${post?.slug?.current}`,
+        ...base.twitter,
+        ...(imageUrl ? { images: [imageUrl] } : {}),
       },
     };
   }
-  return {
+  return buildLocalePageMetadata(locale, `/blog/${slug}`, {
     title: t("blogPostNotFoundTitle"),
     description: t("blogPostNotFoundDescription"),
-  };
+    robotsIndex: false,
+  });
 }
 
 const SingleBlog = async (props: Props) => {
   const params = await props.params;
-  const { slug } = params;
+  const { locale, slug } = params;
   if (!isSanityConfigured) {
     return <main className="container max-w-[1400px] pt-[150px] pb-[60px] lg:pt-[220px]">{messages.sanity}</main>;
   }
   const post = await getPostBySlug(slug);
   if (!post) notFound();
-  const postURL = `${process.env.SITE_URL}blog/${post?.slug?.current}`;
+  const slugPart = post?.slug?.current || slug;
+  const postURL = new URL(
+    localizedPath(locale, `/blog/${slugPart}`),
+    getMetadataBase()
+  ).toString();
 
   await structuredAlgoliaHtmlData({
     type: "blog",
     title: post?.title || "",
     htmlString: post?.metadata || "",
-    pageUrl: `${process.env.SITE_URL}/blog/${post?.slug?.current}`,
+    pageUrl: postURL,
     imageURL: post?.mainImage ? (imageBuilder(post.mainImage).url() as string) : "",
   });
 

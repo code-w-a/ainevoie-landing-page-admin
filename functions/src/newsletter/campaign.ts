@@ -1,5 +1,9 @@
 import { FieldValue } from "firebase-admin/firestore";
-import { HttpsError, onCall } from "firebase-functions/v2/https";
+import {
+  CallableRequest,
+  HttpsError,
+  onCall,
+} from "firebase-functions/v2/https";
 import {
   DEFAULT_MAX_CONCURRENT,
   DEFAULT_MAX_PER_SECOND,
@@ -15,6 +19,7 @@ import {
   getNewsletterSettings,
   logNewsletterEvent,
 } from "../shared/firestore";
+import { withSentryFunction } from "../shared/sentry";
 import { sanitizeFirestorePayload } from "../shared/sanitize";
 
 type CampaignFilters = {
@@ -47,7 +52,7 @@ export const createNewsletterCampaign = onCall(
     invoker: "public",
     secrets: [ADMIN_API_KEY, NEWSLETTER_FROM_NAME, NEWSLETTER_FROM_EMAIL],
   },
-  async (request) => {
+  withSentryFunction("createNewsletterCampaign", async (request: CallableRequest<any>) => {
     requireAdmin(request);
 
     const {
@@ -152,5 +157,5 @@ export const createNewsletterCampaign = onCall(
       campaignId,
       status: "draft",
     };
-  }
+  })
 );

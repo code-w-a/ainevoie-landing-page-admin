@@ -7,6 +7,7 @@ import {
   type NewsletterSubscriberStatus,
 } from "@/types/newsletter";
 import { sanitizePayload } from "@/lib/newsletterAdmin";
+import { captureServerException } from "@/lib/sentryServer";
 
 const ALLOWED_STATUS_SET = new Set<string>(NEWSLETTER_SUBSCRIBER_STATUSES);
 const CONSENT_METHOD = "single_opt_in";
@@ -189,6 +190,7 @@ export async function PATCH(
     await docRef.update(sanitizePayload(updates));
     return NextResponse.json({ status: "ok" });
   } catch (error) {
+    captureServerException(error, { route: "api/admin/newsletter/subscribers/[id]/route.ts" });
     return NextResponse.json(
       { error: "Nu am putut actualiza abonatul." },
       { status: 500 }
@@ -207,6 +209,7 @@ export async function DELETE(
     await db.collection("newsletter_subscribers").doc(id).delete();
     return NextResponse.json({ status: "ok" });
   } catch (error) {
+    captureServerException(error, { route: "api/admin/newsletter/subscribers/[id]/route.ts" });
     return NextResponse.json(
       { error: "Nu am putut șterge abonatul." },
       { status: 500 }

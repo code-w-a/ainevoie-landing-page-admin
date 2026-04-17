@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdminDb, serializeDoc } from "@/lib/firebaseAdmin";
 import { requireAdmin } from "@/lib/adminAuth";
+import { captureServerException } from "@/lib/sentryServer";
 
 export async function GET(
   request: Request,
@@ -82,6 +83,7 @@ export async function GET(
       logs,
     });
   } catch (error) {
+    captureServerException(error, { route: "api/admin/newsletter/campaigns/[id]/report/route.ts" });
     return NextResponse.json(
       { error: "Nu am putut încărca raportul campaniei." },
       { status: 500 }

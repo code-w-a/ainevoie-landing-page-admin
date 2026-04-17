@@ -1,6 +1,6 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { getFunctions } from "firebase-admin/functions";
-import { onTaskDispatched } from "firebase-functions/v2/tasks";
+import { onTaskDispatched, type Request as TaskRequest } from "firebase-functions/v2/tasks";
 import {
   REGION,
   RETRY_DELAYS_SECONDS,
@@ -29,6 +29,10 @@ import {
   normalizeEmail,
 } from "../shared/firestore";
 import { NewsletterErrorKind } from "../shared/newsletterTypes";
+import {
+  captureFunctionException,
+  withSentryFunction,
+} from "../shared/sentry";
 
 type ClassifiedError = {
   kind: NewsletterErrorKind;
@@ -129,7 +133,7 @@ export const newsletterSendTask = onTaskDispatched(
       maxConcurrentDispatches: 50,
     },
   },
-  async (request) => {
+  withSentryFunction("newsletterSendTask", async (request: TaskRequest<any>) => {
     const { campaignId, jobPath } = request.data as {
       campaignId?: string;
       jobPath?: string;
@@ -381,6 +385,20 @@ export const newsletterSendTask = onTaskDispatched(
         updatedAt: FieldValue.serverTimestamp(),
       });
 
+      await captureFunctionException(error, {
+        handler: "newsletterSendTask",
+        tags: {
+          campaign_id: campaignId,
+          error_kind: classified.kind,
+          error_code: classified.code,
+        },
+        extra: {
+          email,
+          attempts,
+          jobPath,
+        },
+      });
+
       await campaignRef.update({
         "stats.failed": FieldValue.increment(1),
         "stats.queued": FieldValue.increment(-1),
@@ -404,5 +422,5 @@ export const newsletterSendTask = onTaskDispatched(
         message: `Trimitere eșuată definitiv: ${classified.message}`,
       });
     }
-  }
+  })
 );

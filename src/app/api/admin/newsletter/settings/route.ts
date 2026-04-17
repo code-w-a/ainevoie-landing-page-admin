@@ -3,6 +3,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { devLogServerError } from "@/lib/devServerErrorLog";
 import { getAdminDb, serializeDoc } from "@/lib/firebaseAdmin";
 import { requireAdmin } from "@/lib/adminAuth";
+import { captureServerException } from "@/lib/sentryServer";
 
 const SETTINGS_DOC = "default";
 
@@ -21,6 +22,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ item: serializeDoc(doc) });
   } catch (error) {
+    captureServerException(error, { route: "api/admin/newsletter/settings/route.ts" });
     devLogServerError("GET /api/admin/newsletter/settings", error);
     return NextResponse.json(
       { error: "Nu am putut încărca setările." },
@@ -45,6 +47,7 @@ export async function PUT(request: Request) {
 
     return NextResponse.json({ status: "ok" });
   } catch (error) {
+    captureServerException(error, { route: "api/admin/newsletter/settings/route.ts" });
     devLogServerError("PUT /api/admin/newsletter/settings", error);
     return NextResponse.json(
       { error: "Nu am putut actualiza setările." },

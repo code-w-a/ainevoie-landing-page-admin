@@ -1,5 +1,6 @@
 import { Link } from "@/i18n/navigation";
 import { routing } from "@/i18n/routing";
+import { buildLocalePageMetadata } from "@/lib/seo";
 import { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import Image from "next/image";
@@ -16,10 +17,11 @@ export async function generateMetadata({
   }
   setRequestLocale(locale);
   const t = await getTranslations({ locale, namespace: "Metadata" });
-  return {
+  return buildLocalePageMetadata(locale, "/error", {
     title: t("error404MetaTitle"),
     description: t("error404MetaDescription"),
-  };
+    robotsIndex: false,
+  });
 }
 
 export default async function ErrorPage({ params }: PageProps) {

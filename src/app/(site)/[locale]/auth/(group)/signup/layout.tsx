@@ -4,7 +4,7 @@ import { PropsWithChildren } from "react";
 export const metadata: Metadata = {
   title: "Creează cont | AInevoie",
   description: "Creează un cont AInevoie pentru a solicita sau oferi servicii.",
-  // other metadata
+  robots: { index: false, follow: true },
 };
 
 export default function Layout({ children }: PropsWithChildren) {

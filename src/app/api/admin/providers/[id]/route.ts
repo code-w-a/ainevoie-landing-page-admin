@@ -3,6 +3,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { requireAdmin } from "@/lib/adminAuth";
 import { getAdminDb, serializeDoc } from "@/lib/firebaseAdmin";
 import { isProviderStatus } from "@/lib/providers";
+import { captureServerException } from "@/lib/sentryServer";
 
 type UpdatePayload = {
   onboardingStatus?: string;
@@ -35,7 +36,8 @@ export async function GET(
       .filter(Boolean) as Array<Record<string, unknown>>;
 
     return NextResponse.json({ item: serializeDoc(doc), events });
-  } catch {
+  } catch (error) {
+    captureServerException(error, { route: "api/admin/providers/[id]/route.ts" });
     return NextResponse.json(
       { error: "Nu am putut încărca prestatorul." },
       { status: 500 }
@@ -92,7 +94,8 @@ export async function PATCH(
     }
 
     return NextResponse.json({ status: "updated" });
-  } catch {
+  } catch (error) {
+    captureServerException(error, { route: "api/admin/providers/[id]/route.ts" });
     return NextResponse.json(
       { error: "Nu am putut actualiza prestatorul." },
       { status: 500 }

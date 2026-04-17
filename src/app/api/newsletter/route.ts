@@ -3,6 +3,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { getRequestLocale } from "@/lib/apiLocale";
 import { jsonApiError } from "@/lib/apiJsonError";
 import { getAdminDb } from "@/lib/firebaseAdmin";
+import { captureServerException } from "@/lib/sentryServer";
 
 export async function POST(req: Request) {
   const locale = getRequestLocale(req);
@@ -69,7 +70,8 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json({ status: "subscribed" }, { status: 200 });
-  } catch {
+  } catch (error) {
+    captureServerException(error, { route: "api/newsletter/route.ts" });
     return jsonApiError(locale, "NEWSLETTER_SUBSCRIBE_FAILED", 500);
   }
 }

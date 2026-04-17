@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireEnv } from "@/lib/firebaseAdmin";
 import { requireAdmin } from "@/lib/adminAuth";
 import { parseCallableErrorResponse } from "@/lib/newsletterAdmin";
+import { captureServerException } from "@/lib/sentryServer";
 
 const region = process.env.FIREBASE_REGION || "europe-west1";
 
@@ -44,6 +45,7 @@ export async function POST(
     const data = await response.json();
     return NextResponse.json(data);
   } catch (error) {
+    captureServerException(error, { route: "api/admin/newsletter/campaigns/[id]/requeue/route.ts" });
     return NextResponse.json(
       { error: "Nu am putut recoada joburile eșuate." },
       { status: 500 }

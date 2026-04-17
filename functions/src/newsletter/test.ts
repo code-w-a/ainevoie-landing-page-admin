@@ -1,4 +1,8 @@
-import { HttpsError, onCall } from "firebase-functions/v2/https";
+import {
+  CallableRequest,
+  HttpsError,
+  onCall,
+} from "firebase-functions/v2/https";
 import { REGION } from "./constants";
 import { ADMIN_API_KEY, requireAdmin } from "../shared/auth";
 import {
@@ -20,6 +24,7 @@ import {
   getNewsletterSettings,
   logNewsletterEvent,
 } from "../shared/firestore";
+import { withSentryFunction } from "../shared/sentry";
 
 export const sendNewsletterTestEmail = onCall(
   {
@@ -38,7 +43,7 @@ export const sendNewsletterTestEmail = onCall(
       PUBLIC_BASE_URL,
     ],
   },
-  async (request) => {
+  withSentryFunction("sendNewsletterTestEmail", async (request: CallableRequest<any>) => {
     requireAdmin(request);
 
     const { toEmail, subject, html, text, previewText, fromName, fromEmail } =
@@ -80,5 +85,5 @@ export const sendNewsletterTestEmail = onCall(
     });
 
     return { status: "ok" };
-  }
+  })
 );

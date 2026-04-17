@@ -1,6 +1,7 @@
 import { structuredAlgoliaHtmlData } from "@/lib/crawlIndex";
 import { routing } from "@/i18n/routing";
 import { getPostBySlug } from "@/lib/markdown";
+import { buildLocalePageMetadata } from "@/lib/seo";
 import markdownToHtml from "@/lib/markdownToHtml";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { notFound } from "next/navigation";
@@ -21,30 +22,21 @@ export async function generateMetadata(props: Props) {
   const siteName = process.env.SITE_NAME;
   const authorName = process.env.AUTHOR_NAME;
 
-  if (post) {
-    return {
-      title: `${post.title || t("postFallbackTitle")} | ${siteName}`,
-      description: `${post.metadata?.slice(0, 136)}...`,
-      author: authorName,
+  const docPath = `/docs/${slug}`;
 
-      robots: {
-        index: true,
-        follow: true,
-        nocache: true,
-        googleBot: {
-          index: true,
-          follow: false,
-          "max-video-preview": -1,
-          "max-image-preview": "large",
-          "max-snippet": -1,
-        },
-      },
+  if (post) {
+    const title = `${post.title || t("postFallbackTitle")} | ${siteName}`;
+    const description = `${String(post.metadata || "").slice(0, 136)}...`;
+    return {
+      ...buildLocalePageMetadata(locale, docPath, { title, description }),
+      authors: authorName ? [{ name: authorName }] : undefined,
     };
   }
-  return {
+  return buildLocalePageMetadata(locale, docPath, {
     title: t("postNotFoundMetaTitle"),
     description: t("postNotFoundMetaDescription"),
-  };
+    robotsIndex: false,
+  });
 }
 
 export default async function DocsPost(props: Props) {

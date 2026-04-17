@@ -1,9 +1,14 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { getFunctions } from "firebase-admin/functions";
-import { HttpsError, onCall } from "firebase-functions/v2/https";
+import {
+  CallableRequest,
+  HttpsError,
+  onCall,
+} from "firebase-functions/v2/https";
 import { REGION, START_QUEUE_FUNCTION } from "./constants";
 import { ADMIN_API_KEY, requireAdmin } from "../shared/auth";
 import { getDb, logNewsletterEvent } from "../shared/firestore";
+import { withSentryFunction } from "../shared/sentry";
 
 async function deleteScheduledTaskIfExists(taskId: string): Promise<void> {
   const queue = getFunctions().taskQueue(START_QUEUE_FUNCTION);
@@ -23,7 +28,9 @@ export const unscheduleNewsletterCampaign = onCall(
     invoker: "public",
     secrets: [ADMIN_API_KEY],
   },
-  async (request) => {
+  withSentryFunction(
+    "unscheduleNewsletterCampaign",
+    async (request: CallableRequest<any>) => {
     requireAdmin(request);
     const campaignId = typeof request.data?.campaignId === "string" ?
       request.data.campaignId.trim() :
@@ -85,5 +92,6 @@ export const unscheduleNewsletterCampaign = onCall(
       campaignId,
       status: "draft",
     };
-  }
+    }
+  )
 );

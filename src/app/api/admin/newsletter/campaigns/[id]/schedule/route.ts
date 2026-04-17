@@ -5,6 +5,7 @@ import {
   parseCallableErrorResponse,
   readCallableErrorMessage,
 } from "@/lib/newsletterAdmin";
+import { captureServerException } from "@/lib/sentryServer";
 
 const region = process.env.FIREBASE_REGION || "europe-west1";
 
@@ -110,6 +111,7 @@ export async function POST(
       scheduleTaskId: result?.scheduleTaskId || null,
     });
   } catch (error) {
+    captureServerException(error, { route: "api/admin/newsletter/campaigns/[id]/schedule/route.ts" });
     return NextResponse.json(
       { error: "Nu am putut programa campania." },
       { status: 500 }

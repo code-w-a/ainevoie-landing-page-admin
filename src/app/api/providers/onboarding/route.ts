@@ -5,6 +5,7 @@ import { type AppLocale, getRequestLocale } from "@/lib/apiLocale";
 import { getApiErrorMessage } from "@/lib/apiMessages";
 import { getAdminDb } from "@/lib/firebaseAdmin";
 import { sendEmail } from "@/lib/email";
+import { captureServerException } from "@/lib/sentryServer";
 import {
   PROVIDER_LAUNCH_CONTACT_CONSENT_VERSION,
   PROVIDER_PRIVACY_VERSION,
@@ -292,7 +293,8 @@ export async function POST(request: Request) {
       welcomeEmailSent: welcomeEmailResult.sent,
       newsletterStatusAtSignup,
     });
-  } catch {
+  } catch (error) {
+    captureServerException(error, { route: "api/providers/onboarding/route.ts" });
     const locale = getRequestLocale(request);
     return jsonError(locale, "SERVER_ERROR", 500);
   }

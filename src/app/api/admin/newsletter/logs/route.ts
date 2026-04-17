@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdminDb, serializeDoc } from "@/lib/firebaseAdmin";
 import { requireAdmin } from "@/lib/adminAuth";
+import { captureServerException } from "@/lib/sentryServer";
 
 const ALLOWED_SORTS: Record<string, string> = {
   createdAt: "createdAt",
@@ -58,6 +59,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ items, nextCursor });
   } catch (error) {
+    captureServerException(error, { route: "api/admin/newsletter/logs/route.ts" });
     return NextResponse.json(
       { error: "Nu am putut încărca logurile." },
       { status: 500 }

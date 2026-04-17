@@ -41,3 +41,4 @@ yarn.lock
 /ainevoie-ca861-firebase-adminsdk-fbsvc-90cc7228e1.json
 env
 .env.local
+.env.sentry-build-plugin

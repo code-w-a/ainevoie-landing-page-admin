@@ -1,9 +1,14 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { getFunctions } from "firebase-admin/functions";
-import { HttpsError, onCall } from "firebase-functions/v2/https";
+import {
+  CallableRequest,
+  HttpsError,
+  onCall,
+} from "firebase-functions/v2/https";
 import { REGION, SEND_QUEUE_FUNCTION } from "./constants";
 import { ADMIN_API_KEY, requireAdmin } from "../shared/auth";
 import { getDb, logNewsletterEvent } from "../shared/firestore";
+import { withSentryFunction } from "../shared/sentry";
 
 export const requeueFailedJobs = onCall(
   {
@@ -11,7 +16,7 @@ export const requeueFailedJobs = onCall(
     invoker: "public",
     secrets: [ADMIN_API_KEY],
   },
-  async (request) => {
+  withSentryFunction("requeueFailedJobs", async (request: CallableRequest<any>) => {
     requireAdmin(request);
 
     const { campaignId } = request.data ?? {};
@@ -58,5 +63,5 @@ export const requeueFailedJobs = onCall(
     });
 
     return { requeued };
-  }
+  })
 );

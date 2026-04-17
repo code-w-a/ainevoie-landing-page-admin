@@ -11,6 +11,7 @@ import {
   parseCallableErrorResponse,
   sanitizePayload,
 } from "@/lib/newsletterAdmin";
+import { captureServerException } from "@/lib/sentryServer";
 
 const region = process.env.FIREBASE_REGION || "europe-west1";
 
@@ -130,6 +131,7 @@ export async function POST(request: Request) {
     const data = await response.json();
     return NextResponse.json(data);
   } catch (error) {
+    captureServerException(error, { route: "api/admin/newsletter/campaigns/test/route.ts" });
     return NextResponse.json(
       { error: "Nu am putut trimite emailul de test." },
       { status: 500 }

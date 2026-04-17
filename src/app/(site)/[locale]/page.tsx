@@ -10,6 +10,7 @@ import Screens from "@/components/Screens";
 import Testimonials from "@/components/Testimonials";
 import WorkProcess from "@/components/WorkProcess";
 import { routing } from "@/i18n/routing";
+import { buildLocalePageMetadata } from "@/lib/seo";
 import { integrations } from "@integrations-config";
 import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
@@ -26,10 +27,10 @@ export async function generateMetadata({
   }
   setRequestLocale(locale);
   const t = await getTranslations({ locale, namespace: "Metadata" });
-  return {
+  return buildLocalePageMetadata(locale, "/", {
     title: t("homeTitle"),
     description: t("homeDescription"),
-  };
+  });
 }
 
 export default function Home() {

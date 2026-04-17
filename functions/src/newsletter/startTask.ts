@@ -1,9 +1,10 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { HttpsError } from "firebase-functions/v2/https";
-import { onTaskDispatched } from "firebase-functions/v2/tasks";
+import { onTaskDispatched, type Request as TaskRequest } from "firebase-functions/v2/tasks";
 import { dispatchCampaignJobs } from "./dispatch";
 import { REGION } from "./constants";
 import { getDb, logNewsletterEvent } from "../shared/firestore";
+import { withSentryFunction } from "../shared/sentry";
 
 export const newsletterCampaignStartTask = onTaskDispatched(
   {
@@ -13,7 +14,9 @@ export const newsletterCampaignStartTask = onTaskDispatched(
       maxConcurrentDispatches: 50,
     },
   },
-  async (request) => {
+  withSentryFunction(
+    "newsletterCampaignStartTask",
+    async (request: TaskRequest<any>) => {
     const campaignId = typeof request.data?.campaignId === "string" ?
       request.data.campaignId.trim() :
       "";
@@ -90,5 +93,6 @@ export const newsletterCampaignStartTask = onTaskDispatched(
         "Nu am putut porni campania programată."
       );
     }
-  }
+    }
+  )
 );

@@ -4,7 +4,7 @@ import { PropsWithChildren } from "react";
 export const metadata: Metadata = {
   title: "Autentificare | AInevoie",
   description: "Intră în contul tău AInevoie.",
-  // other metadata
+  robots: { index: false, follow: true },
 };
 
 export default function Layout({ children }: PropsWithChildren) {

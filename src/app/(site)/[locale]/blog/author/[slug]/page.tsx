@@ -1,4 +1,6 @@
 import BlogItem from "@/components/Blog/BlogItem";
+import { routing } from "@/i18n/routing";
+import { buildLocalePageMetadata } from "@/lib/seo";
 import {
   getAuthorBySlug,
   getPostsByAuthor,
@@ -7,79 +9,86 @@ import {
 } from "@/sanity/sanity-utils";
 import { Author } from "@/types/blog";
 import { messages } from "@integrations-config";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { notFound } from "next/navigation";
 
 type Props = {
   params: Promise<{
+    locale: string;
     slug: string;
   }>;
 };
 
 export async function generateMetadata(props: Props) {
   const params = await props.params;
-  const { slug } = params;
+  const { locale, slug } = params;
+  if (!routing.locales.includes(locale as (typeof routing.locales)[number])) {
+    notFound();
+  }
+  setRequestLocale(locale);
+  const t = await getTranslations({ locale, namespace: "Metadata" });
+
   if (!isSanityConfigured) {
-    return {
-      title: "Blog | AInevoie",
-      description: "Blogul AInevoie nu este disponibil momentan.",
-    };
+    return buildLocalePageMetadata(locale, "/blog", {
+      title: t("blogMetaTitle"),
+      description: t("blogUnavailableDescription"),
+    });
   }
   const author = (await getAuthorBySlug(slug)) as Author;
-  const siteURL = process.env.SITE_URL;
   const authorName = process.env.AUTHOR_NAME;
 
   if (author) {
+    const path = `/blog/author/${slug}`;
+    const title = `${author.name || "Author Page"} | ${authorName || "AInevoie"} — AInevoie`;
+    const description = String(author.bio || "").slice(0, 160) || title;
+    const base = buildLocalePageMetadata(locale, path, {
+      title,
+      description,
+      robotsIndex: false,
+    });
+    const imageUrlRaw = author.image ? imageBuilder(author.image).url() : "";
+    const imageUrl = typeof imageUrlRaw === "string" && imageUrlRaw ? imageUrlRaw : "";
+
     return {
-      title: `${
-        author.name || "Author Page"
-      } | ${authorName} — AInevoie`,
-      description: author.bio,
-      author: authorName,
-
-      robots: {
-        index: false,
-        follow: false,
-        nocache: true,
-      },
-
+      ...base,
+      authors: authorName ? [{ name: authorName }] : undefined,
       openGraph: {
-        title: `${author.name} | ${authorName}`,
-        description: author.bio,
-        url: `${siteURL}/blog/author/${slug}`,
-        siteName: authorName,
-        images: [
-          {
-            url: imageBuilder(author.image).url(),
-            width: 343,
-            height: 343,
-            alt: author.name,
-          },
-        ],
-        locale: "en_US",
+        ...base.openGraph,
         type: "article",
+        ...(imageUrl ?
+          {
+            images: [
+              {
+                url: imageUrl,
+                width: 343,
+                height: 343,
+                alt: author.name || "",
+              },
+            ],
+          }
+        : {}),
       },
-
       twitter: {
-        card: "summary_large_image",
-        title: `${author.name} | ${authorName}`,
-        description: `${author.bio?.slice(0, 136)}...`,
-        creator: `@${authorName}`,
-        site: `@${authorName}`,
-        images: [imageBuilder(author.image).url()],
-        url: `${siteURL}/blog/author/${slug}`,
+        ...base.twitter,
+        ...(imageUrl ? { images: [imageUrl] } : {}),
       },
-    };
-  } else {
-    return {
-      title: "Autor negăsit",
-      description: "Autorul căutat nu există sau nu mai este disponibil.",
     };
   }
+
+  return buildLocalePageMetadata(locale, `/blog/author/${slug}`, {
+    title: "Autor negăsit | AInevoie",
+    description: "Autorul căutat nu există sau nu mai este disponibil.",
+    robotsIndex: false,
+  });
 }
 
 const BlogGrid = async (props: Props) => {
   const params = await props.params;
-  const { slug } = params;
+  const { locale, slug } = params;
+  if (!routing.locales.includes(locale as (typeof routing.locales)[number])) {
+    notFound();
+  }
+  setRequestLocale(locale);
 
   if (!isSanityConfigured) {
     return <main className="container max-w-[1400px] pt-[150px] pb-[60px] lg:pt-[220px]">{messages.sanity}</main>;

@@ -14,6 +14,7 @@ import {
   logNewsletterEvent,
   normalizeEmail,
 } from "../shared/firestore";
+import { captureFunctionException } from "../shared/sentry";
 import { sanitizeFirestorePayload } from "../shared/sanitize";
 
 type CampaignFilters = {
@@ -169,6 +170,15 @@ export async function dispatchCampaignJobs(
       const duplicate =
         errorText.includes("ALREADY_EXISTS") ||
         errorText.toLowerCase().includes("already exists");
+
+      if (!duplicate) {
+        await captureFunctionException(error, {
+          handler: "dispatchCampaignJobs",
+          tags: { campaign_id: options.campaignId },
+          extra: { email },
+        });
+      }
+
       await logNewsletterEvent(db, {
         campaignId: options.campaignId,
         email,

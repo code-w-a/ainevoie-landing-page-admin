@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/adminAuth";
 import { getAdminDb, serializeDoc } from "@/lib/firebaseAdmin";
+import { captureServerException } from "@/lib/sentryServer";
 import {
   isProviderCityOption,
   isProviderServiceOption,
@@ -90,7 +91,8 @@ export async function GET(request: Request) {
         totalPages: Math.max(Math.ceil(total / pageSize), 1),
       },
     });
-  } catch {
+  } catch (error) {
+    captureServerException(error, { route: "api/admin/providers/route.ts" });
     return NextResponse.json(
       { error: "Nu am putut încărca prestatorii." },
       { status: 500 }

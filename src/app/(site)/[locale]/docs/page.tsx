@@ -1,4 +1,5 @@
 import { routing } from "@/i18n/routing";
+import { buildLocalePageMetadata } from "@/lib/seo";
 import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { notFound } from "next/navigation";
@@ -14,10 +15,10 @@ export async function generateMetadata({
   }
   setRequestLocale(locale);
   const t = await getTranslations({ locale, namespace: "Docs" });
-  return {
+  return buildLocalePageMetadata(locale, "/docs", {
     title: t("metaTitle"),
     description: t("metaDescription"),
-  };
+  });
 }
 
 export default async function DocsPage({ params }: PageProps) {

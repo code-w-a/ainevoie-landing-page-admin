@@ -13,6 +13,7 @@ import {
   parseCallableErrorResponse,
   sanitizePayload,
 } from "@/lib/newsletterAdmin";
+import { captureServerException } from "@/lib/sentryServer";
 
 const region = process.env.FIREBASE_REGION || "europe-west1";
 const ALLOWED_SORTS: Record<string, string> = {
@@ -89,6 +90,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ items, nextCursor });
   } catch (error) {
+    captureServerException(error, { route: "api/admin/newsletter/campaigns/route.ts" });
     devLogServerError("GET /api/admin/newsletter/campaigns", error);
     return NextResponse.json(
       { error: "Nu am putut încărca campaniile." },
@@ -232,6 +234,7 @@ export async function POST(request: Request) {
       status: result?.status || "draft",
     });
   } catch (error) {
+    captureServerException(error, { route: "api/admin/newsletter/campaigns/route.ts" });
     return NextResponse.json(
       { error: "Nu am putut crea campania." },
       { status: 500 }

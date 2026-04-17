@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { devLogServerError } from "@/lib/devServerErrorLog";
 import { getAdminDb, serializeDoc } from "@/lib/firebaseAdmin";
 import { requireAdmin } from "@/lib/adminAuth";
+import { captureServerException } from "@/lib/sentryServer";
 
 export async function GET(request: Request) {
   try {
@@ -47,6 +48,7 @@ export async function GET(request: Request) {
       logs,
     });
   } catch (error) {
+    captureServerException(error, { route: "api/admin/newsletter/overview/route.ts" });
     devLogServerError("GET /api/admin/newsletter/overview", error);
     return NextResponse.json(
       { error: "Nu am putut încărca sumarul." },

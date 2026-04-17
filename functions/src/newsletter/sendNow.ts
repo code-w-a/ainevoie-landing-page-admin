@@ -1,10 +1,15 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { getFunctions } from "firebase-admin/functions";
-import { HttpsError, onCall } from "firebase-functions/v2/https";
+import {
+  CallableRequest,
+  HttpsError,
+  onCall,
+} from "firebase-functions/v2/https";
 import { dispatchCampaignJobs } from "./dispatch";
 import { REGION, START_QUEUE_FUNCTION } from "./constants";
 import { ADMIN_API_KEY, requireAdmin } from "../shared/auth";
 import { getDb, logNewsletterEvent } from "../shared/firestore";
+import { withSentryFunction } from "../shared/sentry";
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -28,7 +33,9 @@ export const sendNewsletterCampaignNow = onCall(
     invoker: "public",
     secrets: [ADMIN_API_KEY],
   },
-  async (request) => {
+  withSentryFunction(
+    "sendNewsletterCampaignNow",
+    async (request: CallableRequest<any>) => {
     requireAdmin(request);
     const campaignId = typeof request.data?.campaignId === "string" ?
       request.data.campaignId.trim() :
@@ -107,5 +114,6 @@ export const sendNewsletterCampaignNow = onCall(
       status,
       counts,
     };
-  }
+    }
+  )
 );

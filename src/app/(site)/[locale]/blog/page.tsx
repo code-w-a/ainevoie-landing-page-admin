@@ -1,5 +1,6 @@
 import BlogItem from "@/components/Blog/BlogItem";
 import { routing } from "@/i18n/routing";
+import { buildLocalePageMetadata } from "@/lib/seo";
 import { getPosts, isSanityConfigured } from "@/sanity/sanity-utils";
 import { integrations, messages } from "@integrations-config";
 import { Metadata } from "next";
@@ -17,10 +18,10 @@ export async function generateMetadata({
   }
   setRequestLocale(locale);
   const t = await getTranslations({ locale, namespace: "Metadata" });
-  return {
+  return buildLocalePageMetadata(locale, "/blog", {
     title: t("blogMetaTitle"),
     description: t("blogMetaDescription"),
-  };
+  });
 }
 
 export default async function BlogGrid({ params }: PageProps) {

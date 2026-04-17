@@ -1,10 +1,11 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { onRequest } from "firebase-functions/v2/https";
 import { getDb, getSubscriberByToken } from "../shared/firestore";
+import { withSentryFunction } from "../shared/sentry";
 
 export const unsubscribe = onRequest(
   { region: "europe-west1", invoker: "public" },
-  async (req, res) => {
+  withSentryFunction("unsubscribe", async (req: any, res: any) => {
     const token = typeof req.query.token === "string" ? req.query.token : "";
     if (!token) {
       res.status(400).send(
@@ -34,5 +35,5 @@ export const unsubscribe = onRequest(
     res.status(200).send(
       "<html><body><h1>Dezabonare confirmată</h1><p>Nu vei mai primi emailuri de la AInevoie.</p></body></html>"
     );
-  }
+  })
 );

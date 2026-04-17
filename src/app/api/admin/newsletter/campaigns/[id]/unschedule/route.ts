@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireEnv } from "@/lib/firebaseAdmin";
 import { requireAdmin } from "@/lib/adminAuth";
 import { parseCallableErrorResponse } from "@/lib/newsletterAdmin";
+import { captureServerException } from "@/lib/sentryServer";
 
 const region = process.env.FIREBASE_REGION || "europe-west1";
 
@@ -62,6 +63,7 @@ export async function POST(
       status: result?.status || "draft",
     });
   } catch (error) {
+    captureServerException(error, { route: "api/admin/newsletter/campaigns/[id]/unschedule/route.ts" });
     return NextResponse.json(
       { error: "Nu am putut anula programarea campaniei." },
       { status: 500 }
