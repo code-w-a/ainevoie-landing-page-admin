@@ -97,8 +97,12 @@ export function AdminNotificationsMenu() {
     }
   }, [open, fetchSignups]);
 
+  const seen = useMemo(() => {
+    void seenVersion;
+    return loadSeen();
+  }, [seenVersion]);
+
   const { unreadSubscribers, unreadProviders } = useMemo(() => {
-    const seen = loadSeen();
     const subSeen = new Set(seen.subscriberIds);
     const provSeen = new Set(seen.providerIds);
     const subscribers = (raw?.newSubscribers ?? []).filter(
@@ -111,7 +115,7 @@ export function AdminNotificationsMenu() {
       unreadSubscribers: subscribers,
       unreadProviders: providers,
     };
-  }, [raw, seenVersion]);
+  }, [raw, seen]);
 
   const unreadCount =
     unreadSubscribers.length + unreadProviders.length;

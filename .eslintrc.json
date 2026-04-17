@@ -1,3 +1,24 @@
 {
-  "extends": "next/core-web-vitals"
+  "extends": "next/core-web-vitals",
+  "ignorePatterns": [
+    ".next/**",
+    "coverage/**",
+    "functions/**",
+    "functions/lib/**",
+    "node_modules/**",
+    "playwright-report/**",
+    "test-results/**"
+  ],
+  "overrides": [
+    {
+      "files": [
+        "*.config.ts",
+        "**/*.test.ts",
+        "**/*.spec.ts"
+      ],
+      "env": {
+        "node": true
+      }
+    }
+  ]
 }

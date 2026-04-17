@@ -70,7 +70,7 @@ export default function AdminOverviewPage() {
     ];
   }, [data]);
 
-  const campaigns = data?.campaigns ?? [];
+  const campaigns = useMemo(() => data?.campaigns ?? [], [data?.campaigns]);
   const logs = data?.logs ?? [];
   const campaignNameById = useMemo(() => {
     const map = new Map<string, string>();

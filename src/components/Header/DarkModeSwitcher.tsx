@@ -1,17 +1,15 @@
 import { useTheme } from "next-themes";
 
 export default function DarkModeSwitcher() {
-  const { theme, setTheme } = useTheme();
+  const { resolvedTheme, setTheme } = useTheme();
 
   return (
     <button
       onClick={() => {
-        setTheme(theme === "light" ? "dark" : "light");
+        setTheme(resolvedTheme === "dark" ? "light" : "dark");
       }}
     >
-      <span className="sr-only">
-        Switch to {theme === "light" ? "dark" : "light"} mode
-      </span>
+      <span className="sr-only">Toggle color mode</span>
 
       <span className="block dark:hidden">
         <svg

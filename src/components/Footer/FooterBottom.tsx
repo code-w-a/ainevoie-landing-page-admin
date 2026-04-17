@@ -23,7 +23,6 @@ const FooterBottom = () => {
                 <Link
                   href="#"
                   className="text-white opacity-70 hover:opacity-100"
-                  name="icon social"
                   aria-label="icon social"
                 >
                   <svg
@@ -50,7 +49,6 @@ const FooterBottom = () => {
                 <Link
                   href="#"
                   className="text-white opacity-70 hover:opacity-100"
-                  name="icon social"
                   aria-label="icon social"
                 >
                   <svg
@@ -77,7 +75,6 @@ const FooterBottom = () => {
                 <Link
                   href="#"
                   className="text-white opacity-70 hover:opacity-100"
-                  name="icon social"
                   aria-label="icon social"
                 >
                   <svg
@@ -104,7 +101,6 @@ const FooterBottom = () => {
                 <Link
                   href="#"
                   className="text-white opacity-70 hover:opacity-100"
-                  name="icon social"
                   aria-label="icon social"
                 >
                   <svg

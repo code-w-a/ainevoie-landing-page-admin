@@ -6,7 +6,14 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src tests vitest.config.ts playwright.config.ts instrumentation.ts instrumentation-client.ts integrations.config.tsx sanity.config.ts sentry.edge.config.ts sentry.server.config.ts --ext .js,.jsx,.ts,.tsx --max-warnings=0 --no-error-on-unmatched-pattern",
+    "test:unit": "vitest run",
+    "test:unit:watch": "vitest",
+    "test:smoke": "playwright test",
+    "test:build": "next build",
+    "test:functions": "npm --prefix functions run build",
+    "test:ci": "npm run typecheck && npm run lint && npm run test:unit && npm run test:functions && npm run test:build && npm run test:smoke",
     "stripe:listen": "stripe listen --forward-to http://localhost:3000/api/stripe/webhook"
   },
   "dependencies": {
@@ -49,6 +56,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@tailwindcss/postcss": "^4.0.14",
     "@tailwindcss/typography": "^0.5.16",
     "@types/bcrypt": "^5.0.2",
@@ -63,7 +71,8 @@
     "prettier": "^3.2.5",
     "prettier-plugin-tailwindcss": "^0.6.11",
     "tailwindcss": "^4.0.14",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.4"
   },
   "engines": {
     "node": ">=20"

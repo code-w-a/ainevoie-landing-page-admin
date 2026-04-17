@@ -14,9 +14,6 @@ const nextConfig = {
       },
     ],
   },
-  typescript: {
-    ignoreBuildErrors: true,
-  },
 };
 
 const nextIntlConfig = withNextIntl(nextConfig);
