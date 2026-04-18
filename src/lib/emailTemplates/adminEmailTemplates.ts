@@ -7,17 +7,11 @@ export type TemplateContent = {
   greeting: string;
   intro: string;
   steps: string[];
+  note: string;
   signature: string;
 };
 
-export type PrelaunchContent = {
-  heading: string;
-  body: string;
-};
-
 export type EmailTemplateConfig = {
-  prelaunchEnabled: boolean;
-  prelaunch: Record<AppLocale, PrelaunchContent>;
   providerWelcome: Record<AppLocale, TemplateContent>;
   providerApproved: Record<AppLocale, TemplateContent>;
 };
@@ -34,19 +28,6 @@ export type RenderedTemplate = {
 };
 
 export const EMAIL_TEMPLATE_DEFAULTS: EmailTemplateConfig = {
-  prelaunchEnabled: true,
-  prelaunch: {
-    ro: {
-      heading: "Momentan suntem în prelaunch",
-      body:
-        "Aplicația mobilă AInevoie este în curs de finalizare. Datele tale sunt deja pregătite și le vei folosi direct la lansare.",
-    },
-    en: {
-      heading: "We are currently in prelaunch",
-      body:
-        "The AInevoie mobile app is in the final stages of development. Your account is ready and will be waiting for you at launch.",
-    },
-  },
   providerWelcome: {
     ro: {
       subject: "Bine ai venit pe AInevoie",
@@ -58,6 +39,8 @@ export const EMAIL_TEMPLATE_DEFAULTS: EmailTemplateConfig = {
         "Dacă e nevoie, primești cereri de completare.",
         "La lansare, te autentifici direct cu acest cont.",
       ],
+      note:
+        "Momentan suntem în prelaunch: aplicația mobilă AInevoie este în curs de finalizare, iar datele tale te vor aștepta la lansare.",
       signature: "Cu drag,\nEchipa AInevoie",
     },
     en: {
@@ -70,6 +53,8 @@ export const EMAIL_TEMPLATE_DEFAULTS: EmailTemplateConfig = {
         "If we need anything else, we will contact you.",
         "When the app goes live, sign in with this same account.",
       ],
+      note:
+        "We are currently in prelaunch: the AInevoie mobile app is in the final stages of development and your account will be waiting for you at launch.",
       signature: "Kind regards,\nThe AInevoie team",
     },
   },
@@ -84,6 +69,7 @@ export const EMAIL_TEMPLATE_DEFAULTS: EmailTemplateConfig = {
         "Te vom anunța prin email când aplicația mobilă este disponibilă.",
         "La lansare te vei autentifica cu adresa {{email}} pentru a prelua primele cereri.",
       ],
+      note: "",
       signature: "Cu drag,\nEchipa AInevoie",
     },
     en: {
@@ -96,6 +82,7 @@ export const EMAIL_TEMPLATE_DEFAULTS: EmailTemplateConfig = {
         "We will notify you by email as soon as the mobile app is available.",
         "At launch, sign in with {{email}} to start receiving requests.",
       ],
+      note: "",
       signature: "Kind regards,\nThe AInevoie team",
     },
   },
@@ -139,6 +126,11 @@ function normalizeString(value: unknown, fallback: string): string {
   return trimmed.length > 0 ? value : fallback;
 }
 
+function normalizeOptionalString(value: unknown, fallback: string): string {
+  if (typeof value !== "string") return fallback;
+  return value;
+}
+
 function normalizeSteps(value: unknown, fallback: string[]): string[] {
   if (!Array.isArray(value)) return fallback;
   const filtered = value
@@ -159,19 +151,8 @@ function mergeTemplateContent(
     greeting: normalizeString(data.greeting, defaults.greeting),
     intro: normalizeString(data.intro, defaults.intro),
     steps: normalizeSteps(data.steps, defaults.steps),
+    note: normalizeOptionalString(data.note, defaults.note),
     signature: normalizeString(data.signature, defaults.signature),
-  };
-}
-
-function mergePrelaunchContent(
-  raw: unknown,
-  defaults: PrelaunchContent
-): PrelaunchContent {
-  if (!raw || typeof raw !== "object") return defaults;
-  const data = raw as Record<string, unknown>;
-  return {
-    heading: normalizeString(data.heading, defaults.heading),
-    body: normalizeString(data.body, defaults.body),
   };
 }
 
@@ -187,34 +168,13 @@ function mergeTemplateLocales(
   };
 }
 
-function mergePrelaunchLocales(
-  raw: unknown,
-  defaults: Record<AppLocale, PrelaunchContent>
-): Record<AppLocale, PrelaunchContent> {
-  const data =
-    raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
-  return {
-    ro: mergePrelaunchContent(data.ro, defaults.ro),
-    en: mergePrelaunchContent(data.en, defaults.en),
-  };
-}
-
 export function mergeEmailTemplateConfig(
   raw: unknown
 ): EmailTemplateConfig {
   const data =
     raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
-  const prelaunchEnabled =
-    typeof data.prelaunchEnabled === "boolean" ?
-      data.prelaunchEnabled
-    : EMAIL_TEMPLATE_DEFAULTS.prelaunchEnabled;
 
   return {
-    prelaunchEnabled,
-    prelaunch: mergePrelaunchLocales(
-      data.prelaunch,
-      EMAIL_TEMPLATE_DEFAULTS.prelaunch
-    ),
     providerWelcome: mergeTemplateLocales(
       data.providerWelcome,
       EMAIL_TEMPLATE_DEFAULTS.providerWelcome
@@ -239,24 +199,24 @@ function renderSteps(steps: string[], vars: TemplateVars): { html: string; text:
   return { html: htmlItems, text: textItems };
 }
 
-function renderPrelaunchBlockHtml(block: PrelaunchContent, vars: TemplateVars): string {
+function renderNoteBlockHtml(note: string, vars: TemplateVars): string {
+  const lines = note.split(/\r?\n/);
+  const body = lines
+    .map((line) => replaceVarsHtml(escapeHtml(line), vars))
+    .join("<br/>");
   return `
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 18px;">
       <tr>
         <td style="border-left:3px solid #d35400;background:#fff7ed;padding:12px 16px;border-radius:4px;">
-          <p style="margin:0 0 6px;font-weight:bold;color:#9a3412;">${replaceVarsHtml(block.heading, vars)}</p>
-          <p style="margin:0;color:#7c2d12;">${replaceVarsHtml(block.body, vars)}</p>
+          <p style="margin:0;color:#7c2d12;">${body}</p>
         </td>
       </tr>
     </table>
   `;
 }
 
-function renderPrelaunchBlockText(block: PrelaunchContent, vars: TemplateVars): string {
-  return [
-    `** ${replaceVarsRaw(block.heading, vars)} **`,
-    replaceVarsRaw(block.body, vars),
-  ].join("\n");
+function renderNoteBlockText(note: string, vars: TemplateVars): string {
+  return replaceVarsRaw(note, vars);
 }
 
 export type RenderTemplateParams = {
@@ -270,8 +230,6 @@ export function renderTemplate(params: RenderTemplateParams): RenderedTemplate {
   const { kind, locale, config, vars } = params;
   const localeKey = normalizeLocale(locale);
   const content = config[kind][localeKey];
-  const prelaunch = config.prelaunch[localeKey];
-  const prelaunchEnabled = config.prelaunchEnabled === true;
 
   const subject = replaceVarsRaw(content.subject, vars);
   const greetingHtml = replaceVarsHtml(content.greeting, vars);
@@ -283,10 +241,11 @@ export function renderTemplate(params: RenderTemplateParams): RenderedTemplate {
 
   const { html: stepsHtml, text: stepsText } = renderSteps(content.steps, vars);
 
-  const prelaunchHtml =
-    prelaunchEnabled ? renderPrelaunchBlockHtml(prelaunch, vars) : "";
-  const prelaunchText =
-    prelaunchEnabled ? renderPrelaunchBlockText(prelaunch, vars) : "";
+  const noteTrimmed =
+    typeof content.note === "string" ? content.note.trim() : "";
+  const hasNote = noteTrimmed.length > 0;
+  const noteHtml = hasNote ? renderNoteBlockHtml(content.note, vars) : "";
+  const noteText = hasNote ? renderNoteBlockText(content.note, vars) : "";
 
   const stepsSectionHtml =
     stepsHtml.length > 0 ?
@@ -309,7 +268,7 @@ export function renderTemplate(params: RenderTemplateParams): RenderedTemplate {
                   <p style="margin:0 0 12px;">${greetingHtml}</p>
                   <p style="margin:0 0 12px;">${introHtml}</p>
                   ${stepsSectionHtml}
-                  ${prelaunchHtml}
+                  ${noteHtml}
                   <p style="margin:0;">${signatureHtml}</p>
                 </td>
               </tr>
@@ -328,8 +287,8 @@ export function renderTemplate(params: RenderTemplateParams): RenderedTemplate {
   if (stepsText.length > 0) {
     textLines.push("", stepsText);
   }
-  if (prelaunchText.length > 0) {
-    textLines.push("", prelaunchText);
+  if (noteText.length > 0) {
+    textLines.push("", noteText);
   }
   textLines.push(
     "",

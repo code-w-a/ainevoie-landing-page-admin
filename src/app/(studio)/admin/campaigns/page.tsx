@@ -956,6 +956,13 @@ export default function CampaignsPage() {
         closeCreateDialogs();
         resetCreateForm();
         setActiveTab("list");
+        setSearch("");
+        setStatusFilter("all");
+        setSortBy("createdAt");
+        setSortDir("desc");
+        setPageIndex(0);
+        setCursors([null]);
+        setSelectedIds(new Set());
         reload();
       }
     } catch (error) {

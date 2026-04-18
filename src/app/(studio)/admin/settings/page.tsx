@@ -17,9 +17,7 @@ import { adminFetch } from "@/components/admin/adminApi";
 import { AdminFormGridSkeleton } from "@/components/admin/AdminSkeletonLayouts";
 import { EmailTemplateEditor } from "@/components/admin/EmailTemplateEditor";
 import {
-  EMAIL_TEMPLATE_LOCALES,
   EmailTemplateConfig,
-  PrelaunchContent,
   TemplateContent,
   getDefaultEmailTemplateConfig,
 } from "@/lib/emailTemplates/adminEmailTemplates";
@@ -35,15 +33,9 @@ type TopTab = (typeof TOP_TABS)[keyof typeof TOP_TABS];
 const TEMPLATE_TABS = {
   welcome: "welcome",
   approved: "approved",
-  prelaunch: "prelaunch",
 } as const;
 
 type TemplateTab = (typeof TEMPLATE_TABS)[keyof typeof TEMPLATE_TABS];
-
-const PRELAUNCH_LOCALE_LABELS: Record<AppLocale, string> = {
-  ro: "Română",
-  en: "Engleză",
-};
 
 function tabTriggerClass(active: boolean): string {
   const base =
@@ -127,7 +119,6 @@ export default function SettingsPage() {
   const [templateTab, setTemplateTab] = useState<TemplateTab>(
     TEMPLATE_TABS.welcome
   );
-  const [prelaunchLocale, setPrelaunchLocale] = useState<AppLocale>("ro");
 
   useEffect(() => {
     if (templatesData?.item) {
@@ -143,36 +134,6 @@ export default function SettingsPage() {
     setTemplatesSaveOk(false);
   }
 
-  function updatePrelaunchLocale(
-    locale: AppLocale,
-    patch: Partial<PrelaunchContent>
-  ) {
-    setConfig((prev) => ({
-      ...prev,
-      prelaunch: {
-        ...prev.prelaunch,
-        [locale]: { ...prev.prelaunch[locale], ...patch },
-      },
-    }));
-    setTemplatesSaveOk(false);
-  }
-
-  function setPrelaunchEnabled(enabled: boolean) {
-    setConfig((prev) => ({ ...prev, prelaunchEnabled: enabled }));
-    setTemplatesSaveOk(false);
-  }
-
-  function resetPrelaunchLocale(locale: AppLocale) {
-    setConfig((prev) => ({
-      ...prev,
-      prelaunch: {
-        ...prev.prelaunch,
-        [locale]: { ...defaults.prelaunch[locale] },
-      },
-    }));
-    setTemplatesSaveOk(false);
-  }
-
   async function saveTemplates() {
     setTemplatesSaving(true);
     setTemplatesSaveError(null);
@@ -181,8 +142,6 @@ export default function SettingsPage() {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          prelaunchEnabled: config.prelaunchEnabled,
-          prelaunch: config.prelaunch,
           providerWelcome: config.providerWelcome,
           providerApproved: config.providerApproved,
         }),
@@ -350,8 +309,8 @@ export default function SettingsPage() {
             <CardHeader>
               <CardTitle>Template-uri email generale</CardTitle>
               <CardDescription>
-                Editează subiect, salut, pași și semnătură pentru emailurile
-                trimise automat prestatorilor.
+                Editează subiect, salut, pași, mesajul special și semnătura
+                pentru emailurile trimise automat prestatorilor.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -384,14 +343,6 @@ export default function SettingsPage() {
                     >
                       Aprobare prestator
                     </TabTrigger>
-                    <TabTrigger
-                      value={TEMPLATE_TABS.prelaunch}
-                      className={tabTriggerClass(
-                        templateTab === TEMPLATE_TABS.prelaunch
-                      )}
-                    >
-                      Bloc prelaunch
-                    </TabTrigger>
                   </TabList>
 
                   <TabContent value={TEMPLATE_TABS.welcome} className="mt-6">
@@ -399,8 +350,6 @@ export default function SettingsPage() {
                       kind="providerWelcome"
                       content={config.providerWelcome}
                       defaults={defaults.providerWelcome}
-                      prelaunch={config.prelaunch}
-                      prelaunchEnabled={config.prelaunchEnabled}
                       onChange={(next) => updateKind("providerWelcome", next)}
                     />
                   </TabContent>
@@ -410,101 +359,8 @@ export default function SettingsPage() {
                       kind="providerApproved"
                       content={config.providerApproved}
                       defaults={defaults.providerApproved}
-                      prelaunch={config.prelaunch}
-                      prelaunchEnabled={config.prelaunchEnabled}
                       onChange={(next) => updateKind("providerApproved", next)}
                     />
-                  </TabContent>
-
-                  <TabContent
-                    value={TEMPLATE_TABS.prelaunch}
-                    className="mt-6 space-y-4"
-                  >
-                    <label className="flex items-center gap-3 text-sm">
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4 rounded border-input"
-                        checked={config.prelaunchEnabled}
-                        onChange={(event) =>
-                          setPrelaunchEnabled(event.target.checked)
-                        }
-                      />
-                      <span className="font-medium">
-                        Include blocul prelaunch (aplicație mobilă) în mailuri
-                      </span>
-                    </label>
-                    <p className="text-xs text-muted-foreground">
-                      Când este bifat, blocul apare atât în mailul de welcome,
-                      cât și în cel de aprobare.
-                    </p>
-
-                    <Tabs
-                      value={prelaunchLocale}
-                      onValueChange={(value) =>
-                        setPrelaunchLocale(value as AppLocale)
-                      }
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <TabList className="flex gap-2">
-                          {EMAIL_TEMPLATE_LOCALES.map((locale) => (
-                            <TabTrigger
-                              key={locale}
-                              value={locale}
-                              className={tabTriggerClass(
-                                prelaunchLocale === locale
-                              )}
-                            >
-                              {PRELAUNCH_LOCALE_LABELS[locale]}
-                            </TabTrigger>
-                          ))}
-                        </TabList>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => resetPrelaunchLocale(prelaunchLocale)}
-                        >
-                          Resetează {PRELAUNCH_LOCALE_LABELS[prelaunchLocale]}{" "}
-                          la default
-                        </Button>
-                      </div>
-
-                      {EMAIL_TEMPLATE_LOCALES.map((locale) => (
-                        <TabContent
-                          key={locale}
-                          value={locale}
-                          className="mt-4 space-y-3"
-                        >
-                          <div className="space-y-2">
-                            <label className="text-sm font-medium">
-                              Titlu
-                            </label>
-                            <Input
-                              value={config.prelaunch[locale].heading}
-                              onChange={(event) =>
-                                updatePrelaunchLocale(locale, {
-                                  heading: event.target.value,
-                                })
-                              }
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <label className="text-sm font-medium">
-                              Paragraf
-                            </label>
-                            <textarea
-                              className="min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                              value={config.prelaunch[locale].body}
-                              onChange={(event) =>
-                                updatePrelaunchLocale(locale, {
-                                  body: event.target.value,
-                                })
-                              }
-                            />
-                          </div>
-                        </TabContent>
-                      ))}
-                    </Tabs>
                   </TabContent>
                 </Tabs>
               )}

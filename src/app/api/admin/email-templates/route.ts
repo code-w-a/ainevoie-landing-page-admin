@@ -19,9 +19,8 @@ const MAX_GREETING = 500;
 const MAX_INTRO = 2000;
 const MAX_STEP = 500;
 const MAX_STEPS = 10;
+const MAX_NOTE = 2000;
 const MAX_SIGNATURE = 500;
-const MAX_PRELAUNCH_HEADING = 200;
-const MAX_PRELAUNCH_BODY = 2000;
 
 function trimOrEmpty(value: unknown, maxLen: number): string {
   if (typeof value !== "string") return "";
@@ -42,16 +41,8 @@ function sanitizeTemplateContent(raw: unknown) {
     greeting: trimOrEmpty(data.greeting, MAX_GREETING),
     intro: trimOrEmpty(data.intro, MAX_INTRO),
     steps,
+    note: trimOrEmpty(data.note, MAX_NOTE),
     signature: trimOrEmpty(data.signature, MAX_SIGNATURE),
-  };
-}
-
-function sanitizePrelaunchContent(raw: unknown) {
-  if (!raw || typeof raw !== "object") return null;
-  const data = raw as Record<string, unknown>;
-  return {
-    heading: trimOrEmpty(data.heading, MAX_PRELAUNCH_HEADING),
-    body: trimOrEmpty(data.body, MAX_PRELAUNCH_BODY),
   };
 }
 
@@ -66,30 +57,10 @@ function sanitizeTemplateLocales(raw: unknown) {
   return result;
 }
 
-function sanitizePrelaunchLocales(raw: unknown) {
-  if (!raw || typeof raw !== "object") return {};
-  const data = raw as Record<string, unknown>;
-  const result: Record<string, unknown> = {};
-  for (const locale of EMAIL_TEMPLATE_LOCALES) {
-    const content = sanitizePrelaunchContent(data[locale]);
-    if (content) result[locale] = content;
-  }
-  return result;
-}
-
 function sanitizePayload(raw: unknown) {
   const data =
     raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   const payload: Record<string, unknown> = {};
-
-  if (typeof data.prelaunchEnabled === "boolean") {
-    payload.prelaunchEnabled = data.prelaunchEnabled;
-  }
-
-  const prelaunch = sanitizePrelaunchLocales(data.prelaunch);
-  if (Object.keys(prelaunch).length > 0) {
-    payload.prelaunch = prelaunch;
-  }
 
   for (const kind of EMAIL_TEMPLATE_KINDS) {
     const locales = sanitizeTemplateLocales(data[kind]);

@@ -9,9 +9,6 @@ import {
 describe("mergeEmailTemplateConfig", () => {
   it("falls back to defaults for an empty config", () => {
     const merged = mergeEmailTemplateConfig({});
-    expect(merged.prelaunchEnabled).toBe(
-      EMAIL_TEMPLATE_DEFAULTS.prelaunchEnabled
-    );
     expect(merged.providerWelcome.ro.subject).toBe(
       EMAIL_TEMPLATE_DEFAULTS.providerWelcome.ro.subject
     );
@@ -20,9 +17,13 @@ describe("mergeEmailTemplateConfig", () => {
     );
   });
 
-  it("keeps explicit false for prelaunchEnabled toggle", () => {
-    const merged = mergeEmailTemplateConfig({ prelaunchEnabled: false });
-    expect(merged.prelaunchEnabled).toBe(false);
+  it("ignores legacy prelaunch fields on the doc", () => {
+    const merged = mergeEmailTemplateConfig({
+      prelaunchEnabled: true,
+      prelaunch: { ro: { heading: "h", body: "b" } },
+    });
+    expect(merged).not.toHaveProperty("prelaunchEnabled");
+    expect(merged).not.toHaveProperty("prelaunch");
   });
 
   it("falls back field-by-field to defaults when partial", () => {
@@ -46,6 +47,15 @@ describe("mergeEmailTemplateConfig", () => {
       },
     });
     expect(merged.providerApproved.ro.steps).toEqual(["pas valid"]);
+  });
+
+  it("preserves an explicit empty note without falling back", () => {
+    const merged = mergeEmailTemplateConfig({
+      providerWelcome: {
+        ro: { note: "" },
+      },
+    });
+    expect(merged.providerWelcome.ro.note).toBe("");
   });
 });
 
@@ -80,36 +90,66 @@ describe("renderTemplate", () => {
     expect(rendered.html).toContain("&quot;x&quot;");
   });
 
-  it("omits the prelaunch block when disabled", () => {
-    const config = getDefaultEmailTemplateConfig();
-    config.prelaunchEnabled = false;
+  it("omits the note block when note is empty or whitespace", () => {
+    const config: typeof baseConfig = {
+      providerWelcome: {
+        ...baseConfig.providerWelcome,
+        ro: { ...baseConfig.providerWelcome.ro, note: "   " },
+      },
+      providerApproved: baseConfig.providerApproved,
+    };
     const rendered = renderTemplate({
-      kind: "providerApproved",
+      kind: "providerWelcome",
       locale: "ro",
       config,
       vars: { fullName: "Test", email: "t@example.com" },
     });
-    expect(rendered.html).not.toContain(
-      EMAIL_TEMPLATE_DEFAULTS.prelaunch.ro.heading
-    );
-    expect(rendered.text).not.toContain(
-      EMAIL_TEMPLATE_DEFAULTS.prelaunch.ro.heading
-    );
+    expect(rendered.html).not.toContain("border-left:3px solid #d35400");
+    expect(rendered.text.replace(baseConfig.providerWelcome.ro.signature, "")).not.toContain("AInevoie");
   });
 
-  it("includes the prelaunch block when enabled", () => {
+  it("includes the note block when note is filled and replaces placeholders", () => {
+    const config: typeof baseConfig = {
+      providerWelcome: {
+        ...baseConfig.providerWelcome,
+        ro: {
+          ...baseConfig.providerWelcome.ro,
+          note: "Salut {{fullName}}, scrie la {{email}}.",
+        },
+      },
+      providerApproved: baseConfig.providerApproved,
+    };
     const rendered = renderTemplate({
-      kind: "providerApproved",
+      kind: "providerWelcome",
       locale: "ro",
-      config: baseConfig,
-      vars: { fullName: "Test", email: "t@example.com" },
+      config,
+      vars: { fullName: "Ana", email: "ana@example.com" },
     });
-    expect(rendered.html).toContain(
-      EMAIL_TEMPLATE_DEFAULTS.prelaunch.ro.heading
-    );
-    expect(rendered.text).toContain(
-      EMAIL_TEMPLATE_DEFAULTS.prelaunch.ro.heading
-    );
+    expect(rendered.html).toContain("Salut Ana");
+    expect(rendered.html).toContain("ana@example.com");
+    expect(rendered.text).toContain("Salut Ana, scrie la ana@example.com.");
+    expect(rendered.html).toContain("border-left:3px solid #d35400");
+  });
+
+  it("HTML-escapes the note content", () => {
+    const config: typeof baseConfig = {
+      providerWelcome: {
+        ...baseConfig.providerWelcome,
+        ro: {
+          ...baseConfig.providerWelcome.ro,
+          note: "<script>alert(1)</script>",
+        },
+      },
+      providerApproved: baseConfig.providerApproved,
+    };
+    const rendered = renderTemplate({
+      kind: "providerWelcome",
+      locale: "ro",
+      config,
+      vars: { fullName: "x", email: "x@example.com" },
+    });
+    expect(rendered.html).not.toContain("<script>alert(1)");
+    expect(rendered.html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
   });
 
   it("falls back to Romanian rendering when locale is unknown", () => {

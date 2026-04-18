@@ -6,7 +6,6 @@ import {
   EMAIL_TEMPLATE_LOCALES,
   EmailTemplateConfig,
   EmailTemplateKind,
-  PrelaunchContent,
   TemplateContent,
   renderTemplate,
 } from "@/lib/emailTemplates/adminEmailTemplates";
@@ -29,8 +28,6 @@ type EmailTemplateEditorProps = {
   kind: EmailTemplateKind;
   content: Record<AppLocale, TemplateContent>;
   defaults: Record<AppLocale, TemplateContent>;
-  prelaunch: Record<AppLocale, PrelaunchContent>;
-  prelaunchEnabled: boolean;
   onChange: (next: Record<AppLocale, TemplateContent>) => void;
 };
 
@@ -46,8 +43,6 @@ export function EmailTemplateEditor({
   kind,
   content,
   defaults,
-  prelaunch,
-  prelaunchEnabled,
   onChange,
 }: EmailTemplateEditorProps) {
   const [activeLocale, setActiveLocale] = useState<AppLocale>("ro");
@@ -90,8 +85,6 @@ export function EmailTemplateEditor({
 
   const previewConfig = useMemo<EmailTemplateConfig>(
     () => ({
-      prelaunchEnabled,
-      prelaunch,
       providerWelcome:
         kind === "providerWelcome"
           ? content
@@ -100,10 +93,8 @@ export function EmailTemplateEditor({
         kind === "providerApproved"
           ? content
           : ({} as Record<AppLocale, TemplateContent>),
-      // Only the edited kind is inspected by renderTemplate below; the other
-      // kind slot is unused at render time.
     }),
-    [kind, content, prelaunch, prelaunchEnabled]
+    [kind, content]
   );
 
   const previewHtml = useMemo(() => {
@@ -241,6 +232,23 @@ export function EmailTemplateEditor({
                 </div>
 
                 <div className="space-y-2">
+                  <label className="text-sm font-medium">
+                    Mesaj special (opțional)
+                  </label>
+                  <textarea
+                    className="min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    value={content[locale].note}
+                    onChange={(event) =>
+                      updateLocale(locale, { note: event.target.value })
+                    }
+                    placeholder="ex.: Suntem în prelaunch, aplicația mobilă va fi disponibilă în curând."
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Dacă e gol, blocul nu apare în email. {PLACEHOLDER_HINT}
+                  </p>
+                </div>
+
+                <div className="space-y-2">
                   <label className="text-sm font-medium">Semnătură</label>
                   <textarea
                     className="min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
@@ -274,11 +282,6 @@ export function EmailTemplateEditor({
                     sandbox=""
                   />
                 </div>
-                {!prelaunchEnabled && (
-                  <p className="text-xs text-muted-foreground">
-                    Blocul prelaunch este dezactivat (vezi tab-ul Prelaunch).
-                  </p>
-                )}
               </div>
             </div>
           </TabContent>
