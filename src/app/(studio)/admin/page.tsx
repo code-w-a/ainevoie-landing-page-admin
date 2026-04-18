@@ -26,7 +26,11 @@ import {
   AdminStatCardsSkeleton,
   AdminTableSkeleton,
 } from "@/components/admin/AdminSkeletonLayouts";
-import { campaignStatusLabel, logLevelLabel } from "@/lib/adminLabels";
+import {
+  adminCommonLabels,
+  campaignStatusLabel,
+  logLevelLabel,
+} from "@/lib/adminLabels";
 import { formatAdminDateTime } from "@/lib/formatAdminDateTime";
 
 type OverviewResponse = {
@@ -214,8 +218,11 @@ export default function AdminOverviewPage() {
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium">
                         {log.campaignId ?
-                          campaignNameById.get(log.campaignId) || log.campaignId
-                        : "General"}
+                          (typeof log.campaignName === "string" &&
+                            log.campaignName.trim()) ||
+                          campaignNameById.get(log.campaignId) ||
+                          adminCommonLabels.deletedCampaign
+                        : adminCommonLabels.generalLog}
                       </span>
                       <Badge variant={log.level === "error" ? "danger" : "secondary"}>
                         {logLevelLabel(log.level)}

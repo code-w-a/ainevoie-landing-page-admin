@@ -206,6 +206,10 @@ export const newsletterSendTask = onTaskDispatched(
     }
 
     const campaign = campaignSnap.data() || {};
+    const campaignName =
+      (typeof campaign.subject === "string" && campaign.subject.trim()) ||
+      (typeof campaign.name === "string" && campaign.name.trim()) ||
+      null;
     if (campaign.status && !["queued", "sending"].includes(String(campaign.status))) {
       await jobRef.update({
         status: "skipped",
@@ -264,6 +268,7 @@ export const newsletterSendTask = onTaskDispatched(
       await maybeCompleteCampaign(campaignRef);
       await logNewsletterEvent(db, {
         campaignId,
+        campaignName,
         email: typeof jobData.email === "string" ? normalizeEmail(jobData.email) : undefined,
         level: "info",
         message: "Abonat neeligibil, job ignorat.",
@@ -289,6 +294,7 @@ export const newsletterSendTask = onTaskDispatched(
       await maybeCompleteCampaign(campaignRef);
       await logNewsletterEvent(db, {
         campaignId,
+        campaignName,
         level: "error",
         message: "Job fără email valid.",
       });
@@ -342,6 +348,7 @@ export const newsletterSendTask = onTaskDispatched(
 
       await logNewsletterEvent(db, {
         campaignId,
+        campaignName,
         email,
         level: "info",
         message: "Email trimis cu succes.",
@@ -370,6 +377,7 @@ export const newsletterSendTask = onTaskDispatched(
 
         await logNewsletterEvent(db, {
           campaignId,
+          campaignName,
           email,
           level: "warning",
           message: `Trimitere eșuată temporar, retry programat: ${classified.message}`,
@@ -417,6 +425,7 @@ export const newsletterSendTask = onTaskDispatched(
 
       await logNewsletterEvent(db, {
         campaignId,
+        campaignName,
         email,
         level: "error",
         message: `Trimitere eșuată definitiv: ${classified.message}`,

@@ -149,6 +149,7 @@ export const createNewsletterCampaign = onCall(
 
     await logNewsletterEvent(db, {
       campaignId,
+      campaignName: subject,
       level: "info",
       message: "Campanie creată ca draft.",
     });

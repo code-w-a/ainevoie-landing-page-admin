@@ -31,8 +31,64 @@ export async function GET(request: Request) {
       db.collection("newsletter_logs").orderBy("createdAt", "desc").limit(5).get(),
     ]);
 
-    const campaigns = campaignSnap.docs.map(serializeDoc).filter(Boolean);
-    const logs = logSnap.docs.map(serializeDoc).filter(Boolean);
+    const campaigns = campaignSnap.docs.map(serializeDoc).filter(Boolean) as Array<
+      Record<string, unknown>
+    >;
+    const logs = logSnap.docs.map(serializeDoc).filter(Boolean) as Array<
+      Record<string, unknown>
+    >;
+
+    const campaignNameById = new Map<string, string>();
+    for (const campaign of campaigns) {
+      const id = typeof campaign.id === "string" ? (campaign.id as string) : "";
+      const name =
+        (typeof campaign.subject === "string" && (campaign.subject as string).trim()) ||
+        (typeof campaign.name === "string" && (campaign.name as string).trim()) ||
+        "";
+      if (id && name) campaignNameById.set(id, name);
+    }
+
+    const missingIds = Array.from(
+      new Set(
+        logs
+          .filter(
+            (log) =>
+              typeof log.campaignId === "string" &&
+              (log.campaignId as string).length > 0 &&
+              !(typeof log.campaignName === "string" && (log.campaignName as string).trim()) &&
+              !campaignNameById.has(log.campaignId as string)
+          )
+          .map((log) => log.campaignId as string)
+      )
+    );
+
+    if (missingIds.length > 0) {
+      const refs = missingIds.map((id) =>
+        db.collection("newsletter_campaigns").doc(id)
+      );
+      const docs = await db.getAll(...refs);
+      for (const doc of docs) {
+        if (!doc.exists) continue;
+        const data = doc.data() || {};
+        const name =
+          (typeof data.subject === "string" && data.subject.trim()) ||
+          (typeof data.name === "string" && data.name.trim()) ||
+          "";
+        if (name) campaignNameById.set(doc.id, name);
+      }
+    }
+
+    for (const log of logs) {
+      if (
+        typeof log.campaignId === "string" &&
+        !(typeof log.campaignName === "string" && (log.campaignName as string).trim())
+      ) {
+        const resolved = campaignNameById.get(log.campaignId as string);
+        if (resolved) {
+          log.campaignName = resolved;
+        }
+      }
+    }
 
     return NextResponse.json({
       stats: {

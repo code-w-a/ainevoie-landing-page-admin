@@ -70,6 +70,8 @@ export function campaignJobStatusLabel(status?: string | null): string {
 }
 
 export const adminCommonLabels = {
+  deletedCampaign: "Campanie ștearsă",
+  generalLog: "General",
   search: "Căutare",
   page: "Pagina",
   previous: "Anterior",

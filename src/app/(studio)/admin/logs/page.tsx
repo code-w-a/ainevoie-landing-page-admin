@@ -86,20 +86,37 @@ export default function LogsPage() {
     setCursors([null]);
   }, [pageSize, sortBy, sortDir, levelFilter]);
 
+  const resolveCampaignLabel = (log: any): string => {
+    if (typeof log?.campaignName === "string" && log.campaignName.trim()) {
+      return log.campaignName.trim();
+    }
+    if (typeof log?.campaignId === "string" && log.campaignId) {
+      return (
+        campaignNameById.get(log.campaignId) || adminCommonLabels.deletedCampaign
+      );
+    }
+    return "-";
+  };
+
   const filteredLogs = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
     if (!normalizedSearch) return logs;
     return logs.filter((log) => {
       const message = (log.message || "").toLowerCase();
       const campaign = (log.campaignId || "").toLowerCase();
-      const campaignName =
+      const persistedName =
+        typeof log.campaignName === "string" ?
+          log.campaignName.toLowerCase()
+        : "";
+      const liveName =
         typeof log.campaignId === "string" ?
           (campaignNameById.get(log.campaignId) || "").toLowerCase()
         : "";
       return (
         message.includes(normalizedSearch) ||
         campaign.includes(normalizedSearch) ||
-        campaignName.includes(normalizedSearch)
+        persistedName.includes(normalizedSearch) ||
+        liveName.includes(normalizedSearch)
       );
     });
   }, [logs, search, campaignNameById]);
@@ -180,11 +197,7 @@ export default function LogsPage() {
                     <TableCell className="max-w-[360px] truncate">
                       {log.message}
                     </TableCell>
-                    <TableCell>
-                      {log.campaignId ?
-                        campaignNameById.get(log.campaignId) || log.campaignId
-                      : "-"}
-                    </TableCell>
+                    <TableCell>{resolveCampaignLabel(log)}</TableCell>
                     <TableCell>
                       {formatAdminDateTime(log.createdAt, { includeSeconds: true })}
                     </TableCell>

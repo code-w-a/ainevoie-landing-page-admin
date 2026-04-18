@@ -69,6 +69,10 @@ export async function dispatchCampaignJobs(
   }
 
   const campaignData = campaignSnap.data() || {};
+  const campaignName =
+    (typeof campaignData.subject === "string" && campaignData.subject.trim()) ||
+    (typeof campaignData.name === "string" && campaignData.name.trim()) ||
+    null;
   const settings = await getNewsletterSettings(db);
   const rawSendConfig = readObject(options.sendConfig);
 
@@ -122,6 +126,7 @@ export async function dispatchCampaignJobs(
       skipped += 1;
       await logNewsletterEvent(db, {
         campaignId: options.campaignId,
+        campaignName,
         level: "info",
         email: typeof subscriberData.email === "string" ?
           normalizeEmail(subscriberData.email) :
@@ -138,6 +143,7 @@ export async function dispatchCampaignJobs(
       skipped += 1;
       await logNewsletterEvent(db, {
         campaignId: options.campaignId,
+        campaignName,
         level: "error",
         message: `Email invalid pentru abonatul ${subscriberDoc.id}.`,
       });
@@ -181,6 +187,7 @@ export async function dispatchCampaignJobs(
 
       await logNewsletterEvent(db, {
         campaignId: options.campaignId,
+        campaignName,
         email,
         level: duplicate ? "info" : "error",
         message: duplicate ?
@@ -227,6 +234,7 @@ export async function dispatchCampaignJobs(
 
   await logNewsletterEvent(db, {
     campaignId: options.campaignId,
+    campaignName,
     level: "info",
     message: `Dispatch inițiat. total=${total}, queued=${queued}, skipped=${skipped}`,
   });

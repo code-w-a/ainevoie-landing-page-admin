@@ -20,10 +20,8 @@ import {
   normalizeRomaniaLocationCode,
   normalizeRomaniaLocationName,
 } from "@/lib/romaniaLocations";
-import {
-  getProviderWelcomeEmailSubject,
-  getProviderWelcomeTemplate,
-} from "@/lib/emailTemplates/providerWelcome";
+import { renderTemplate } from "@/lib/emailTemplates/adminEmailTemplates";
+import { getEmailTemplateConfig } from "@/lib/emailTemplates/adminEmailTemplatesServer";
 import type {
   ProviderLegalStatus,
   ProviderNewsletterStatusAtSignup,
@@ -71,12 +69,18 @@ async function sendWelcomeEmail(
   locale: AppLocale
 ): Promise<WelcomeEmailResult> {
   try {
-    const template = getProviderWelcomeTemplate({ fullName, locale });
+    const config = await getEmailTemplateConfig();
+    const rendered = renderTemplate({
+      kind: "providerWelcome",
+      locale,
+      config,
+      vars: { fullName, email },
+    });
     await sendEmail({
       to: email,
-      subject: getProviderWelcomeEmailSubject(locale),
-      html: template.html,
-      text: template.text,
+      subject: rendered.subject,
+      html: rendered.html,
+      text: rendered.text,
     });
     return { sent: true };
   } catch (error) {

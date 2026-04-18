@@ -50,6 +50,7 @@ export const sendNewsletterCampaignNow = onCall(
     let filters: Record<string, unknown> = {};
     let sendConfig: Record<string, unknown> = {};
     let scheduledTaskId = "";
+    let campaignName: string | null = null;
 
     await db.runTransaction(async (tx) => {
       const campaignSnap = await tx.get(campaignRef);
@@ -74,6 +75,10 @@ export const sendNewsletterCampaignNow = onCall(
       scheduledTaskId = typeof campaignData.scheduleTaskId === "string" ?
         campaignData.scheduleTaskId :
         "";
+      campaignName =
+        (typeof campaignData.subject === "string" && campaignData.subject.trim()) ||
+        (typeof campaignData.name === "string" && campaignData.name.trim()) ||
+        null;
 
       tx.update(campaignRef, {
         status: "queued",
@@ -100,6 +105,7 @@ export const sendNewsletterCampaignNow = onCall(
 
     await logNewsletterEvent(db, {
       campaignId,
+      campaignName,
       level: "info",
       message: "Trimitere imediată inițiată de admin.",
     });

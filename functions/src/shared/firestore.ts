@@ -144,17 +144,51 @@ export async function getSubscriberByToken(
   return snapshot.docs[0];
 }
 
+const CAMPAIGN_NAME_CACHE = new Map<string, { name: string | null; at: number }>();
+const CAMPAIGN_NAME_CACHE_MS = 60_000;
+
+async function getCampaignDisplayName(
+  db: Firestore,
+  campaignId: string
+): Promise<string | null> {
+  const now = Date.now();
+  const cached = CAMPAIGN_NAME_CACHE.get(campaignId);
+  if (cached && now - cached.at < CAMPAIGN_NAME_CACHE_MS) {
+    return cached.name;
+  }
+  try {
+    const snap = await db.collection("newsletter_campaigns").doc(campaignId).get();
+    const data = snap.exists ? snap.data() || {} : {};
+    const name = readString(data.subject) || readString(data.name) || null;
+    CAMPAIGN_NAME_CACHE.set(campaignId, { name: name ?? null, at: now });
+    return name ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function logNewsletterEvent(
   db: Firestore,
   payload: {
     campaignId?: string;
+    campaignName?: string | null;
     email?: string;
     level: NewsletterLogLevel;
     message: string;
   }
 ): Promise<void> {
+  let campaignName =
+    typeof payload.campaignName === "string" && payload.campaignName.trim() ?
+      payload.campaignName.trim()
+    : null;
+
+  if (!campaignName && payload.campaignId) {
+    campaignName = await getCampaignDisplayName(db, payload.campaignId);
+  }
+
   await db.collection("newsletter_logs").add({
     campaignId: payload.campaignId ?? null,
+    campaignName: campaignName ?? null,
     email: payload.email ?? null,
     level: payload.level,
     message: payload.message,

@@ -53,7 +53,51 @@ export async function GET(request: Request) {
 
     const snapshot = await query.get();
 
-    const items = snapshot.docs.map(serializeDoc).filter(Boolean);
+    const items = snapshot.docs.map(serializeDoc).filter(Boolean) as Array<
+      Record<string, unknown>
+    >;
+
+    const idsToResolve = Array.from(
+      new Set(
+        items
+          .filter(
+            (item) =>
+              typeof item.campaignId === "string" &&
+              (item.campaignId as string).length > 0 &&
+              !(typeof item.campaignName === "string" && (item.campaignName as string).trim())
+          )
+          .map((item) => item.campaignId as string)
+      )
+    );
+
+    if (idsToResolve.length > 0) {
+      const refs = idsToResolve.map((id) =>
+        db.collection("newsletter_campaigns").doc(id)
+      );
+      const docs = await db.getAll(...refs);
+      const nameById = new Map<string, string>();
+      for (const doc of docs) {
+        if (!doc.exists) continue;
+        const data = doc.data() || {};
+        const name =
+          (typeof data.subject === "string" && data.subject.trim()) ||
+          (typeof data.name === "string" && data.name.trim()) ||
+          "";
+        if (name) nameById.set(doc.id, name);
+      }
+      for (const item of items) {
+        if (
+          typeof item.campaignId === "string" &&
+          !(typeof item.campaignName === "string" && (item.campaignName as string).trim())
+        ) {
+          const resolved = nameById.get(item.campaignId as string);
+          if (resolved) {
+            item.campaignName = resolved;
+          }
+        }
+      }
+    }
+
     const lastDoc = snapshot.docs[snapshot.docs.length - 1];
     const nextCursor = lastDoc ? serializeCursor(lastDoc.get(sortField)) : null;
 

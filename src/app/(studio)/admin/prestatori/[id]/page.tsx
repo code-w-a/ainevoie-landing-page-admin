@@ -57,9 +57,21 @@ type ProviderEvent = {
   fromStatus?: string | null;
   toStatus?: string | null;
   actorUid?: string;
+  actorLabel?: string | null;
   note?: string | null;
   createdAt?: string;
 };
+
+function formatActor(event: ProviderEvent): string {
+  if (typeof event.actorLabel === "string" && event.actorLabel.trim()) {
+    return event.actorLabel.trim();
+  }
+  const uid = event.actorUid;
+  if (!uid) return "necunoscut";
+  if (uid === "system_onboarding") return "Sistem (onboarding public)";
+  if (uid === "system") return "Sistem";
+  return `Utilizator ${uid.slice(0, 6)}…`;
+}
 
 function getStatusMeta(status?: string | null) {
   switch (status) {
@@ -427,7 +439,9 @@ export default function ProviderDetailPage() {
                   </div>
                   <p className="text-xs text-muted-foreground">
                     {formatAdminDateTime(event.createdAt)} • actor:{" "}
-                    {event.actorUid || "necunoscut"}
+                    <span title={event.actorUid || undefined}>
+                      {formatActor(event)}
+                    </span>
                   </p>
                   {event.note && <p className="mt-2 text-sm">{event.note}</p>}
                 </div>
