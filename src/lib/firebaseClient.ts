@@ -1,5 +1,7 @@
 import { getApps, initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
+import { getFunctions } from "firebase/functions";
+import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -15,8 +17,16 @@ export function getFirebaseApp() {
     initializeApp(firebaseConfig);
   }
   return getApps()[0];
-  }
+}
 
 export function getFirebaseAuth() {
   return getAuth(getFirebaseApp());
+}
+
+export function getFirebaseStorage() {
+  return getStorage(getFirebaseApp());
+}
+
+export function getFirebaseFunctions() {
+  return getFunctions(getFirebaseApp(), process.env.NEXT_PUBLIC_FIREBASE_REGION || "europe-west1");
 }

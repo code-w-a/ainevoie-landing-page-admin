@@ -11,8 +11,11 @@ import {
 
 describe("provider helpers", () => {
   it("validates canonical provider statuses", () => {
-    expect(isProviderStatus("new")).toBe(true);
+    expect(isProviderStatus("pre_registered")).toBe(true);
+    expect(isProviderStatus("pending_review")).toBe(true);
     expect(isProviderStatus("approved")).toBe(true);
+    expect(isProviderStatus("suspended")).toBe(true);
+    expect(isProviderStatus("new")).toBe(false);
     expect(isProviderStatus("archived")).toBe(false);
   });
 
@@ -23,7 +26,7 @@ describe("provider helpers", () => {
   });
 
   it("matches city and service options case-insensitively", () => {
-    expect(isProviderCityOption(" bucuresti ")).toBe(true);
+    expect(isProviderCityOption(" sector 6 ")).toBe(true);
     expect(isProviderCityOption("Oradea")).toBe(true);
     expect(isProviderServiceOption(" curatenie birouri ")).toBe(true);
     expect(isProviderCityOption("Atlantis")).toBe(false);
@@ -33,6 +36,8 @@ describe("provider helpers", () => {
   it("maps provider statuses to badge variants", () => {
     expect(providerStatusVariant("approved")).toBe("success");
     expect(providerStatusVariant("rejected")).toBe("danger");
+    expect(providerStatusVariant("suspended")).toBe("danger");
+    expect(providerStatusVariant("pending_review")).toBe("warning");
     expect(providerStatusVariant("in_review")).toBe("warning");
     expect(providerStatusVariant("new")).toBe("outline");
   });

@@ -25,22 +25,40 @@ describe("Romania locations dataset", () => {
     ).toBe(true);
   });
 
-  it("returns București for county code B", () => {
-    expect(getCitiesByCounty("B")).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          cityCode: "179132",
-          cityName: "București",
-        }),
-      ])
-    );
+  it("returns București sectors for county code B", () => {
+    expect(getCitiesByCounty("B")).toEqual([
+      expect.objectContaining({
+        cityCode: "179141",
+        cityName: "Sector 1",
+      }),
+      expect.objectContaining({
+        cityCode: "179150",
+        cityName: "Sector 2",
+      }),
+      expect.objectContaining({
+        cityCode: "179169",
+        cityName: "Sector 3",
+      }),
+      expect.objectContaining({
+        cityCode: "179178",
+        cityName: "Sector 4",
+      }),
+      expect.objectContaining({
+        cityCode: "179187",
+        cityName: "Sector 5",
+      }),
+      expect.objectContaining({
+        cityCode: "179196",
+        cityName: "Sector 6",
+      }),
+    ]);
   });
 
   it("does not accept a city under the wrong county", () => {
-    const bucuresti = findRomaniaCity("B", "179132");
+    const sector = findRomaniaCity("B", "179196");
 
-    expect(bucuresti?.cityName).toBe("București");
-    expect(isRomaniaCityForCounty("CJ", "179132")).toBe(false);
+    expect(sector?.cityName).toBe("Sector 6");
+    expect(isRomaniaCityForCounty("CJ", "179196")).toBe(false);
   });
 
   it("validates county codes case-insensitively", () => {

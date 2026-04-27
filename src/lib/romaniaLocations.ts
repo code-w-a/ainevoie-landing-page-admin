@@ -11,6 +11,7 @@ export type RomaniaLocalityType =
   | "capital"
   | "county_seat_municipality"
   | "municipality"
+  | "sector"
   | "town";
 
 export type RomaniaUrbanLocality = {
@@ -139,7 +140,12 @@ export const ROMANIA_URBAN_LOCALITIES = [
   { countyCode: "BR", countyName: "Brăila", cityCode: "42753", cityName: "Făurei", citySlug: "faurei", type: "town" },
   { countyCode: "BR", countyName: "Brăila", cityCode: "43331", cityName: "Ianca", citySlug: "ianca", type: "town" },
   { countyCode: "BR", countyName: "Brăila", cityCode: "43411", cityName: "Însurăței", citySlug: "insuratei", type: "town" },
-  { countyCode: "B", countyName: "București", cityCode: "179132", cityName: "București", citySlug: "bucuresti", type: "capital" },
+  { countyCode: "B", countyName: "București", cityCode: "179141", cityName: "Sector 1", citySlug: "sector-1", type: "sector" },
+  { countyCode: "B", countyName: "București", cityCode: "179150", cityName: "Sector 2", citySlug: "sector-2", type: "sector" },
+  { countyCode: "B", countyName: "București", cityCode: "179169", cityName: "Sector 3", citySlug: "sector-3", type: "sector" },
+  { countyCode: "B", countyName: "București", cityCode: "179178", cityName: "Sector 4", citySlug: "sector-4", type: "sector" },
+  { countyCode: "B", countyName: "București", cityCode: "179187", cityName: "Sector 5", citySlug: "sector-5", type: "sector" },
+  { countyCode: "B", countyName: "București", cityCode: "179196", cityName: "Sector 6", citySlug: "sector-6", type: "sector" },
   { countyCode: "BZ", countyName: "Buzău", cityCode: "44818", cityName: "Buzău", citySlug: "buzau", type: "county_seat_municipality" },
   { countyCode: "BZ", countyName: "Buzău", cityCode: "47916", cityName: "Nehoiu", citySlug: "nehoiu", type: "town" },
   { countyCode: "BZ", countyName: "Buzău", cityCode: "48325", cityName: "Pătârlagele", citySlug: "patarlagele", type: "town" },

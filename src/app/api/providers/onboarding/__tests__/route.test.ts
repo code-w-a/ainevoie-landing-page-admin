@@ -32,7 +32,7 @@ type QuerySnapshot = {
 
 const validPayload = {
   acceptTerms: true,
-  cityCode: "179132",
+  cityCode: "179196",
   countyCode: "B",
   email: "provider@example.com",
   fullName: "Provider Test",
@@ -253,16 +253,16 @@ describe("POST /api/providers/onboarding", () => {
       expect.objectContaining({
         accountStatus: "active",
         authProviders: ["password"],
-        city: "București",
-        cityCode: "179132",
-        cityName: "București",
-        cityNameNormalized: "bucuresti",
-        cityNormalized: "bucuresti",
+        city: "Sector 6",
+        cityCode: "179196",
+        cityName: "Sector 6",
+        cityNameNormalized: "sector 6",
+        cityNormalized: "sector 6",
         createdBy: "provider-uid",
         countyCode: "B",
         countyName: "București",
         countyNameNormalized: "bucuresti",
-        coverageAreaText: "România, București, București",
+        coverageAreaText: "România, București, Sector 6",
         documents: {
           identity: {
             originalFileName: null,
@@ -293,8 +293,8 @@ describe("POST /api/providers/onboarding", () => {
           coverageArea: {
             centerLat: null,
             centerLng: null,
-            cityCode: "179132",
-            cityName: "București",
+            cityCode: "179196",
+            cityName: "Sector 6",
             countryCode: "RO",
             countryName: "România",
             countyCode: "B",
@@ -303,7 +303,7 @@ describe("POST /api/providers/onboarding", () => {
             locationLabel: null,
             placeId: null,
           },
-          coverageAreaText: "România, București, București",
+          coverageAreaText: "România, București, Sector 6",
           displayName: "Provider Test",
           shortBio: null,
           specialization: "Curatenie birouri",
@@ -315,12 +315,13 @@ describe("POST /api/providers/onboarding", () => {
         role: "provider",
         schemaVersion: 1,
         status: "pre_registered",
+        onboardingStatus: "pre_registered",
         updatedBy: "provider-uid",
       }),
     );
     expect(providerEventAdd).toHaveBeenCalledWith(
       expect.objectContaining({
-        toStatus: "new",
+        toStatus: "pre_registered",
         type: "status_changed",
       }),
     );

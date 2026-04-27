@@ -1,30 +1,35 @@
 import {
   PROVIDER_LEGAL_STATUSES,
+  LEGACY_PROVIDER_STATUSES,
   PROVIDER_STATUSES,
   type ProviderLegalStatus,
   type ProviderRecord,
   type ProviderStatus,
+  type ProviderStatusLike,
 } from "@/types/provider";
 import {
   ROMANIA_URBAN_LOCALITIES,
   normalizeRomaniaLocationName,
 } from "@/lib/romaniaLocations";
 
-export const providerStatusLabel: Record<ProviderStatus, string> = {
+export const providerStatusLabel: Record<ProviderStatusLike, string> = {
+  pre_registered: "Preînregistrat",
+  pending_review: "În verificare",
   new: "Nou",
   in_review: "In verificare",
   approved: "Aprobat",
   rejected: "Respins",
+  suspended: "Suspendat",
 };
 
 export function providerStatusVariant(status?: string | null) {
   if (status === "approved") {
     return "success" as const;
   }
-  if (status === "rejected") {
+  if (status === "rejected" || status === "suspended") {
     return "danger" as const;
   }
-  if (status === "in_review") {
+  if (status === "pending_review" || status === "in_review") {
     return "warning" as const;
   }
   return "outline" as const;
@@ -109,6 +114,13 @@ function normalizeOption(value: string) {
 
 export function isProviderStatus(value: string): value is ProviderStatus {
   return (PROVIDER_STATUSES as readonly string[]).includes(value);
+}
+
+export function isProviderStatusLike(value: string): value is ProviderStatusLike {
+  return (
+    (PROVIDER_STATUSES as readonly string[]).includes(value) ||
+    (LEGACY_PROVIDER_STATUSES as readonly string[]).includes(value)
+  );
 }
 
 export function isProviderLegalStatus(value: string): value is ProviderLegalStatus {

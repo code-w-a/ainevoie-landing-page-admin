@@ -49,10 +49,10 @@ test.describe("application smoke checks", () => {
     await expect(page.locator("#provider-county")).toBeVisible();
     await page.locator("#provider-county").selectOption("B");
     await expect(page.locator("#provider-city-search")).toBeEnabled();
-    await page.locator("#provider-city-search").fill("buc");
-    await page.locator("#provider-city").selectOption("179132");
+    await page.locator("#provider-city-search").fill("sector 6");
+    await page.locator("#provider-city-listbox").getByRole("option", { name: "Sector 6" }).click();
 
-    await expect(page.locator("#provider-city")).toHaveValue("179132");
+    await expect(page.locator("#provider-city")).toContainText("Sector 6");
   });
 
   test("auth and admin entry points load", async ({ page }) => {

@@ -374,7 +374,7 @@ export async function POST(request: Request) {
       launchContactConsentVersion: launchContactConsent ?
         PROVIDER_LAUNCH_CONTACT_CONSENT_VERSION
       : null,
-      onboardingStatus: "new",
+      onboardingStatus: "pre_registered",
       source: "landing_onboarding",
       welcomeEmailSent: welcomeEmailResult.sent,
       welcomeEmailError: welcomeEmailResult.errorMessage || null,
@@ -384,7 +384,7 @@ export async function POST(request: Request) {
     await db.collection("providers").doc(userRecord.uid).collection("events").add({
       type: "status_changed",
       fromStatus: null,
-      toStatus: "new",
+      toStatus: "pre_registered",
       actorUid: "system_onboarding",
       note: "Prestator inregistrat prin onboarding public.",
       createdAt: FieldValue.serverTimestamp(),

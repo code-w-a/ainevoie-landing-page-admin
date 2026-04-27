@@ -1,18 +1,29 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import { adminFetch } from "@/components/admin/adminApi";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Clock3,
+  FileCheck2,
+  FileSearch,
+  RotateCcw,
+  ShieldCheck,
+  XCircle,
+} from "lucide-react";
+import { adminFetch, readAdminResponseError } from "@/components/admin/adminApi";
 import {
   getProviderLaunchContactConsentState,
   getProviderLegalConsentState,
   providerLegalStatusLabel,
   providerStatusLabel,
+  providerStatusVariant,
 } from "@/lib/providers";
 import { formatAdminDateTime } from "@/lib/formatAdminDateTime";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   AdminFormGridSkeleton,
@@ -20,21 +31,70 @@ import {
   AdminPageHeaderSkeleton,
 } from "@/components/admin/AdminSkeletonLayouts";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, Clock3, FileSearch, XCircle } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
-type ProviderDetails = {
-  id: string;
-  uid: string;
-  fullName: string;
-  email: string;
-  phone: string;
-  city: string;
+type ProviderDocument = {
+  uid?: string;
+  id?: string;
+  status?: string;
+  accountStatus?: string | null;
+  email?: string | null;
+  phoneNumber?: string | null;
+  authProviders?: string[];
+  locale?: string | null;
+  professionalProfile?: {
+    businessName?: string | null;
+    displayName?: string | null;
+    specialization?: string | null;
+    baseRateAmount?: number | null;
+    baseRateCurrency?: string | null;
+    coverageAreaText?: string | null;
+    availabilitySummary?: string | null;
+    shortBio?: string | null;
+    avatarPath?: string | null;
+    coverageArea?: Record<string, unknown> | null;
+  } | null;
+  documents?: {
+    identity?: ProviderDocumentFile | null;
+    professional?: ProviderDocumentFile | null;
+  } | null;
+  reviewState?: {
+    submittedAt?: string | null;
+    lastReviewedAt?: string | null;
+  } | null;
+  adminReview?: {
+    reviewedBy?: string | null;
+    action?: string | null;
+    reason?: string | null;
+    reviewedAt?: string | null;
+  } | null;
+  suspension?: {
+    reason?: string | null;
+    suspendedBy?: string | null;
+    suspendedAt?: string | null;
+  } | null;
+  lastPublishedAt?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+
+  // Legacy landing/onboarding fields kept visible in this admin case.
+  fullName?: string;
+  phone?: string;
+  city?: string;
   cityCode?: string;
   cityName?: string;
   countyCode?: string;
   countyName?: string;
-  serviceType: string;
-  legalStatus: keyof typeof providerLegalStatusLabel;
+  coverageAreaText?: string | null;
+  serviceType?: string;
+  legalStatus?: keyof typeof providerLegalStatusLabel;
   companyName?: string | null;
   cui?: string | null;
   tradeRegisterNumber?: string | null;
@@ -47,97 +107,232 @@ type ProviderDetails = {
   launchContactConsent?: boolean;
   launchContactConsentAt?: string | null;
   launchContactConsentVersion?: string | null;
-  onboardingStatus: keyof typeof providerStatusLabel;
+  onboardingStatus?: string;
   internalNotes?: string;
-  createdAt?: string;
 };
 
-type ProviderEvent = {
-  id: string;
-  fromStatus?: string | null;
-  toStatus?: string | null;
-  actorUid?: string;
-  actorLabel?: string | null;
-  note?: string | null;
-  createdAt?: string;
+type ProviderDocumentFile = {
+  status?: string | null;
+  storagePath?: string | null;
+  originalFileName?: string | null;
+  uploadedAt?: string | null;
 };
 
-function formatActor(event: ProviderEvent): string {
-  if (typeof event.actorLabel === "string" && event.actorLabel.trim()) {
-    return event.actorLabel.trim();
-  }
-  const uid = event.actorUid;
-  if (!uid) return "necunoscut";
-  if (uid === "system_onboarding") return "Sistem (onboarding public)";
-  if (uid === "system") return "Sistem";
-  return `Utilizator ${uid.slice(0, 6)}…`;
+type ProviderCase = {
+  provider?: ProviderDocument | null;
+  providerDirectory?: Record<string, unknown> | null;
+  availability?: Record<string, unknown> | null;
+  services?: Array<Record<string, unknown>>;
+  recentBookings?: Array<Record<string, unknown>>;
+  recentAuditEvents?: Array<Record<string, unknown>>;
+  item?: ProviderDocument | null;
+};
+
+type ReviewAction = "approve" | "reject" | "suspend" | "reinstate";
+
+const actionMeta: Record<
+  ReviewAction,
+  { label: string; title: string; description: string; destructive?: boolean }
+> = {
+  approve: {
+    label: "Aprobă",
+    title: "Aprobă prestatorul",
+    description: "Backend-ul va valida profilul, documentele și disponibilitatea înainte de aprobare.",
+  },
+  reject: {
+    label: "Respinge",
+    title: "Respinge prestatorul",
+    description: "Prestatorul va putea corecta profilul și retrimite pentru verificare.",
+    destructive: true,
+  },
+  suspend: {
+    label: "Suspendă",
+    title: "Suspendă prestatorul",
+    description: "Prestatorul aprobat va fi retras din publicare până la reintegrare.",
+    destructive: true,
+  },
+  reinstate: {
+    label: "Reactivează",
+    title: "Reactivează prestatorul",
+    description: "Backend-ul va republica snapshot-ul public dacă regulile sunt îndeplinite.",
+  },
+};
+
+function getProviderFromCase(data: ProviderCase | null) {
+  return data?.provider || data?.item || null;
 }
 
-function getStatusMeta(status?: string | null) {
+function getProviderId(provider: ProviderDocument | null, fallback?: string) {
+  return provider?.uid || provider?.id || fallback || "";
+}
+
+function getDisplayName(provider: ProviderDocument) {
+  return (
+    provider.professionalProfile?.displayName ||
+    provider.professionalProfile?.businessName ||
+    provider.fullName ||
+    provider.email ||
+    "-"
+  );
+}
+
+function getStatus(provider: ProviderDocument) {
+  return provider.status || provider.onboardingStatus || "pre_registered";
+}
+
+function getStatusLabel(status?: string | null) {
+  if (!status) return "-";
+  return providerStatusLabel[status as keyof typeof providerStatusLabel] || status;
+}
+
+function getStatusIcon(status?: string | null) {
   switch (status) {
     case "approved":
-      return {
-        label: providerStatusLabel.approved,
-        variant: "success" as const,
-        Icon: CheckCircle2,
-      };
+      return CheckCircle2;
     case "rejected":
-      return {
-        label: providerStatusLabel.rejected,
-        variant: "danger" as const,
-        Icon: XCircle,
-      };
+    case "suspended":
+      return XCircle;
+    case "pending_review":
     case "in_review":
-      return {
-        label: providerStatusLabel.in_review,
-        variant: "warning" as const,
-        Icon: FileSearch,
-      };
-    case "new":
+      return FileSearch;
     default:
-      return {
-        label: providerStatusLabel.new,
-        variant: "outline" as const,
-        Icon: Clock3,
-      };
+      return Clock3;
   }
 }
 
-function getLegalConsentMeta(data: ProviderDetails) {
-  switch (getProviderLegalConsentState(data)) {
-    case "accepted":
-      return { label: "Acceptat", variant: "success" as const };
-    case "partial":
-      return { label: "Parțial", variant: "warning" as const };
-    case "missing":
-    default:
-      return { label: "Lipsă", variant: "outline" as const };
+function getDocumentMeta(doc?: ProviderDocumentFile | null) {
+  const status = doc?.status;
+  if (status === "uploaded" || status === "approved") {
+    return { label: "Încărcat", ok: true, variant: "success" as const };
   }
+  if (status === "pending" || status === "submitted") {
+    return { label: "În așteptare", ok: false, variant: "warning" as const };
+  }
+  if (status === "rejected") {
+    return { label: "Respins", ok: false, variant: "danger" as const };
+  }
+  return { label: "Lipsă", ok: false, variant: "outline" as const };
 }
 
-function getLaunchContactMeta(data: ProviderDetails) {
-  switch (getProviderLaunchContactConsentState(data)) {
-    case "accepted":
-      return { label: "Da", variant: "success" as const };
-    case "declined":
-      return { label: "Nu", variant: "secondary" as const };
-    case "missing":
-    default:
-      return { label: "Lipsă", variant: "outline" as const };
+function hasConfiguredAvailability(provider: ProviderDocument, availability?: Record<string, unknown> | null) {
+  if (provider.professionalProfile?.availabilitySummary) {
+    return true;
   }
+  if (!availability || typeof availability !== "object") {
+    return false;
+  }
+  if (availability.configured === true) {
+    return true;
+  }
+  const weekSchedule = availability.weekSchedule;
+  if (!weekSchedule || typeof weekSchedule !== "object") {
+    return false;
+  }
+  return Object.values(weekSchedule).some((value) => {
+    if (Array.isArray(value)) return value.length > 0;
+    if (value && typeof value === "object" && "slots" in value) {
+      return Array.isArray((value as { slots?: unknown[] }).slots) && Boolean((value as { slots?: unknown[] }).slots?.length);
+    }
+    return false;
+  });
+}
+
+function formatValue(value: unknown) {
+  if (typeof value === "string" && value.trim()) {
+    return value;
+  }
+  if (typeof value === "number") {
+    return String(value);
+  }
+  if (typeof value === "boolean") {
+    return value ? "Da" : "Nu";
+  }
+  return "-";
+}
+
+function getAvailableActions(status: string): ReviewAction[] {
+  if (status === "pending_review") return ["approve", "reject"];
+  if (status === "approved") return ["suspend"];
+  if (status === "suspended") return ["reinstate"];
+  return [];
+}
+
+function ReviewDecisionDialog({
+  action,
+  open,
+  loading,
+  error,
+  onOpenChange,
+  onConfirm,
+}: {
+  action: ReviewAction | null;
+  open: boolean;
+  loading: boolean;
+  error: string | null;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: (reason: string) => Promise<boolean>;
+}) {
+  const [reason, setReason] = useState("");
+  const requiresReason = action === "reject" || action === "suspend";
+  const meta = action ? actionMeta[action] : null;
+
+  useEffect(() => {
+    if (open) setReason("");
+  }, [open, action]);
+
+  if (!meta || !action) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg" onPointerDownOutside={(event) => loading && event.preventDefault()}>
+        <DialogHeader>
+          <DialogTitle>{meta.title}</DialogTitle>
+          <DialogDescription>{meta.description}</DialogDescription>
+        </DialogHeader>
+        {requiresReason && (
+          <div>
+            <label className="mb-2 inline-block text-sm font-medium">Motiv obligatoriu</label>
+            <textarea
+              className="min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              value={reason}
+              disabled={loading}
+              onChange={(event) => setReason(event.target.value)}
+              placeholder="Scrie motivul care va fi transmis către backend..."
+            />
+          </div>
+        )}
+        {error && <p className="text-sm text-rose-500">{error}</p>}
+        <DialogFooter>
+          <Button type="button" variant="outline" disabled={loading} onClick={() => onOpenChange(false)}>
+            Anulează
+          </Button>
+          <Button
+            type="button"
+            variant={meta.destructive ? "destructive" : "default"}
+            disabled={loading || (requiresReason && !reason.trim())}
+            onClick={async () => {
+              const done = await onConfirm(reason);
+              if (done) onOpenChange(false);
+            }}
+          >
+            {loading ? "Se procesează..." : meta.label}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 export default function ProviderDetailPage() {
   const params = useParams<{ id: string }>();
   const id = Array.isArray(params?.id) ? params.id[0] : params?.id;
 
-  const [data, setData] = useState<ProviderDetails | null>(null);
+  const [data, setData] = useState<ProviderCase | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [status, setStatus] = useState("new");
-  const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [events, setEvents] = useState<ProviderEvent[]>([]);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [dialogAction, setDialogAction] = useState<ReviewAction | null>(null);
 
   const loadDetails = useCallback(async () => {
     if (!id) return;
@@ -148,17 +343,11 @@ export default function ProviderDetailPage() {
         cache: "no-store",
       });
       if (!res.ok) {
-        throw new Error("load_failed");
+        throw new Error(await readAdminResponseError(res, "Nu am putut încărca fișa prestatorului."));
       }
-      const json = await res.json();
-      const item = json?.item as ProviderDetails;
-      const history = (json?.events || []) as ProviderEvent[];
-      setData(item);
-      setStatus(item?.onboardingStatus || "new");
-      setNotes(item?.internalNotes || "");
-      setEvents(history);
-    } catch {
-      setError("Nu am putut încărca fișa prestatorului.");
+      setData((await res.json()) as ProviderCase);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Nu am putut încărca fișa prestatorului.");
     } finally {
       setLoading(false);
     }
@@ -168,25 +357,29 @@ export default function ProviderDetailPage() {
     void loadDetails();
   }, [loadDetails]);
 
-  async function saveChanges() {
-    if (!id) return;
+  const provider = getProviderFromCase(data);
+  const status = provider ? getStatus(provider) : "";
+  const StatusIcon = getStatusIcon(status);
+  const availableActions = useMemo(() => getAvailableActions(status), [status]);
+
+  async function submitReview(action: ReviewAction, reason: string) {
+    if (!id) return false;
     setSaving(true);
-    setError(null);
+    setActionError(null);
     try {
-      const res = await adminFetch(`/api/admin/providers/${id}`, {
-        method: "PATCH",
+      const res = await adminFetch(`/api/admin/providers/${id}/review`, {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          onboardingStatus: status,
-          internalNotes: notes,
-        }),
+        body: JSON.stringify({ action, reason: reason.trim() || undefined }),
       });
       if (!res.ok) {
-        throw new Error("update_failed");
+        throw new Error(await readAdminResponseError(res, "Nu am putut procesa decizia."));
       }
       await loadDetails();
-    } catch {
-      setError("Nu am putut salva modificările.");
+      return true;
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Nu am putut procesa decizia.");
+      return false;
     } finally {
       setSaving(false);
     }
@@ -214,16 +407,6 @@ export default function ProviderDetailPage() {
         </Card>
         <Card>
           <CardHeader>
-            <Skeleton className="h-6 w-40" />
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Skeleton className="h-9 w-full max-w-xs" />
-            <Skeleton className="min-h-[140px] w-full rounded-md" />
-            <Skeleton className="h-9 w-44" />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
             <Skeleton className="h-6 w-36" />
           </CardHeader>
           <CardContent>
@@ -234,7 +417,7 @@ export default function ProviderDetailPage() {
     );
   }
 
-  if (!data) {
+  if (!provider) {
     return (
       <div className="space-y-3">
         <p className="text-sm text-rose-500">{error || "Prestatorul nu a fost găsit."}</p>
@@ -245,211 +428,346 @@ export default function ProviderDetailPage() {
     );
   }
 
+  const providerId = getProviderId(provider, id);
+  const profile = provider.professionalProfile || {};
+  const identityMeta = getDocumentMeta(provider.documents?.identity);
+  const professionalMeta = getDocumentMeta(provider.documents?.professional);
+  const availabilityOk = hasConfiguredAvailability(provider, data?.availability);
+  const profileOk = Boolean(profile.displayName && profile.specialization && (profile.coverageAreaText || provider.coverageAreaText));
+  const publicSnapshotOk = Boolean(data?.providerDirectory);
+  const legalConsentMeta =
+    getProviderLegalConsentState(provider) === "accepted"
+      ? { label: "Acceptat", variant: "success" as const }
+      : getProviderLegalConsentState(provider) === "partial"
+        ? { label: "Parțial", variant: "warning" as const }
+        : { label: "Lipsă", variant: "outline" as const };
+  const launchContactMeta =
+    getProviderLaunchContactConsentState(provider) === "accepted"
+      ? { label: "Da", variant: "success" as const }
+      : getProviderLaunchContactConsentState(provider) === "declined"
+        ? { label: "Nu", variant: "secondary" as const }
+        : { label: "Lipsă", variant: "outline" as const };
+
+  const checklist = [
+    {
+      label: "Profil profesional complet",
+      ok: profileOk,
+      detail: profileOk ? "Display name, specializare și zonă completate" : "Lipsesc date de profil",
+    },
+    {
+      label: "Document identitate",
+      ok: identityMeta.ok,
+      detail: provider.documents?.identity?.originalFileName || identityMeta.label,
+    },
+    {
+      label: "Document profesional",
+      ok: professionalMeta.ok,
+      detail: provider.documents?.professional?.originalFileName || professionalMeta.label,
+    },
+    {
+      label: "Disponibilitate configurată",
+      ok: availabilityOk,
+      detail: profile.availabilitySummary || (availabilityOk ? "Configurată" : "Lipsă"),
+    },
+    {
+      label: "Snapshot public",
+      ok: publicSnapshotOk,
+      detail: publicSnapshotOk ? "providerDirectory există" : "Nepublicat",
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">{data.fullName}</h1>
-          <p className="text-sm text-muted-foreground">{data.email}</p>
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <h1 className="text-2xl font-semibold">{getDisplayName(provider)}</h1>
+            <Badge variant={providerStatusVariant(status)} className="gap-1.5">
+              <StatusIcon className="h-3.5 w-3.5" />
+              {getStatusLabel(status)}
+            </Badge>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            {provider.email || "-"} {provider.phoneNumber || provider.phone ? `• ${provider.phoneNumber || provider.phone}` : ""}
+          </p>
+          <p className="text-xs text-muted-foreground">ID: {providerId}</p>
         </div>
         <Button variant="outline" asChild>
           <Link href="/admin/prestatori">Înapoi la listă</Link>
         </Button>
       </div>
 
+      {error && <p className="text-sm text-rose-500">{error}</p>}
+
       <Card>
         <CardHeader>
-          <CardTitle>Date prestator</CardTitle>
+          <CardTitle>Verificare provider</CardTitle>
+          <CardDescription>
+            Checklist vizual pentru condițiile pe care backend-ul le validează la aprobare.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          {checklist.map((item) => {
+            const Icon = item.ok ? CheckCircle2 : AlertTriangle;
+            return (
+              <div key={item.label} className="rounded-lg border border-border p-3">
+                <div className="mb-2 flex items-center gap-2">
+                  <Icon className={`h-4 w-4 ${item.ok ? "text-emerald-600" : "text-amber-600"}`} />
+                  <p className="text-sm font-medium">{item.label}</p>
+                </div>
+                <p className="text-xs text-muted-foreground">{formatValue(item.detail)}</p>
+              </div>
+            );
+          })}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Acțiuni</CardTitle>
+          <CardDescription>
+            Deciziile folosesc exclusiv callable-ul adminReviewProvider.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {availableActions.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Nu există acțiuni disponibile pentru statusul curent.
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {availableActions.map((action) => {
+                const meta = actionMeta[action];
+                const Icon =
+                  action === "approve"
+                    ? ShieldCheck
+                    : action === "reinstate"
+                      ? RotateCcw
+                      : action === "suspend"
+                        ? AlertTriangle
+                        : XCircle;
+                return (
+                  <Button
+                    key={action}
+                    variant={meta.destructive ? "destructive" : "default"}
+                    disabled={saving}
+                    onClick={() => setDialogAction(action)}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {meta.label}
+                  </Button>
+                );
+              })}
+            </div>
+          )}
+          {actionError && <p className="text-sm text-rose-500">{actionError}</p>}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Profil profesional</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
           <div>
-            <p className="text-xs uppercase text-muted-foreground">Telefon</p>
-            <p className="text-sm">{data.phone || "-"}</p>
+            <p className="text-xs uppercase text-muted-foreground">Nume public</p>
+            <p className="text-sm">{formatValue(profile.displayName)}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase text-muted-foreground">Business</p>
+            <p className="text-sm">{formatValue(profile.businessName)}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase text-muted-foreground">Specializare</p>
+            <p className="text-sm">{formatValue(profile.specialization || provider.serviceType)}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase text-muted-foreground">Zonă acoperire</p>
+            <p className="text-sm">{formatValue(profile.coverageAreaText || provider.coverageAreaText)}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase text-muted-foreground">Tarif de bază</p>
+            <p className="text-sm">
+              {typeof profile.baseRateAmount === "number"
+                ? `${profile.baseRateAmount} ${profile.baseRateCurrency || "RON"}`
+                : "-"}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs uppercase text-muted-foreground">Disponibilitate</p>
+            <p className="text-sm">{formatValue(profile.availabilitySummary)}</p>
+          </div>
+          <div className="md:col-span-2">
+            <p className="text-xs uppercase text-muted-foreground">Bio</p>
+            <p className="text-sm">{formatValue(profile.shortBio)}</p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Documente și publicare</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-2">
+          <div>
+            <p className="text-xs uppercase text-muted-foreground">Document identitate</p>
+            <Badge variant={identityMeta.variant} className="mt-1">
+              <FileCheck2 className="h-3.5 w-3.5" />
+              {identityMeta.label}
+            </Badge>
+            <p className="mt-2 text-xs text-muted-foreground">
+              {provider.documents?.identity?.storagePath || "-"}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs uppercase text-muted-foreground">Document profesional</p>
+            <Badge variant={professionalMeta.variant} className="mt-1">
+              <FileCheck2 className="h-3.5 w-3.5" />
+              {professionalMeta.label}
+            </Badge>
+            <p className="mt-2 text-xs text-muted-foreground">
+              {provider.documents?.professional?.storagePath || "-"}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs uppercase text-muted-foreground">Trimis la verificare</p>
+            <p className="text-sm">{formatAdminDateTime(provider.reviewState?.submittedAt)}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase text-muted-foreground">Ultima decizie</p>
+            <p className="text-sm">
+              {formatValue(provider.adminReview?.action)} • {formatAdminDateTime(provider.adminReview?.reviewedAt || provider.reviewState?.lastReviewedAt)}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs uppercase text-muted-foreground">Ultimul motiv</p>
+            <p className="text-sm">{formatValue(provider.adminReview?.reason || provider.suspension?.reason)}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase text-muted-foreground">Publicat la</p>
+            <p className="text-sm">{formatAdminDateTime(provider.lastPublishedAt)}</p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Date preînregistrare</CardTitle>
+          <CardDescription>
+            Câmpurile capturate de formularul public rămân vizibile pentru context operațional.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-2">
+          <div>
+            <p className="text-xs uppercase text-muted-foreground">Nume formular</p>
+            <p className="text-sm">{formatValue(provider.fullName)}</p>
           </div>
           <div>
             <p className="text-xs uppercase text-muted-foreground">Județ / Oraș</p>
             <p className="text-sm">
-              {[data.countyName, data.cityName || data.city].filter(Boolean).join(" / ") || "-"}
+              {[provider.countyName, provider.cityName || provider.city].filter(Boolean).join(" / ") || "-"}
             </p>
           </div>
           <div>
-            <p className="text-xs uppercase text-muted-foreground">Serviciu</p>
-            <p className="text-sm">{data.serviceType || "-"}</p>
+            <p className="text-xs uppercase text-muted-foreground">Serviciu formular</p>
+            <p className="text-sm">{formatValue(provider.serviceType)}</p>
           </div>
           <div>
             <p className="text-xs uppercase text-muted-foreground">Statut juridic</p>
             <p className="text-sm">
-              {providerLegalStatusLabel[data.legalStatus] || data.legalStatus || "-"}
+              {provider.legalStatus ? providerLegalStatusLabel[provider.legalStatus] || provider.legalStatus : "-"}
             </p>
           </div>
           <div>
             <p className="text-xs uppercase text-muted-foreground">Nume companie / PFA</p>
-            <p className="text-sm">{data.companyName || "-"}</p>
+            <p className="text-sm">{formatValue(provider.companyName)}</p>
           </div>
           <div>
             <p className="text-xs uppercase text-muted-foreground">CUI</p>
-            <p className="text-sm">{data.cui || "-"}</p>
+            <p className="text-sm">{formatValue(provider.cui)}</p>
           </div>
           <div>
             <p className="text-xs uppercase text-muted-foreground">Nr. Registrului Comerțului</p>
-            <p className="text-sm">{data.tradeRegisterNumber || "-"}</p>
+            <p className="text-sm">{formatValue(provider.tradeRegisterNumber)}</p>
           </div>
           <div>
             <p className="text-xs uppercase text-muted-foreground">Estimare înființare</p>
-            <p className="text-sm">{data.estimatedSetupTimeline || "-"}</p>
+            <p className="text-sm">{formatValue(provider.estimatedSetupTimeline)}</p>
           </div>
           <div>
             <p className="text-xs uppercase text-muted-foreground">Are contabil</p>
             <p className="text-sm">
-              {data.hasAccountant === "yes"
+              {provider.hasAccountant === "yes"
                 ? "Da"
-                : data.hasAccountant === "no"
+                : provider.hasAccountant === "no"
                   ? "Nu"
-                  : data.hasAccountant === "unsure"
+                  : provider.hasAccountant === "unsure"
                     ? "Încă nu"
                     : "-"}
             </p>
           </div>
           <div>
-            <p className="text-xs uppercase text-muted-foreground">Status curent</p>
-            {(() => {
-              const statusMeta = getStatusMeta(status);
-              const Icon = statusMeta.Icon;
-              return (
-                <Badge variant={statusMeta.variant} className="gap-1.5">
-                  <Icon className="h-3.5 w-3.5" />
-                  {statusMeta.label}
-                </Badge>
-              );
-            })()}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Consimțăminte</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2">
-          <div>
             <p className="text-xs uppercase text-muted-foreground">Termeni / politică</p>
-            {(() => {
-              const consentMeta = getLegalConsentMeta(data);
-              return <Badge variant={consentMeta.variant}>{consentMeta.label}</Badge>;
-            })()}
+            <Badge variant={legalConsentMeta.variant}>{legalConsentMeta.label}</Badge>
           </div>
           <div>
             <p className="text-xs uppercase text-muted-foreground">Contact lansare</p>
-            {(() => {
-              const contactMeta = getLaunchContactMeta(data);
-              return <Badge variant={contactMeta.variant}>{contactMeta.label}</Badge>;
-            })()}
+            <Badge variant={launchContactMeta.variant}>{launchContactMeta.label}</Badge>
           </div>
           <div>
-            <p className="text-xs uppercase text-muted-foreground">Termeni acceptați la</p>
-            <p className="text-sm">{formatAdminDateTime(data.termsAcceptedAt)}</p>
-          </div>
-          <div>
-            <p className="text-xs uppercase text-muted-foreground">Versiune termeni</p>
-            <p className="text-sm">{data.termsVersion || "-"}</p>
-          </div>
-          <div>
-            <p className="text-xs uppercase text-muted-foreground">Politică acceptată la</p>
-            <p className="text-sm">{formatAdminDateTime(data.privacyAcceptedAt)}</p>
-          </div>
-          <div>
-            <p className="text-xs uppercase text-muted-foreground">Versiune politică</p>
-            <p className="text-sm">{data.privacyVersion || "-"}</p>
-          </div>
-          <div>
-            <p className="text-xs uppercase text-muted-foreground">Contact lansare la</p>
-            <p className="text-sm">{formatAdminDateTime(data.launchContactConsentAt)}</p>
-          </div>
-          <div>
-            <p className="text-xs uppercase text-muted-foreground">Versiune contact</p>
-            <p className="text-sm">{data.launchContactConsentVersion || "-"}</p>
+            <p className="text-xs uppercase text-muted-foreground">Creat la</p>
+            <p className="text-sm">{formatAdminDateTime(provider.createdAt)}</p>
           </div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Gestionare</CardTitle>
+          <CardTitle>Activitate recentă</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="grid gap-4 lg:grid-cols-2">
           <div>
-            <label className="mb-2 inline-block text-sm font-medium">Schimbă status</label>
-            <select
-              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm md:max-w-xs"
-              value={status}
-              onChange={(event) => setStatus(event.target.value)}
-            >
-              <option value="new">Nou</option>
-              <option value="in_review">În verificare</option>
-              <option value="approved">Aprobat</option>
-              <option value="rejected">Respins</option>
-            </select>
-          </div>
-          <div>
-            <label className="mb-2 inline-block text-sm font-medium">Notițe interne</label>
-            <textarea
-              className="min-h-[140px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              value={notes}
-              onChange={(event) => setNotes(event.target.value)}
-              placeholder="Observații pentru echipa internă..."
-            />
-          </div>
-          {error && <p className="text-sm text-rose-500">{error}</p>}
-          <Button onClick={saveChanges} disabled={saving}>
-            {saving ? "Se salvează..." : "Salvează modificările"}
-          </Button>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Istoric status</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {events.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nu există evenimente încă.</p>
-          ) : (
-            <div className="space-y-3">
-              {events.map((event) => (
-                <div key={event.id} className="rounded-lg border border-border p-3">
-                  <div className="mb-1 flex flex-wrap items-center gap-2 text-sm">
-                    {(() => {
-                      const toMeta = getStatusMeta(event.toStatus);
-                      const ToIcon = toMeta.Icon;
-                      const fromMeta = getStatusMeta(event.fromStatus);
-                      return (
-                        <>
-                          <Badge variant={toMeta.variant} className="gap-1.5">
-                            <ToIcon className="h-3.5 w-3.5" />
-                            {toMeta.label}
-                          </Badge>
-                          {event.fromStatus && (
-                            <span className="text-muted-foreground">
-                              din {fromMeta.label}
-                            </span>
-                          )}
-                        </>
-                      );
-                    })()}
+            <p className="mb-3 text-sm font-medium">Audit</p>
+            {!data?.recentAuditEvents?.length ? (
+              <p className="text-sm text-muted-foreground">Nu există evenimente recente.</p>
+            ) : (
+              <div className="space-y-2">
+                {data.recentAuditEvents.slice(0, 5).map((event, index) => (
+                  <div key={String(event.id || index)} className="rounded-lg border border-border p-3 text-sm">
+                    <p>{formatValue(event.action || event.type || event.message)}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatAdminDateTime(event.createdAt || event.at)}
+                    </p>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    {formatAdminDateTime(event.createdAt)} • actor:{" "}
-                    <span title={event.actorUid || undefined}>
-                      {formatActor(event)}
-                    </span>
-                  </p>
-                  {event.note && <p className="mt-2 text-sm">{event.note}</p>}
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </div>
+          <div>
+            <p className="mb-3 text-sm font-medium">Servicii / booking-uri</p>
+            <p className="text-sm text-muted-foreground">
+              {data?.services?.length || 0} servicii, {data?.recentBookings?.length || 0} booking-uri recente.
+            </p>
+          </div>
         </CardContent>
       </Card>
+
+      <ReviewDecisionDialog
+        action={dialogAction}
+        open={Boolean(dialogAction)}
+        loading={saving}
+        error={actionError}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDialogAction(null);
+            setActionError(null);
+          }
+        }}
+        onConfirm={async (reason) => {
+          if (!dialogAction) return false;
+          return submitReview(dialogAction, reason);
+        }}
+      />
     </div>
   );
 }

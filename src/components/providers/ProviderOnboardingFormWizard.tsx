@@ -2,6 +2,12 @@
 
 import { Checkbox } from "@/components/ui/checkbox";
 import { InputGroup } from "@/components/ui/input-group";
+import { getFirebaseAuth, getFirebaseFunctions, getFirebaseStorage } from "@/lib/firebaseClient";
+import {
+  cloneDefaultProviderWeekSchedule,
+  validateProviderWeekSchedule,
+  type ProviderWeekDay,
+} from "@/lib/providerAvailability";
 import { PROVIDER_SERVICE_ENTRIES } from "@/lib/providers";
 import {
   ROMANIA_COUNTIES,
@@ -11,8 +17,12 @@ import {
 } from "@/lib/romaniaLocations";
 import { PROVIDER_LEGAL_STATUSES, type ProviderLegalStatus } from "@/types/provider";
 import axios from "axios";
-import { ChevronDown, Eye, EyeOff } from "lucide-react";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { httpsCallable } from "firebase/functions";
+import { ref, uploadBytes } from "firebase/storage";
+import { ChevronDown, Eye, EyeOff, FileCheck2, ImagePlus, UploadCloud } from "lucide-react";
 import { Link, useRouter } from "@/i18n/navigation";
+import Image from "next/image";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
@@ -45,8 +55,49 @@ type ProviderOnboardingFormWizardProps = {
   onStepChange: (step: number) => void;
 };
 
+type UploadState = "empty" | "added" | "uploading" | "uploaded" | "error";
+type FileSlot = {
+  file: File | null;
+  previewUrl: string | null;
+  status: UploadState;
+  storagePath: string | null;
+  error: string | null;
+};
+
+const MAX_STEP = 7;
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+
+function emptyFileSlot(): FileSlot {
+  return {
+    file: null,
+    previewUrl: null,
+    status: "empty",
+    storagePath: null,
+    error: null,
+  };
+}
+
 function isValidEmail(value: string) {
   return value.includes("@");
+}
+
+function sanitizeFileName(file: File) {
+  const safeName = file.name.toLowerCase().replace(/[^a-z0-9._-]+/g, "-");
+  return `${Date.now()}-${safeName || "upload.jpg"}`;
+}
+
+function assertImageFile(file: File, errorMessage: string) {
+  if (!file.type.startsWith("image/") || file.size > MAX_IMAGE_BYTES) {
+    throw new Error(errorMessage);
+  }
+}
+
+function readCallableError(error: unknown, fallback: string) {
+  const err = error as { message?: string; code?: string; details?: unknown };
+  if (typeof err.message === "string" && err.message.trim()) {
+    return err.message;
+  }
+  return fallback;
 }
 
 export default function ProviderOnboardingFormWizard({
@@ -60,17 +111,32 @@ export default function ProviderOnboardingFormWizard({
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [citySearch, setCitySearch] = useState("");
   const [cityDropdownOpen, setCityDropdownOpen] = useState(false);
+  const [newsletterStatusLoading, setNewsletterStatusLoading] = useState(false);
+  const [isActiveNewsletterSubscriber, setIsActiveNewsletterSubscriber] = useState(false);
+  const [newsletterStatusError, setNewsletterStatusError] = useState<string | null>(null);
+  const [providerUid, setProviderUid] = useState<string | null>(null);
+  const [accountCreating, setAccountCreating] = useState(false);
+  const [avatar, setAvatar] = useState<FileSlot>(() => emptyFileSlot());
+  const [identityDocument, setIdentityDocument] = useState<FileSlot>(() => emptyFileSlot());
+  const [professionalDocument, setProfessionalDocument] = useState<FileSlot>(() => emptyFileSlot());
+  const [weekSchedule, setWeekSchedule] = useState<ProviderWeekDay[]>(
+    cloneDefaultProviderWeekSchedule
+  );
+  const [availabilitySaved, setAvailabilitySaved] = useState(false);
+  const [availabilitySaving, setAvailabilitySaving] = useState(false);
+  const [availabilityError, setAvailabilityError] = useState<string | null>(null);
+  const [finalSubmitting, setFinalSubmitting] = useState(false);
+  const [finalError, setFinalError] = useState<string | null>(null);
   const cityComboRef = useRef<HTMLDivElement>(null);
   const citySearchInputRef = useRef<HTMLInputElement>(null);
 
   const legalStatusOptions = useMemo(
-    () =>
-      [
-        { value: "pfa_ready" as const, label: t("legalPfa") },
-        { value: "srl_ready" as const, label: t("legalSrl") },
-        { value: "in_progress" as const, label: t("legalInProgress") },
-        { value: "need_guidance" as const, label: t("legalGuidance") },
-      ],
+    () => [
+      { value: "pfa_ready" as const, label: t("legalPfa") },
+      { value: "srl_ready" as const, label: t("legalSrl") },
+      { value: "in_progress" as const, label: t("legalInProgress") },
+      { value: "need_guidance" as const, label: t("legalGuidance") },
+    ],
     [t]
   );
 
@@ -82,7 +148,7 @@ export default function ProviderOnboardingFormWizard({
     getValues,
     setValue,
     watch,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm<FormValues>({
     defaultValues: {
       legalStatus: PROVIDER_LEGAL_STATUSES[0],
@@ -100,6 +166,7 @@ export default function ProviderOnboardingFormWizard({
       acceptTerms: false,
     },
   });
+
   const emailValue = watch("email");
   const legalStatus = watch("legalStatus");
   const selectedCountyCode = watch("countyCode");
@@ -108,23 +175,22 @@ export default function ProviderOnboardingFormWizard({
   const hasValidEmailForNewsletter = isValidEmail(normalizedEmail);
   const isLegalEntityReady = legalStatus === "pfa_ready" || legalStatus === "srl_ready";
   const isEntityInProgress = legalStatus === "in_progress";
+  const selectedCityRecord = useMemo(
+    () => findRomaniaCity(selectedCountyCode, selectedCityCode),
+    [selectedCountyCode, selectedCityCode]
+  );
   const availableCities = useMemo(
     () => getCitiesByCounty(selectedCountyCode),
     [selectedCountyCode]
   );
   const normalizedCitySearch = normalizeRomaniaLocationName(citySearch);
   const filteredCities = useMemo(() => {
-    if (!normalizedCitySearch) {
-      return availableCities;
-    }
-
+    if (!normalizedCitySearch) return availableCities;
     return availableCities.filter((city) =>
       normalizeRomaniaLocationName(city.cityName).includes(normalizedCitySearch)
     );
   }, [availableCities, normalizedCitySearch]);
-  const [newsletterStatusLoading, setNewsletterStatusLoading] = useState(false);
-  const [isActiveNewsletterSubscriber, setIsActiveNewsletterSubscriber] = useState(false);
-  const [newsletterStatusError, setNewsletterStatusError] = useState<string | null>(null);
+  const busy = accountCreating || availabilitySaving || finalSubmitting;
 
   useEffect(() => {
     setValue("cityCode", "", { shouldValidate: false });
@@ -133,14 +199,17 @@ export default function ProviderOnboardingFormWizard({
   }, [selectedCountyCode, setValue]);
 
   useEffect(() => {
-    if (!cityDropdownOpen) {
-      return;
-    }
+    return () => {
+      if (avatar.previewUrl) URL.revokeObjectURL(avatar.previewUrl);
+      if (identityDocument.previewUrl) URL.revokeObjectURL(identityDocument.previewUrl);
+      if (professionalDocument.previewUrl) URL.revokeObjectURL(professionalDocument.previewUrl);
+    };
+  }, [avatar.previewUrl, identityDocument.previewUrl, professionalDocument.previewUrl]);
+
+  useEffect(() => {
+    if (!cityDropdownOpen) return;
     function handlePointerDown(event: MouseEvent) {
-      if (
-        cityComboRef.current &&
-        !cityComboRef.current.contains(event.target as Node)
-      ) {
+      if (cityComboRef.current && !cityComboRef.current.contains(event.target as Node)) {
         setCityDropdownOpen(false);
       }
     }
@@ -154,13 +223,8 @@ export default function ProviderOnboardingFormWizard({
     }
   }, [cityDropdownOpen]);
 
-  const selectedCityRecord = useMemo(
-    () => findRomaniaCity(selectedCountyCode, selectedCityCode),
-    [selectedCountyCode, selectedCityCode]
-  );
-
   useEffect(() => {
-    if (!hasValidEmailForNewsletter) {
+    if (!hasValidEmailForNewsletter || providerUid) {
       setNewsletterStatusLoading(false);
       setNewsletterStatusError(null);
       setIsActiveNewsletterSubscriber(false);
@@ -181,28 +245,17 @@ export default function ProviderOnboardingFormWizard({
             headers: { "x-next-intl-locale": locale },
           }
         );
-
-        if (isCancelled) {
-          return;
-        }
-
+        if (isCancelled) return;
         const isActive = response.data?.isActiveSubscriber === true;
         setIsActiveNewsletterSubscriber(isActive);
-
-        if (isActive) {
-          setValue("newsletterOptIn", false);
-        }
+        if (isActive) setValue("newsletterOptIn", false);
       } catch {
-        if (isCancelled) {
-          return;
-        }
-
-        setIsActiveNewsletterSubscriber(false);
-        setNewsletterStatusError(t("newsletterCheckError"));
-      } finally {
         if (!isCancelled) {
-          setNewsletterStatusLoading(false);
+          setIsActiveNewsletterSubscriber(false);
+          setNewsletterStatusError(t("newsletterCheckError"));
         }
+      } finally {
+        if (!isCancelled) setNewsletterStatusLoading(false);
       }
     }, 300);
 
@@ -210,7 +263,175 @@ export default function ProviderOnboardingFormWizard({
       isCancelled = true;
       window.clearTimeout(timerId);
     };
-  }, [hasValidEmailForNewsletter, locale, normalizedEmail, setValue, t]);
+  }, [hasValidEmailForNewsletter, locale, normalizedEmail, providerUid, setValue, t]);
+
+  function updateFileSlot(
+    file: File | null,
+    setter: React.Dispatch<React.SetStateAction<FileSlot>>
+  ) {
+    setter((previous) => {
+      if (previous.previewUrl) URL.revokeObjectURL(previous.previewUrl);
+      if (!file) return emptyFileSlot();
+      try {
+        assertImageFile(file, t("uploadImageInvalid"));
+      } catch (error) {
+        return {
+          ...emptyFileSlot(),
+          file,
+          status: "error",
+          error: error instanceof Error ? error.message : t("uploadImageInvalid"),
+        };
+      }
+      return {
+        file,
+        previewUrl: URL.createObjectURL(file),
+        status: "added",
+        storagePath: null,
+        error: null,
+      };
+    });
+  }
+
+  async function createProviderAccount() {
+    const values = getValues();
+    const { confirmPassword, ...formPayload } = values;
+    const selectedCity = findRomaniaCity(values.countyCode, values.cityCode);
+
+    if (!selectedCity) {
+      onStepChange(2);
+      toast.error(t("cityRequired"));
+      return false;
+    }
+
+    setAccountCreating(true);
+    try {
+      const res = await axios.post(
+        "/api/providers/onboarding",
+        {
+          ...formPayload,
+          city: selectedCity.cityName,
+          locale,
+        },
+        {
+          headers: { "x-next-intl-locale": locale },
+        }
+      );
+
+      const uid = typeof res.data?.uid === "string" ? res.data.uid : null;
+      await signInWithEmailAndPassword(getFirebaseAuth(), values.email.trim(), values.password);
+      setProviderUid(uid || getFirebaseAuth().currentUser?.uid || null);
+      toast.success(t("accountCreated"));
+      return true;
+    } catch (error: unknown) {
+      const ax = error as {
+        response?: { data?: { error?: string; code?: string } };
+      };
+      const data = ax.response?.data;
+      const message =
+        typeof data?.error === "string" && data.error.length > 0
+          ? data.error
+          : readCallableError(error, t("toastGenericError"));
+      toast.error(message);
+      return false;
+    } finally {
+      setAccountCreating(false);
+    }
+  }
+
+  async function uploadSlot(
+    slot: FileSlot,
+    setter: React.Dispatch<React.SetStateAction<FileSlot>>,
+    storagePath: string,
+    finalize: () => Promise<void>
+  ) {
+    if (slot.status === "uploaded" && slot.storagePath) return true;
+    if (!slot.file) {
+      setter((previous) => ({ ...previous, status: "error", error: t("uploadRequired") }));
+      return false;
+    }
+
+    try {
+      assertImageFile(slot.file, t("uploadImageInvalid"));
+      setter((previous) => ({ ...previous, status: "uploading", error: null }));
+      await uploadBytes(ref(getFirebaseStorage(), storagePath), slot.file, {
+        contentType: slot.file.type,
+      });
+      await finalize();
+      setter((previous) => ({
+        ...previous,
+        status: "uploaded",
+        storagePath,
+        error: null,
+      }));
+      return true;
+    } catch (error) {
+      setter((previous) => ({
+        ...previous,
+        status: "error",
+        error: readCallableError(error, t("uploadFailed")),
+      }));
+      return false;
+    }
+  }
+
+  async function ensureAvatarUploaded() {
+    const uid = providerUid || getFirebaseAuth().currentUser?.uid;
+    if (!uid || !avatar.file) {
+      setAvatar((previous) => ({ ...previous, status: "error", error: t("uploadRequired") }));
+      return false;
+    }
+    const storagePath =
+      avatar.storagePath || `providers/${uid}/avatar/${sanitizeFileName(avatar.file)}`;
+    return uploadSlot(avatar, setAvatar, storagePath, async () => {
+      const callable = httpsCallable(getFirebaseFunctions(), "finalizeProviderAvatarUpload");
+      await callable({ storagePath });
+    });
+  }
+
+  async function ensureDocumentUploaded(
+    documentType: "identity" | "professional",
+    slot: FileSlot,
+    setter: React.Dispatch<React.SetStateAction<FileSlot>>
+  ) {
+    const uid = providerUid || getFirebaseAuth().currentUser?.uid;
+    if (!uid || !slot.file) {
+      setter((previous) => ({ ...previous, status: "error", error: t("uploadRequired") }));
+      return false;
+    }
+    const storagePath =
+      slot.storagePath ||
+      `providers/${uid}/documents/${documentType}/${sanitizeFileName(slot.file)}`;
+    return uploadSlot(slot, setter, storagePath, async () => {
+      const callable = httpsCallable(getFirebaseFunctions(), "finalizeProviderDocumentUpload");
+      await callable({
+        documentType,
+        storagePath,
+        originalFileName: slot.file?.name || "document.jpg",
+      });
+    });
+  }
+
+  async function saveAvailability() {
+    const validationError = validateProviderWeekSchedule(weekSchedule);
+    if (validationError) {
+      setAvailabilityError(validationError);
+      return false;
+    }
+
+    setAvailabilitySaving(true);
+    setAvailabilityError(null);
+    try {
+      const callable = httpsCallable(getFirebaseFunctions(), "saveProviderAvailabilityProfile");
+      await callable({ weekSchedule });
+      setAvailabilitySaved(true);
+      return true;
+    } catch (error) {
+      setAvailabilityError(readCallableError(error, t("availabilitySaveFailed")));
+      return false;
+    } finally {
+      setAvailabilitySaving(false);
+    }
+  }
 
   async function goNextStep() {
     const stepFields: Record<number, Array<keyof FormValues>> = {
@@ -226,52 +447,150 @@ export default function ProviderOnboardingFormWizard({
         "acceptTerms",
       ],
     };
-    const valid = await trigger(stepFields[currentStep]);
-    if (valid) {
-      onStepChange(Math.min(3, currentStep + 1));
+
+    if (currentStep <= 3) {
+      const valid = await trigger(stepFields[currentStep]);
+      if (!valid) return;
     }
+
+    if (currentStep === 3 && !providerUid) {
+      const created = await createProviderAccount();
+      if (!created) return;
+    }
+
+    if (currentStep === 4) {
+      const uploaded = await ensureAvatarUploaded();
+      if (!uploaded) return;
+    }
+
+    if (currentStep === 5) {
+      const identityUploaded = await ensureDocumentUploaded(
+        "identity",
+        identityDocument,
+        setIdentityDocument
+      );
+      const professionalUploaded = await ensureDocumentUploaded(
+        "professional",
+        professionalDocument,
+        setProfessionalDocument
+      );
+      if (!identityUploaded || !professionalUploaded) return;
+    }
+
+    if (currentStep === 6) {
+      const saved = await saveAvailability();
+      if (!saved) return;
+    }
+
+    onStepChange(Math.min(MAX_STEP, currentStep + 1));
   }
 
   function goBackStep() {
     onStepChange(Math.max(1, currentStep - 1));
   }
 
-  async function onSubmit(values: FormValues) {
-    const { confirmPassword, ...formPayload } = values;
-    const selectedCity = findRomaniaCity(values.countyCode, values.cityCode);
-
-    if (!selectedCity) {
-      onStepChange(2);
-      toast.error(t("cityRequired"));
-      return;
-    }
-
-    const payload = {
-      ...formPayload,
-      city: selectedCity.cityName,
-    };
+  async function onSubmit() {
+    setFinalSubmitting(true);
+    setFinalError(null);
     try {
-      const res = await axios.post("/api/providers/onboarding", {
-        ...payload,
-        locale,
-      }, {
-        headers: { "x-next-intl-locale": locale },
-      });
-      if (res.status === 200) {
-        toast.success(t("toastSuccess"));
-        router.push("/providers/onboarding/success");
+      if (!providerUid && !getFirebaseAuth().currentUser?.uid) {
+        throw new Error(t("accountMissing"));
       }
-    } catch (error: unknown) {
-      const ax = error as {
-        response?: { data?: { error?: string; code?: string } };
-      };
-      const data = ax.response?.data;
-      const message =
-        typeof data?.error === "string" && data.error.length > 0
-          ? data.error
-          : t("toastGenericError");
+      if (avatar.status !== "uploaded") throw new Error(t("avatarRequired"));
+      if (identityDocument.status !== "uploaded" || professionalDocument.status !== "uploaded") {
+        throw new Error(t("documentsRequired"));
+      }
+      if (!availabilitySaved) {
+        const saved = await saveAvailability();
+        if (!saved) return;
+      }
+      const callable = httpsCallable(getFirebaseFunctions(), "submitProviderOnboarding");
+      await callable({});
+      toast.success(t("toastSuccess"));
+      router.push("/providers/onboarding/success");
+    } catch (error) {
+      const message = readCallableError(error, t("toastGenericError"));
+      setFinalError(message);
       toast.error(message);
+    } finally {
+      setFinalSubmitting(false);
     }
+  }
+
+  function renderFilePicker(
+    title: string,
+    description: string,
+    slot: FileSlot,
+    setter: React.Dispatch<React.SetStateAction<FileSlot>>
+  ) {
+    return (
+      <div className="rounded-xl border border-border p-4">
+        <div className="mb-3 flex items-start gap-3">
+          <span className="bg-primary/10 text-primary flex h-10 w-10 shrink-0 items-center justify-center rounded-full">
+            {slot.status === "uploaded" ? (
+              <FileCheck2 className="h-5 w-5" />
+            ) : (
+              <UploadCloud className="h-5 w-5" />
+            )}
+          </span>
+          <div>
+            <p className="font-medium text-black dark:text-white">{title}</p>
+            <p className="text-sm text-muted-foreground">{description}</p>
+          </div>
+        </div>
+
+        {slot.previewUrl && (
+          <Image
+            src={slot.previewUrl}
+            alt=""
+            width={720}
+            height={320}
+            unoptimized
+            className="mb-3 h-40 w-full rounded-lg object-cover"
+          />
+        )}
+
+        <input
+          type="file"
+          accept="image/*"
+          disabled={busy}
+          onChange={(event) => updateFileSlot(event.target.files?.[0] || null, setter)}
+          className="block w-full text-sm file:mr-4 file:rounded-md file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:font-medium file:text-white"
+        />
+
+        <p className="mt-2 text-xs text-muted-foreground">
+          {slot.status === "uploaded"
+            ? t("uploadStatusUploaded")
+            : slot.status === "uploading"
+              ? t("uploadStatusUploading")
+              : slot.file?.name || t("uploadStatusEmpty")}
+        </p>
+        {slot.error && <p className="mt-2 text-xs text-red-500">{slot.error}</p>}
+      </div>
+    );
+  }
+
+  function updateDay(dayKey: string, patch: Partial<ProviderWeekDay>) {
+    setAvailabilitySaved(false);
+    setWeekSchedule((previous) =>
+      previous.map((day) => (day.dayKey === dayKey ? { ...day, ...patch } : day))
+    );
+  }
+
+  function updateRange(dayKey: string, field: "startTime" | "endTime", value: string) {
+    setAvailabilitySaved(false);
+    setWeekSchedule((previous) =>
+      previous.map((day) =>
+        day.dayKey === dayKey
+          ? {
+              ...day,
+              timeRanges: day.timeRanges.map((range, index) =>
+                index === 0 ? { ...range, [field]: value } : range
+              ),
+            }
+          : day
+      )
+    );
   }
 
   return (
@@ -282,6 +601,7 @@ export default function ProviderOnboardingFormWizard({
             <InputGroup
               label={t("fullNameLabel")}
               placeholder={t("fullNamePh")}
+              disabled={Boolean(providerUid)}
               {...register("fullName", { required: t("fullNameRequired") })}
               errorMessages={errors.fullName?.message}
             />
@@ -289,6 +609,7 @@ export default function ProviderOnboardingFormWizard({
               type="email"
               label={t("emailLabel")}
               placeholder={t("emailPh")}
+              disabled={Boolean(providerUid)}
               {...register("email", {
                 required: t("emailRequired"),
                 validate: (value) => value.includes("@") || t("emailInvalid"),
@@ -303,14 +624,12 @@ export default function ProviderOnboardingFormWizard({
                 <input
                   id="provider-password"
                   type={showPassword ? "text" : "password"}
+                  disabled={Boolean(providerUid)}
                   placeholder={t("passwordPh")}
-                  className="border-stroke text-body focus:border-primary focus:shadow-input dark:border-stroke-dark dark:focus:border-primary w-full rounded-md border bg-white px-6 py-3 pr-12 text-base font-medium outline-hidden dark:bg-black dark:text-white"
+                  className="border-stroke text-body focus:border-primary focus:shadow-input dark:border-stroke-dark dark:focus:border-primary w-full rounded-md border bg-white px-6 py-3 pr-12 text-base font-medium outline-hidden disabled:opacity-60 dark:bg-black dark:text-white"
                   {...register("password", {
                     required: t("passwordRequired"),
-                    minLength: {
-                      value: 8,
-                      message: t("passwordMin"),
-                    },
+                    minLength: { value: 8, message: t("passwordMin") },
                   })}
                 />
                 <button
@@ -334,8 +653,9 @@ export default function ProviderOnboardingFormWizard({
                 <input
                   id="provider-confirm-password"
                   type={showConfirmPassword ? "text" : "password"}
+                  disabled={Boolean(providerUid)}
                   placeholder={t("confirmPasswordPh")}
-                  className="border-stroke text-body focus:border-primary focus:shadow-input dark:border-stroke-dark dark:focus:border-primary w-full rounded-md border bg-white px-6 py-3 pr-12 text-base font-medium outline-hidden dark:bg-black dark:text-white"
+                  className="border-stroke text-body focus:border-primary focus:shadow-input dark:border-stroke-dark dark:focus:border-primary w-full rounded-md border bg-white px-6 py-3 pr-12 text-base font-medium outline-hidden disabled:opacity-60 dark:bg-black dark:text-white"
                   {...register("confirmPassword", {
                     required: t("confirmPasswordRequired"),
                     validate: (value) =>
@@ -350,11 +670,7 @@ export default function ProviderOnboardingFormWizard({
                     showConfirmPassword ? t("hideConfirmPassword") : t("showConfirmPassword")
                   }
                 >
-                  {showConfirmPassword ? (
-                    <EyeOff className="h-4 w-4" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
-                  )}
+                  {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
               {errors.confirmPassword?.message && (
@@ -367,6 +683,7 @@ export default function ProviderOnboardingFormWizard({
               <InputGroup
                 label={t("phoneLabel")}
                 placeholder={t("phonePh")}
+                disabled={Boolean(providerUid)}
                 {...register("phone", { required: t("phoneRequired") })}
                 errorMessages={errors.phone?.message}
               />
@@ -385,7 +702,8 @@ export default function ProviderOnboardingFormWizard({
             <select
               id="provider-county"
               aria-label={t("countyAria")}
-              className="border-stroke text-body focus:border-primary focus:shadow-input dark:border-stroke-dark dark:focus:border-primary w-full rounded-md border bg-white px-6 py-3 text-base font-medium outline-hidden dark:bg-black dark:text-white"
+              disabled={Boolean(providerUid)}
+              className="border-stroke text-body focus:border-primary focus:shadow-input dark:border-stroke-dark dark:focus:border-primary w-full rounded-md border bg-white px-6 py-3 text-base font-medium outline-hidden disabled:opacity-60 dark:bg-black dark:text-white"
               {...register("countyCode", { required: t("countyRequired") })}
             >
               <option value="">{t("countyPlaceholder")}</option>
@@ -409,46 +727,32 @@ export default function ProviderOnboardingFormWizard({
                 {...register("cityCode", {
                   required: t("cityRequired"),
                   validate: (value) =>
-                    Boolean(findRomaniaCity(selectedCountyCode, value)) ||
-                    t("cityRequired"),
+                    Boolean(findRomaniaCity(selectedCountyCode, value)) || t("cityRequired"),
                 })}
               />
               <button
                 type="button"
                 id="provider-city"
-                disabled={!selectedCountyCode}
+                disabled={!selectedCountyCode || Boolean(providerUid)}
                 aria-label={t("cityAria")}
                 aria-haspopup="listbox"
                 aria-expanded={cityDropdownOpen}
                 aria-controls="provider-city-listbox"
                 onClick={() => {
-                  if (!selectedCountyCode) {
-                    return;
-                  }
+                  if (!selectedCountyCode || providerUid) return;
                   setCityDropdownOpen((open) => !open);
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === "Escape") {
-                    setCityDropdownOpen(false);
-                  }
                 }}
                 className={cn(
                   "border-stroke text-body focus:border-primary focus:shadow-input dark:border-stroke-dark dark:focus:border-primary flex w-full items-center justify-between gap-2 rounded-md border bg-white px-6 py-3 text-left text-base font-medium outline-hidden disabled:cursor-not-allowed disabled:opacity-60 dark:bg-black dark:text-white",
                   errors.cityCode && "border-red-500"
                 )}
               >
-                <span
-                  className={
-                    selectedCityRecord ?
-                      "text-body truncate"
-                    : "text-muted-foreground truncate"
-                  }
-                >
-                  {!selectedCountyCode ?
-                    t("cityDisabledPlaceholder")
-                  : selectedCityRecord ?
-                    selectedCityRecord.cityName
-                  : t("cityPlaceholder")}
+                <span className={selectedCityRecord ? "text-body truncate" : "text-muted-foreground truncate"}>
+                  {!selectedCountyCode
+                    ? t("cityDisabledPlaceholder")
+                    : selectedCityRecord
+                      ? selectedCityRecord.cityName
+                      : t("cityPlaceholder")}
                 </span>
                 <ChevronDown
                   className={cn(
@@ -459,7 +763,7 @@ export default function ProviderOnboardingFormWizard({
                 />
               </button>
 
-              {cityDropdownOpen && selectedCountyCode ?
+              {cityDropdownOpen && selectedCountyCode ? (
                 <div
                   className="border-stroke dark:border-stroke-dark absolute left-0 right-0 z-[100] mt-1 overflow-hidden rounded-md border bg-white shadow-lg dark:bg-black"
                   role="presentation"
@@ -472,12 +776,6 @@ export default function ProviderOnboardingFormWizard({
                     onChange={(event) => setCitySearch(event.target.value)}
                     placeholder={t("citySearchPlaceholder")}
                     className="border-stroke text-body focus:border-primary dark:border-stroke-dark w-full border-0 border-b bg-white px-4 py-2.5 text-sm outline-hidden dark:bg-black dark:text-white"
-                    onKeyDown={(event) => {
-                      if (event.key === "Escape") {
-                        event.stopPropagation();
-                        setCityDropdownOpen(false);
-                      }
-                    }}
                   />
                   <ul
                     id="provider-city-listbox"
@@ -492,9 +790,7 @@ export default function ProviderOnboardingFormWizard({
                           aria-selected={selectedCityCode === city.cityCode}
                           className="hover:bg-muted/80 dark:hover:bg-muted/20 w-full px-4 py-2.5 text-left text-sm text-body dark:text-white"
                           onClick={() => {
-                            setValue("cityCode", city.cityCode, {
-                              shouldValidate: true,
-                            });
+                            setValue("cityCode", city.cityCode, { shouldValidate: true });
                             setCitySearch("");
                             setCityDropdownOpen(false);
                           }}
@@ -504,13 +800,13 @@ export default function ProviderOnboardingFormWizard({
                       </li>
                     ))}
                   </ul>
-                  {filteredCities.length === 0 ?
+                  {filteredCities.length === 0 ? (
                     <p className="text-muted-foreground px-4 py-3 text-xs">
                       {t("cityEmpty")}
                     </p>
-                  : null}
+                  ) : null}
                 </div>
-              : null}
+              ) : null}
             </div>
             {errors.cityCode?.message && (
               <p className="mt-2 text-xs text-red-500">{errors.cityCode.message}</p>
@@ -523,10 +819,9 @@ export default function ProviderOnboardingFormWizard({
             <select
               id="provider-service"
               aria-label={t("serviceAria")}
-              className="border-stroke text-body focus:border-primary focus:shadow-input dark:border-stroke-dark dark:focus:border-primary w-full rounded-md border bg-white px-6 py-3 text-base font-medium outline-hidden dark:bg-black dark:text-white"
-              {...register("serviceType", {
-                required: t("serviceRequired"),
-              })}
+              disabled={Boolean(providerUid)}
+              className="border-stroke text-body focus:border-primary focus:shadow-input dark:border-stroke-dark dark:focus:border-primary w-full rounded-md border bg-white px-6 py-3 text-base font-medium outline-hidden disabled:opacity-60 dark:bg-black dark:text-white"
+              {...register("serviceType", { required: t("serviceRequired") })}
             >
               {PROVIDER_SERVICE_ENTRIES.map((entry) => (
                 <option key={entry.value} value={entry.value}>
@@ -550,7 +845,8 @@ export default function ProviderOnboardingFormWizard({
             <select
               id="provider-legal-status"
               aria-label={t("legalStatusAria")}
-              className="border-stroke text-body focus:border-primary focus:shadow-input dark:border-stroke-dark dark:focus:border-primary w-full rounded-md border bg-white px-6 py-3 text-base font-medium outline-hidden dark:bg-black dark:text-white"
+              disabled={Boolean(providerUid)}
+              className="border-stroke text-body focus:border-primary focus:shadow-input dark:border-stroke-dark dark:focus:border-primary w-full rounded-md border bg-white px-6 py-3 text-base font-medium outline-hidden disabled:opacity-60 dark:bg-black dark:text-white"
               {...register("legalStatus", { required: t("legalStatusRequired") })}
             >
               {legalStatusOptions.map((option) => (
@@ -570,6 +866,7 @@ export default function ProviderOnboardingFormWizard({
                 <InputGroup
                   label={t("companyLabel")}
                   placeholder={t("companyPh")}
+                  disabled={Boolean(providerUid)}
                   {...register("companyName", {
                     validate: (value) =>
                       !isLegalEntityReady || value.trim().length > 1 || t("companyRequired"),
@@ -580,6 +877,7 @@ export default function ProviderOnboardingFormWizard({
               <InputGroup
                 label={t("cuiLabel")}
                 placeholder={t("cuiPh")}
+                disabled={Boolean(providerUid)}
                 {...register("cui", {
                   validate: (value) =>
                     !isLegalEntityReady || value.trim().length > 1 || t("cuiRequired"),
@@ -589,6 +887,7 @@ export default function ProviderOnboardingFormWizard({
               <InputGroup
                 label={t("tradeRegisterLabel")}
                 placeholder={t("tradeRegisterPh")}
+                disabled={Boolean(providerUid)}
                 {...register("tradeRegisterNumber")}
                 errorMessages={errors.tradeRegisterNumber?.message}
               />
@@ -604,12 +903,11 @@ export default function ProviderOnboardingFormWizard({
                 <select
                   id="setup-timeline"
                   aria-label={t("timelineAria")}
-                  className="border-stroke text-body focus:border-primary focus:shadow-input dark:border-stroke-dark dark:focus:border-primary w-full rounded-md border bg-white px-6 py-3 text-base font-medium outline-hidden dark:bg-black dark:text-white"
+                  disabled={Boolean(providerUid)}
+                  className="border-stroke text-body focus:border-primary focus:shadow-input dark:border-stroke-dark dark:focus:border-primary w-full rounded-md border bg-white px-6 py-3 text-base font-medium outline-hidden disabled:opacity-60 dark:bg-black dark:text-white"
                   {...register("estimatedSetupTimeline", {
                     validate: (value) =>
-                      !isEntityInProgress ||
-                      value.trim().length > 0 ||
-                      t("timelineRequired"),
+                      !isEntityInProgress || value.trim().length > 0 || t("timelineRequired"),
                   })}
                 >
                   <option value="">{t("timelinePlaceholder")}</option>
@@ -619,7 +917,9 @@ export default function ProviderOnboardingFormWizard({
                   <option value="over_2_months">{t("timelineOver2")}</option>
                 </select>
                 {errors.estimatedSetupTimeline?.message && (
-                  <p className="mt-2 text-xs text-red-500">{errors.estimatedSetupTimeline.message}</p>
+                  <p className="mt-2 text-xs text-red-500">
+                    {errors.estimatedSetupTimeline.message}
+                  </p>
                 )}
               </fieldset>
               <fieldset>
@@ -629,7 +929,8 @@ export default function ProviderOnboardingFormWizard({
                 <select
                   id="has-accountant"
                   aria-label={t("accountantAria")}
-                  className="border-stroke text-body focus:border-primary focus:shadow-input dark:border-stroke-dark dark:focus:border-primary w-full rounded-md border bg-white px-6 py-3 text-base font-medium outline-hidden dark:bg-black dark:text-white"
+                  disabled={Boolean(providerUid)}
+                  className="border-stroke text-body focus:border-primary focus:shadow-input dark:border-stroke-dark dark:focus:border-primary w-full rounded-md border bg-white px-6 py-3 text-base font-medium outline-hidden disabled:opacity-60 dark:bg-black dark:text-white"
                   {...register("hasAccountant")}
                 >
                   <option value="unsure">{t("accountantUnsure")}</option>
@@ -640,10 +941,9 @@ export default function ProviderOnboardingFormWizard({
             </div>
           )}
 
-          {hasValidEmailForNewsletter && (
+          {hasValidEmailForNewsletter && !providerUid && (
             <div className="rounded-md border border-border p-3 sm:p-4">
               <p className="mb-2 text-sm font-medium">{t("newsletterTitle")}</p>
-
               {newsletterStatusLoading ? (
                 <p className="text-xs text-muted-foreground">{t("newsletterChecking")}</p>
               ) : isActiveNewsletterSubscriber ? (
@@ -662,7 +962,6 @@ export default function ProviderOnboardingFormWizard({
                   )}
                 />
               )}
-
               {newsletterStatusError && !newsletterStatusLoading && (
                 <p className="mt-2 text-xs text-muted-foreground">{newsletterStatusError}</p>
               )}
@@ -676,6 +975,7 @@ export default function ProviderOnboardingFormWizard({
               <Checkbox
                 name={field.name}
                 checked={field.value}
+                disabled={Boolean(providerUid)}
                 onChange={(event) => field.onChange(event.target.checked)}
                 label={t("launchContactOptIn")}
               />
@@ -685,14 +985,13 @@ export default function ProviderOnboardingFormWizard({
           <Controller
             control={control}
             name="acceptTerms"
-            rules={{
-              required: t("termsRequired"),
-            }}
+            rules={{ required: t("termsRequired") }}
             render={({ field, fieldState }) => (
               <div>
                 <Checkbox
                   name={field.name}
                   checked={field.value}
+                  disabled={Boolean(providerUid)}
                   onChange={(event) => field.onChange(event.target.checked)}
                   label={
                     <>
@@ -714,34 +1013,127 @@ export default function ProviderOnboardingFormWizard({
               </div>
             )}
           />
+          {providerUid && (
+            <p className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+              {t("accountReady")}
+            </p>
+          )}
         </>
+      )}
+
+      {currentStep === 4 && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <ImagePlus className="text-primary h-5 w-5" />
+            <p className="text-sm text-muted-foreground">{t("avatarIntro")}</p>
+          </div>
+          {renderFilePicker(t("avatarTitle"), t("avatarDescription"), avatar, setAvatar)}
+        </div>
+      )}
+
+      {currentStep === 5 && (
+        <div className="grid gap-4 md:grid-cols-2">
+          {renderFilePicker(
+            t("identityDocumentTitle"),
+            t("identityDocumentDescription"),
+            identityDocument,
+            setIdentityDocument
+          )}
+          {renderFilePicker(
+            t("professionalDocumentTitle"),
+            t("professionalDocumentDescription"),
+            professionalDocument,
+            setProfessionalDocument
+          )}
+        </div>
+      )}
+
+      {currentStep === 6 && (
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">{t("availabilityIntro")}</p>
+          <div className="space-y-2">
+            {weekSchedule.map((day) => (
+              <div
+                key={day.dayKey}
+                className="grid gap-3 rounded-lg border border-border p-3 md:grid-cols-[1fr_auto_auto]"
+              >
+                <label className="flex items-center gap-3 text-sm font-medium">
+                  <input
+                    type="checkbox"
+                    checked={day.isEnabled}
+                    onChange={(event) =>
+                      updateDay(day.dayKey, { isEnabled: event.target.checked })
+                    }
+                  />
+                  {day.label}
+                </label>
+                <input
+                  type="time"
+                  value={day.timeRanges[0]?.startTime || "09:00"}
+                  disabled={!day.isEnabled}
+                  onChange={(event) => updateRange(day.dayKey, "startTime", event.target.value)}
+                  className="rounded-md border border-input bg-background px-3 py-2 text-sm disabled:opacity-50"
+                />
+                <input
+                  type="time"
+                  value={day.timeRanges[0]?.endTime || "17:00"}
+                  disabled={!day.isEnabled}
+                  onChange={(event) => updateRange(day.dayKey, "endTime", event.target.value)}
+                  className="rounded-md border border-input bg-background px-3 py-2 text-sm disabled:opacity-50"
+                />
+              </div>
+            ))}
+          </div>
+          {availabilityError && <p className="text-sm text-red-500">{availabilityError}</p>}
+          {availabilitySaved && (
+            <p className="text-sm text-emerald-600">{t("availabilitySaved")}</p>
+          )}
+        </div>
+      )}
+
+      {currentStep === 7 && (
+        <div className="space-y-4 rounded-xl border border-border p-4">
+          <p className="text-sm text-muted-foreground">{t("finalReviewIntro")}</p>
+          <ul className="space-y-2 text-sm">
+            <li>{avatar.status === "uploaded" ? "✓" : "•"} {t("finalAvatar")}</li>
+            <li>
+              {identityDocument.status === "uploaded" &&
+              professionalDocument.status === "uploaded"
+                ? "✓"
+                : "•"}{" "}
+              {t("finalDocuments")}
+            </li>
+            <li>{availabilitySaved ? "✓" : "•"} {t("finalAvailability")}</li>
+          </ul>
+          {finalError && <p className="text-sm text-red-500">{finalError}</p>}
+        </div>
       )}
 
       <div className="mt-6 flex items-center justify-between gap-3 border-t border-border pt-6">
         <button
           type="button"
           onClick={goBackStep}
-          disabled={currentStep === 1 || isSubmitting}
+          disabled={currentStep === 1 || busy}
           className="border-stroke dark:border-stroke-dark hover:border-primary rounded-md border px-5 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
         >
           {t("back")}
         </button>
-        {currentStep < 3 ? (
+        {currentStep < MAX_STEP ? (
           <button
             type="button"
             onClick={goNextStep}
-            disabled={isSubmitting}
+            disabled={busy}
             className="bg-primary hover:bg-primary/90 rounded-md px-5 py-2 text-sm font-medium text-white disabled:opacity-60"
           >
-            {t("next")}
+            {accountCreating || availabilitySaving ? t("submitting") : t("next")}
           </button>
         ) : (
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={busy}
             className="bg-primary hover:bg-primary/90 rounded-md px-5 py-2 text-sm font-medium text-white disabled:opacity-60"
           >
-            {isSubmitting ? t("submitting") : t("submit")}
+            {finalSubmitting ? t("submitting") : t("submitReview")}
           </button>
         )}
       </div>

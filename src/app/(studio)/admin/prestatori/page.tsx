@@ -6,12 +6,11 @@ import { useEffect, useMemo, useState } from "react";
 import { useAdminData } from "@/components/admin/useAdminData";
 import { AdminTableSkeleton } from "@/components/admin/AdminSkeletonLayouts";
 import {
-  getProviderLaunchContactConsentState,
-  getProviderLegalConsentState,
   providerServiceOptions,
   providerStatusLabel,
   providerStatusVariant,
 } from "@/lib/providers";
+import { PROVIDER_STATUSES, type ProviderStatus } from "@/types/provider";
 import { ROMANIA_COUNTIES, getCitiesByCounty } from "@/lib/romaniaLocations";
 import { formatAdminDateTime } from "@/lib/formatAdminDateTime";
 import {
@@ -33,31 +32,31 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-type ProviderItem = {
-  id: string;
-  fullName: string;
-  email: string;
-  phone: string;
-  city: string;
-  cityCode?: string;
-  cityName?: string;
-  countyCode?: string;
-  countyName?: string;
-  serviceType: string;
-  onboardingStatus: keyof typeof providerStatusLabel;
-  termsAcceptedAt?: string | null;
-  termsVersion?: string | null;
-  privacyAcceptedAt?: string | null;
-  privacyVersion?: string | null;
-  launchContactConsent?: boolean;
-  launchContactConsentAt?: string | null;
-  launchContactConsentVersion?: string | null;
-  createdAt?: string;
+type ProviderListItem = {
+  providerId?: string;
+  id?: string;
+  status?: ProviderStatus | string;
+  accountStatus?: string | null;
+  email?: string | null;
+  phoneNumber?: string | null;
+  businessName?: string | null;
+  displayName?: string | null;
+  specialization?: string | null;
+  coverageAreaText?: string | null;
+  availabilitySummary?: string | null;
+  identityDocumentStatus?: string | null;
+  professionalDocumentStatus?: string | null;
+  submittedAt?: string | null;
+  lastReviewedAt?: string | null;
+  reviewedAt?: string | null;
+  reviewAction?: string | null;
+  lastPublishedAt?: string | null;
+  updatedAt?: string | null;
 };
 
 type ProvidersResponse = {
-  items: ProviderItem[];
-  pagination: {
+  items: ProviderListItem[];
+  pagination?: {
     page: number;
     pageSize: number;
     total: number;
@@ -65,28 +64,38 @@ type ProvidersResponse = {
   };
 };
 
-function getLegalConsentMeta(item: ProviderItem) {
-  switch (getProviderLegalConsentState(item)) {
-    case "accepted":
-      return { label: "Acceptat", variant: "success" as const };
-    case "partial":
-      return { label: "Parțial", variant: "warning" as const };
-    case "missing":
-    default:
-      return { label: "Lipsă", variant: "outline" as const };
-  }
+function getProviderId(item: ProviderListItem) {
+  return item.providerId || item.id || "";
 }
 
-function getLaunchContactMeta(item: ProviderItem) {
-  switch (getProviderLaunchContactConsentState(item)) {
-    case "accepted":
-      return { label: "Da", variant: "success" as const };
-    case "declined":
-      return { label: "Nu", variant: "secondary" as const };
-    case "missing":
-    default:
-      return { label: "Lipsă", variant: "outline" as const };
+function getStatusLabel(status?: string | null) {
+  if (!status) return "-";
+  return providerStatusLabel[status as keyof typeof providerStatusLabel] || status;
+}
+
+function getDocumentMeta(status?: string | null) {
+  if (status === "uploaded" || status === "approved") {
+    return { label: "Încărcat", variant: "success" as const };
   }
+  if (status === "pending" || status === "submitted") {
+    return { label: "În așteptare", variant: "warning" as const };
+  }
+  if (status === "rejected") {
+    return { label: "Respins", variant: "danger" as const };
+  }
+  return { label: "Lipsă", variant: "outline" as const };
+}
+
+function formatReviewTimeline(item: ProviderListItem) {
+  const submitted = formatAdminDateTime(item.submittedAt);
+  const reviewed = formatAdminDateTime(item.lastReviewedAt || item.reviewedAt);
+  const published = formatAdminDateTime(item.lastPublishedAt);
+
+  return [
+    submitted !== "-" ? `Trimis: ${submitted}` : null,
+    reviewed !== "-" ? `Revizuit: ${reviewed}` : null,
+    published !== "-" ? `Publicat: ${published}` : null,
+  ].filter(Boolean);
 }
 
 export default function AdminProvidersPage() {
@@ -129,7 +138,7 @@ export default function AdminProvidersPage() {
       <div>
         <h1 className="text-2xl font-semibold">Prestatori</h1>
         <p className="text-sm text-muted-foreground">
-          Lista prestatorilor înregistrați prin onboarding.
+          Verificare operațională pentru prestatorii înscriși și trimiși la review.
         </p>
       </div>
 
@@ -158,10 +167,11 @@ export default function AdminProvidersPage() {
             }}
           >
             <option value="all">Toate statusurile</option>
-            <option value="new">Nou</option>
-            <option value="in_review">În verificare</option>
-            <option value="approved">Aprobat</option>
-            <option value="rejected">Respins</option>
+            {PROVIDER_STATUSES.map((providerStatus) => (
+              <option key={providerStatus} value={providerStatus}>
+                {providerStatusLabel[providerStatus]}
+              </option>
+            ))}
           </select>
           <select
             className="h-9 rounded-md border border-input bg-background px-3 text-sm disabled:opacity-60"
@@ -232,7 +242,7 @@ export default function AdminProvidersPage() {
       <Card>
         <CardHeader>
           <CardTitle>Lista prestatori</CardTitle>
-          <CardDescription>{pagination?.total || 0} rezultate</CardDescription>
+          <CardDescription>{pagination?.total || items.length} rezultate</CardDescription>
         </CardHeader>
         <CardContent>
           {error && <p className="mb-4 text-sm text-rose-500">{error}</p>}
@@ -242,99 +252,113 @@ export default function AdminProvidersPage() {
           : <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Nume</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Județ / Oraș</TableHead>
-                  <TableHead>Serviciu</TableHead>
+                  <TableHead>Provider</TableHead>
+                  <TableHead>Contact</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Termeni / Politică</TableHead>
-                  <TableHead>Contact lansare</TableHead>
-                  <TableHead>Creat la</TableHead>
+                  <TableHead>Specializare</TableHead>
+                  <TableHead>Zonă</TableHead>
+                  <TableHead>Document identitate</TableHead>
+                  <TableHead>Document profesional</TableHead>
+                  <TableHead>Disponibilitate</TableHead>
+                  <TableHead>Timeline</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {items.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center text-sm text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center text-sm text-muted-foreground">
                       Nu există prestatori pentru filtrele curente.
                     </TableCell>
                   </TableRow>
                 )}
-                {items.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell className="font-medium">{item.fullName}</TableCell>
-                    <TableCell>{item.email}</TableCell>
-                    <TableCell>
-                      {[item.countyName, item.cityName || item.city].filter(Boolean).join(" / ") ||
-                        "-"}
-                    </TableCell>
-                    <TableCell>{item.serviceType}</TableCell>
-                    <TableCell>
-                      <Badge variant={providerStatusVariant(item.onboardingStatus)}>
-                        {providerStatusLabel[item.onboardingStatus] || item.onboardingStatus}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {(() => {
-                        const consentMeta = getLegalConsentMeta(item);
-                        return <Badge variant={consentMeta.variant}>{consentMeta.label}</Badge>;
-                      })()}
-                    </TableCell>
-                    <TableCell>
-                      {(() => {
-                        const contactMeta = getLaunchContactMeta(item);
-                        return <Badge variant={contactMeta.variant}>{contactMeta.label}</Badge>;
-                      })()}
-                    </TableCell>
-                    <TableCell>{formatAdminDateTime(item.createdAt)}</TableCell>
-                    <TableCell className="text-right align-middle">
-                      <Button
-                        variant="outline"
-                        size="default"
-                        className="h-9 min-w-[9.25rem] shrink-0 gap-2 px-4 font-medium shadow-sm hover:bg-muted/80"
-                        asChild
-                      >
-                        <Link
-                          href={`/admin/prestatori/${item.id}`}
-                          className="inline-flex items-center justify-center"
-                        >
-                          <FileText className="h-4 w-4 shrink-0 opacity-90" aria-hidden />
-                          <span className="whitespace-nowrap">Vezi fișa</span>
-                        </Link>
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {items.map((item) => {
+                  const providerId = getProviderId(item);
+                  const identityMeta = getDocumentMeta(item.identityDocumentStatus);
+                  const professionalMeta = getDocumentMeta(item.professionalDocumentStatus);
+                  const timeline = formatReviewTimeline(item);
+
+                  return (
+                    <TableRow key={providerId || item.email || item.displayName}>
+                      <TableCell>
+                        <div className="font-medium">
+                          {item.displayName || item.businessName || providerId || "-"}
+                        </div>
+                        {item.businessName && item.businessName !== item.displayName && (
+                          <div className="text-xs text-muted-foreground">{item.businessName}</div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div>{item.email || "-"}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {item.phoneNumber || "-"}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={providerStatusVariant(item.status)}>
+                          {getStatusLabel(item.status)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{item.specialization || "-"}</TableCell>
+                      <TableCell>{item.coverageAreaText || "-"}</TableCell>
+                      <TableCell>
+                        <Badge variant={identityMeta.variant}>{identityMeta.label}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={professionalMeta.variant}>{professionalMeta.label}</Badge>
+                      </TableCell>
+                      <TableCell>{item.availabilitySummary || "-"}</TableCell>
+                      <TableCell>
+                        {timeline.length ? (
+                          <div className="space-y-1 text-xs text-muted-foreground">
+                            {timeline.map((line) => (
+                              <div key={line}>{line}</div>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button size="sm" variant="outline" asChild disabled={!providerId}>
+                          <Link href={`/admin/prestatori/${providerId}`}>
+                            <FileText className="mr-2 h-4 w-4" />
+                            Detalii
+                          </Link>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           }
 
-          <div className="mt-4 flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">
-              Pagina {pagination?.page || 1} din {pagination?.totalPages || 1}
-            </span>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-                disabled={loading || (pagination?.page || 1) <= 1}
-              >
-                Anterior
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((prev) => prev + 1)}
-                disabled={
-                  loading || (pagination?.page || 1) >= (pagination?.totalPages || 1)
-                }
-              >
-                Următor
-              </Button>
+          {pagination && pagination.totalPages > 1 && (
+            <div className="mt-4 flex items-center justify-between text-sm">
+              <span>
+                Pagina {pagination.page} din {pagination.totalPages}
+              </span>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={loading || page <= 1}
+                  onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
+                >
+                  Înapoi
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={loading || page >= pagination.totalPages}
+                  onClick={() => setPage((prev) => prev + 1)}
+                >
+                  Înainte
+                </Button>
+              </div>
             </div>
-          </div>
+          )}
         </CardContent>
       </Card>
     </div>

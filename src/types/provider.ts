@@ -1,5 +1,15 @@
-export const PROVIDER_STATUSES = ["new", "in_review", "approved", "rejected"] as const;
+export const PROVIDER_STATUSES = [
+  "pre_registered",
+  "pending_review",
+  "approved",
+  "rejected",
+  "suspended",
+] as const;
 export type ProviderStatus = (typeof PROVIDER_STATUSES)[number];
+
+export const LEGACY_PROVIDER_STATUSES = ["new", "in_review"] as const;
+export type LegacyProviderStatus = (typeof LEGACY_PROVIDER_STATUSES)[number];
+export type ProviderStatusLike = ProviderStatus | LegacyProviderStatus;
 
 export const PROVIDER_LEGAL_STATUSES = [
   "pfa_ready",
@@ -52,7 +62,7 @@ export type ProviderRecord = {
   launchContactConsent?: boolean;
   launchContactConsentAt?: string | null;
   launchContactConsentVersion?: string | null;
-  onboardingStatus: ProviderStatus;
+  onboardingStatus: ProviderStatusLike;
   source: "landing_onboarding";
   internalNotes?: string;
   welcomeEmailSent?: boolean;
