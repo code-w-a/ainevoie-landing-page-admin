@@ -131,6 +131,7 @@ describe("admin provider callable proxy routes", () => {
             providerId: "provider-1",
             action: "suspend",
             reason: "Document expirat",
+            adminUid: "admin-uid",
             adminApiKey: "admin-secret",
           },
         }),

@@ -10,6 +10,7 @@ import {
   ChevronRight,
   Copy,
   MoreHorizontal,
+  Pencil,
   Trash2,
 } from "lucide-react";
 
@@ -1755,7 +1756,12 @@ export default function CampaignsPage() {
                             <DropdownMenuContent align="end" className="w-52">
                               {id && (
                                 <DropdownMenuItem asChild>
-                                  <Link href={`/admin/campaigns/${id}`}>Vezi campanie</Link>
+                                  <Link href={`/admin/campaigns/${id}`}>
+                                    {status === "draft" && (
+                                      <Pencil className="mr-2 h-4 w-4" aria-hidden />
+                                    )}
+                                    {status === "draft" ? "Editează" : "Vezi campanie"}
+                                  </Link>
                                 </DropdownMenuItem>
                               )}
                               {id && (

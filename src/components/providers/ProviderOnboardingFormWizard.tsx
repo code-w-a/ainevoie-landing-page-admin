@@ -3,11 +3,6 @@
 import { Checkbox } from "@/components/ui/checkbox";
 import { InputGroup } from "@/components/ui/input-group";
 import { getFirebaseAuth, getFirebaseFunctions, getFirebaseStorage } from "@/lib/firebaseClient";
-import {
-  cloneDefaultProviderWeekSchedule,
-  validateProviderWeekSchedule,
-  type ProviderWeekDay,
-} from "@/lib/providerAvailability";
 import { PROVIDER_SERVICE_ENTRIES } from "@/lib/providers";
 import {
   ROMANIA_COUNTIES,
@@ -64,7 +59,7 @@ type FileSlot = {
   error: string | null;
 };
 
-const MAX_STEP = 7;
+const MAX_STEP = 6;
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
 function emptyFileSlot(): FileSlot {
@@ -119,12 +114,6 @@ export default function ProviderOnboardingFormWizard({
   const [avatar, setAvatar] = useState<FileSlot>(() => emptyFileSlot());
   const [identityDocument, setIdentityDocument] = useState<FileSlot>(() => emptyFileSlot());
   const [professionalDocument, setProfessionalDocument] = useState<FileSlot>(() => emptyFileSlot());
-  const [weekSchedule, setWeekSchedule] = useState<ProviderWeekDay[]>(
-    cloneDefaultProviderWeekSchedule
-  );
-  const [availabilitySaved, setAvailabilitySaved] = useState(false);
-  const [availabilitySaving, setAvailabilitySaving] = useState(false);
-  const [availabilityError, setAvailabilityError] = useState<string | null>(null);
   const [finalSubmitting, setFinalSubmitting] = useState(false);
   const [finalError, setFinalError] = useState<string | null>(null);
   const cityComboRef = useRef<HTMLDivElement>(null);
@@ -190,7 +179,7 @@ export default function ProviderOnboardingFormWizard({
       normalizeRomaniaLocationName(city.cityName).includes(normalizedCitySearch)
     );
   }, [availableCities, normalizedCitySearch]);
-  const busy = accountCreating || availabilitySaving || finalSubmitting;
+  const busy = accountCreating || finalSubmitting;
 
   useEffect(() => {
     setValue("cityCode", "", { shouldValidate: false });
@@ -411,28 +400,6 @@ export default function ProviderOnboardingFormWizard({
     });
   }
 
-  async function saveAvailability() {
-    const validationError = validateProviderWeekSchedule(weekSchedule);
-    if (validationError) {
-      setAvailabilityError(validationError);
-      return false;
-    }
-
-    setAvailabilitySaving(true);
-    setAvailabilityError(null);
-    try {
-      const callable = httpsCallable(getFirebaseFunctions(), "saveProviderAvailabilityProfile");
-      await callable({ weekSchedule });
-      setAvailabilitySaved(true);
-      return true;
-    } catch (error) {
-      setAvailabilityError(readCallableError(error, t("availabilitySaveFailed")));
-      return false;
-    } finally {
-      setAvailabilitySaving(false);
-    }
-  }
-
   async function goNextStep() {
     const stepFields: Record<number, Array<keyof FormValues>> = {
       1: ["fullName", "email", "password", "confirmPassword", "phone"],
@@ -477,11 +444,6 @@ export default function ProviderOnboardingFormWizard({
       if (!identityUploaded || !professionalUploaded) return;
     }
 
-    if (currentStep === 6) {
-      const saved = await saveAvailability();
-      if (!saved) return;
-    }
-
     onStepChange(Math.min(MAX_STEP, currentStep + 1));
   }
 
@@ -499,10 +461,6 @@ export default function ProviderOnboardingFormWizard({
       if (avatar.status !== "uploaded") throw new Error(t("avatarRequired"));
       if (identityDocument.status !== "uploaded" || professionalDocument.status !== "uploaded") {
         throw new Error(t("documentsRequired"));
-      }
-      if (!availabilitySaved) {
-        const saved = await saveAvailability();
-        if (!saved) return;
       }
       const callable = httpsCallable(getFirebaseFunctions(), "submitProviderOnboarding");
       await callable({});
@@ -567,29 +525,6 @@ export default function ProviderOnboardingFormWizard({
         </p>
         {slot.error && <p className="mt-2 text-xs text-red-500">{slot.error}</p>}
       </div>
-    );
-  }
-
-  function updateDay(dayKey: string, patch: Partial<ProviderWeekDay>) {
-    setAvailabilitySaved(false);
-    setWeekSchedule((previous) =>
-      previous.map((day) => (day.dayKey === dayKey ? { ...day, ...patch } : day))
-    );
-  }
-
-  function updateRange(dayKey: string, field: "startTime" | "endTime", value: string) {
-    setAvailabilitySaved(false);
-    setWeekSchedule((previous) =>
-      previous.map((day) =>
-        day.dayKey === dayKey
-          ? {
-              ...day,
-              timeRanges: day.timeRanges.map((range, index) =>
-                index === 0 ? { ...range, [field]: value } : range
-              ),
-            }
-          : day
-      )
     );
   }
 
@@ -1049,49 +984,6 @@ export default function ProviderOnboardingFormWizard({
       )}
 
       {currentStep === 6 && (
-        <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">{t("availabilityIntro")}</p>
-          <div className="space-y-2">
-            {weekSchedule.map((day) => (
-              <div
-                key={day.dayKey}
-                className="grid gap-3 rounded-lg border border-border p-3 md:grid-cols-[1fr_auto_auto]"
-              >
-                <label className="flex items-center gap-3 text-sm font-medium">
-                  <input
-                    type="checkbox"
-                    checked={day.isEnabled}
-                    onChange={(event) =>
-                      updateDay(day.dayKey, { isEnabled: event.target.checked })
-                    }
-                  />
-                  {day.label}
-                </label>
-                <input
-                  type="time"
-                  value={day.timeRanges[0]?.startTime || "09:00"}
-                  disabled={!day.isEnabled}
-                  onChange={(event) => updateRange(day.dayKey, "startTime", event.target.value)}
-                  className="rounded-md border border-input bg-background px-3 py-2 text-sm disabled:opacity-50"
-                />
-                <input
-                  type="time"
-                  value={day.timeRanges[0]?.endTime || "17:00"}
-                  disabled={!day.isEnabled}
-                  onChange={(event) => updateRange(day.dayKey, "endTime", event.target.value)}
-                  className="rounded-md border border-input bg-background px-3 py-2 text-sm disabled:opacity-50"
-                />
-              </div>
-            ))}
-          </div>
-          {availabilityError && <p className="text-sm text-red-500">{availabilityError}</p>}
-          {availabilitySaved && (
-            <p className="text-sm text-emerald-600">{t("availabilitySaved")}</p>
-          )}
-        </div>
-      )}
-
-      {currentStep === 7 && (
         <div className="space-y-4 rounded-xl border border-border p-4">
           <p className="text-sm text-muted-foreground">{t("finalReviewIntro")}</p>
           <ul className="space-y-2 text-sm">
@@ -1103,7 +995,6 @@ export default function ProviderOnboardingFormWizard({
                 : "•"}{" "}
               {t("finalDocuments")}
             </li>
-            <li>{availabilitySaved ? "✓" : "•"} {t("finalAvailability")}</li>
           </ul>
           {finalError && <p className="text-sm text-red-500">{finalError}</p>}
         </div>
@@ -1125,7 +1016,7 @@ export default function ProviderOnboardingFormWizard({
             disabled={busy}
             className="bg-primary hover:bg-primary/90 rounded-md px-5 py-2 text-sm font-medium text-white disabled:opacity-60"
           >
-            {accountCreating || availabilitySaving ? t("submitting") : t("next")}
+            {accountCreating ? t("submitting") : t("next")}
           </button>
         ) : (
           <button

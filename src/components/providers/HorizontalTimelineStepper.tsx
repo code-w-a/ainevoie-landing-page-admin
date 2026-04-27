@@ -20,8 +20,7 @@ export default function HorizontalTimelineStepper({
       { id: 3, label: t("stepConfirm") },
       { id: 4, label: t("stepAvatar") },
       { id: 5, label: t("stepDocuments") },
-      { id: 6, label: t("stepAvailability") },
-      { id: 7, label: t("stepReview") },
+      { id: 6, label: t("stepReview") },
     ],
     [t]
   );
@@ -51,7 +50,7 @@ export default function HorizontalTimelineStepper({
           aria-hidden="true"
         />
 
-        <div className="relative z-10 grid grid-cols-7">
+        <div className="relative z-10 grid grid-cols-6">
           {steps.map((step) => {
             const isCompleted = step.id < safeStep;
             const isCurrent = step.id === safeStep;

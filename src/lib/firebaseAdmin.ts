@@ -1,5 +1,6 @@
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
 
 /**
  * Server-side Firestore uses the service account from FIREBASE_PROJECT_ID,
@@ -14,18 +15,29 @@ function getPrivateKey() {
   return key.replace(/\\n/g, "\n");
 }
 
-export function getAdminDb() {
+function getAdminApp() {
   if (!getApps().length) {
-    initializeApp({
+    return initializeApp({
       credential: cert({
         projectId: process.env.FIREBASE_PROJECT_ID,
         clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
         privateKey: getPrivateKey(),
       }),
+      storageBucket: process.env.FIREBASE_STORAGE_BUCKET || process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
     });
   }
 
-  return getFirestore();
+  return getApps()[0];
+}
+
+export function getAdminDb() {
+  return getFirestore(getAdminApp());
+}
+
+export function getAdminStorageBucket() {
+  const bucketName = process.env.FIREBASE_STORAGE_BUCKET || process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+  const storage = getStorage(getAdminApp());
+  return bucketName ? storage.bucket(bucketName) : storage.bucket();
 }
 
 export function serializeDoc(doc: FirebaseFirestore.DocumentSnapshot) {

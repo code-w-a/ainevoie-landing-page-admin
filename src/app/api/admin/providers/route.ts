@@ -13,10 +13,9 @@ function readPositiveNumber(value: string | null, fallback: number, max: number)
 
 export async function GET(request: Request) {
   try {
-    await requireAdmin(request);
+    const admin = await requireAdmin(request);
     const { searchParams } = new URL(request.url);
-
-    const result = await callAdminCallable("listAdminProviders", {
+    const filters = {
       page: readPositiveNumber(searchParams.get("page"), 1, 10_000),
       pageSize: readPositiveNumber(searchParams.get("pageSize"), 20, 100),
       q: searchParams.get("q")?.trim() || undefined,
@@ -24,14 +23,31 @@ export async function GET(request: Request) {
       countyCode: searchParams.get("countyCode")?.trim() || undefined,
       cityCode: searchParams.get("cityCode")?.trim() || undefined,
       serviceType: searchParams.get("serviceType")?.trim() || undefined,
-    }, "Nu am putut încărca prestatorii.");
+    };
+
+    console.info("[admin-providers] list request", {
+      adminUid: admin.uid,
+      filters,
+    });
+
+    const result = await callAdminCallable(
+      "listAdminProviders",
+      filters,
+      "Nu am putut încărca prestatorii.",
+      admin.idToken
+    );
 
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof AdminCallableError) {
+      console.error("[admin-providers] callable error", {
+        status: error.status,
+        message: error.message,
+      });
       return NextResponse.json({ error: error.message }, { status: error.status });
     }
 
+    console.error("[admin-providers] route error", error);
     captureServerException(error, { route: "api/admin/providers/route.ts" });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Nu am putut încărca prestatorii." },

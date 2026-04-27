@@ -7,6 +7,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock3,
+  ExternalLink,
   FileCheck2,
   FileSearch,
   RotateCcw,
@@ -117,6 +118,7 @@ type ProviderDocumentFile = {
   originalFileName?: string | null;
   uploadedAt?: string | null;
 };
+type ProviderDocumentType = "identity" | "professional";
 
 type ProviderCase = {
   provider?: ProviderDocument | null;
@@ -137,7 +139,7 @@ const actionMeta: Record<
   approve: {
     label: "Aprobă",
     title: "Aprobă prestatorul",
-    description: "Backend-ul va valida profilul, documentele și disponibilitatea înainte de aprobare.",
+    description: "Sistemul verifică profilul, documentele și disponibilitatea înainte de aprobare.",
   },
   reject: {
     label: "Respinge",
@@ -154,8 +156,15 @@ const actionMeta: Record<
   reinstate: {
     label: "Reactivează",
     title: "Reactivează prestatorul",
-    description: "Backend-ul va republica snapshot-ul public dacă regulile sunt îndeplinite.",
+    description: "Prestatorul va redeveni vizibil pentru clienți dacă datele necesare sunt complete.",
   },
+};
+
+const reviewActionLabel: Record<string, string> = {
+  approve: "Aprobat",
+  reject: "Respins",
+  suspend: "Suspendat",
+  reinstate: "Reactivat",
 };
 
 function getProviderFromCase(data: ProviderCase | null) {
@@ -214,6 +223,23 @@ function getDocumentMeta(doc?: ProviderDocumentFile | null) {
   return { label: "Lipsă", ok: false, variant: "outline" as const };
 }
 
+function canViewProviderDocument(doc?: ProviderDocumentFile | null) {
+  return (
+    Boolean(doc?.storagePath) &&
+    (doc?.status === "uploaded" || doc?.status === "approved")
+  );
+}
+
+function getDocumentDisplayName(doc?: ProviderDocumentFile | null) {
+  if (doc?.originalFileName) {
+    return doc.originalFileName;
+  }
+  if (doc?.storagePath) {
+    return "Fișier încărcat";
+  }
+  return "-";
+}
+
 function hasConfiguredAvailability(provider: ProviderDocument, availability?: Record<string, unknown> | null) {
   if (provider.professionalProfile?.availabilitySummary) {
     return true;
@@ -248,6 +274,24 @@ function formatValue(value: unknown) {
     return value ? "Da" : "Nu";
   }
   return "-";
+}
+
+function formatReviewAction(value: unknown) {
+  if (typeof value !== "string" || !value.trim()) {
+    return "-";
+  }
+  return reviewActionLabel[value] || value;
+}
+
+function formatActivityLabel(value: unknown) {
+  if (typeof value !== "string" || !value.trim()) {
+    return "-";
+  }
+  const cleaned = value.replace(/^provider\./, "");
+  return (
+    reviewActionLabel[cleaned] ||
+    cleaned.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase())
+  );
 }
 
 function getAvailableActions(status: string): ReviewAction[] {
@@ -297,7 +341,7 @@ function ReviewDecisionDialog({
               value={reason}
               disabled={loading}
               onChange={(event) => setReason(event.target.value)}
-              placeholder="Scrie motivul care va fi transmis către backend..."
+              placeholder="Scrie motivul care va fi salvat pentru această decizie..."
             />
           </div>
         )}
@@ -333,6 +377,11 @@ export default function ProviderDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [dialogAction, setDialogAction] = useState<ReviewAction | null>(null);
+  const [documentPreviewOpen, setDocumentPreviewOpen] = useState(false);
+  const [documentPreviewTitle, setDocumentPreviewTitle] = useState("");
+  const [documentPreviewUrl, setDocumentPreviewUrl] = useState<string | null>(null);
+  const [documentPreviewLoading, setDocumentPreviewLoading] = useState(false);
+  const [documentPreviewError, setDocumentPreviewError] = useState<string | null>(null);
 
   const loadDetails = useCallback(async () => {
     if (!id) return;
@@ -356,6 +405,14 @@ export default function ProviderDetailPage() {
   useEffect(() => {
     void loadDetails();
   }, [loadDetails]);
+
+  useEffect(() => {
+    return () => {
+      if (documentPreviewUrl) {
+        URL.revokeObjectURL(documentPreviewUrl);
+      }
+    };
+  }, [documentPreviewUrl]);
 
   const provider = getProviderFromCase(data);
   const status = provider ? getStatus(provider) : "";
@@ -382,6 +439,47 @@ export default function ProviderDetailPage() {
       return false;
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function openDocumentPreview(documentType: ProviderDocumentType, title: string) {
+    if (!id) return;
+    if (documentPreviewUrl) {
+      URL.revokeObjectURL(documentPreviewUrl);
+    }
+    setDocumentPreviewUrl(null);
+    setDocumentPreviewError(null);
+    setDocumentPreviewTitle(title);
+    setDocumentPreviewOpen(true);
+    setDocumentPreviewLoading(true);
+
+    try {
+      const res = await adminFetch(`/api/admin/providers/${id}/documents/${documentType}`, {
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        throw new Error(await readAdminResponseError(res, "Documentul nu poate fi încărcat."));
+      }
+      const blob = await res.blob();
+      setDocumentPreviewUrl(URL.createObjectURL(blob));
+    } catch (err) {
+      setDocumentPreviewError(
+        err instanceof Error ? err.message : "Documentul nu poate fi încărcat."
+      );
+    } finally {
+      setDocumentPreviewLoading(false);
+    }
+  }
+
+  function closeDocumentPreview(open: boolean) {
+    setDocumentPreviewOpen(open);
+    if (!open) {
+      if (documentPreviewUrl) {
+        URL.revokeObjectURL(documentPreviewUrl);
+      }
+      setDocumentPreviewUrl(null);
+      setDocumentPreviewError(null);
+      setDocumentPreviewLoading(false);
     }
   }
 
@@ -434,7 +532,6 @@ export default function ProviderDetailPage() {
   const professionalMeta = getDocumentMeta(provider.documents?.professional);
   const availabilityOk = hasConfiguredAvailability(provider, data?.availability);
   const profileOk = Boolean(profile.displayName && profile.specialization && (profile.coverageAreaText || provider.coverageAreaText));
-  const publicSnapshotOk = Boolean(data?.providerDirectory);
   const legalConsentMeta =
     getProviderLegalConsentState(provider) === "accepted"
       ? { label: "Acceptat", variant: "success" as const }
@@ -452,7 +549,7 @@ export default function ProviderDetailPage() {
     {
       label: "Profil profesional complet",
       ok: profileOk,
-      detail: profileOk ? "Display name, specializare și zonă completate" : "Lipsesc date de profil",
+      detail: profileOk ? "Nume public, specializare și zonă completate" : "Lipsesc date de profil",
     },
     {
       label: "Document identitate",
@@ -468,11 +565,6 @@ export default function ProviderDetailPage() {
       label: "Disponibilitate configurată",
       ok: availabilityOk,
       detail: profile.availabilitySummary || (availabilityOk ? "Configurată" : "Lipsă"),
-    },
-    {
-      label: "Snapshot public",
-      ok: publicSnapshotOk,
-      detail: publicSnapshotOk ? "providerDirectory există" : "Nepublicat",
     },
   ];
 
@@ -490,7 +582,7 @@ export default function ProviderDetailPage() {
           <p className="text-sm text-muted-foreground">
             {provider.email || "-"} {provider.phoneNumber || provider.phone ? `• ${provider.phoneNumber || provider.phone}` : ""}
           </p>
-          <p className="text-xs text-muted-foreground">ID: {providerId}</p>
+          <p className="text-xs text-muted-foreground">Cod intern: {providerId}</p>
         </div>
         <Button variant="outline" asChild>
           <Link href="/admin/prestatori">Înapoi la listă</Link>
@@ -501,9 +593,9 @@ export default function ProviderDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Verificare provider</CardTitle>
+          <CardTitle>Verificare prestator</CardTitle>
           <CardDescription>
-            Checklist vizual pentru condițiile pe care backend-ul le validează la aprobare.
+            Condițiile necesare pentru ca prestatorul să poată fi aprobat și afișat clienților.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
@@ -526,13 +618,13 @@ export default function ProviderDetailPage() {
         <CardHeader>
           <CardTitle>Acțiuni</CardTitle>
           <CardDescription>
-            Deciziile folosesc exclusiv callable-ul adminReviewProvider.
+            Deciziile actualizează starea prestatorului și vizibilitatea lui în aplicație.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {availableActions.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              Nu există acțiuni disponibile pentru statusul curent.
+              Nu există acțiuni disponibile pentru starea curentă.
             </p>
           ) : (
             <div className="flex flex-wrap gap-2">
@@ -574,7 +666,7 @@ export default function ProviderDetailPage() {
             <p className="text-sm">{formatValue(profile.displayName)}</p>
           </div>
           <div>
-            <p className="text-xs uppercase text-muted-foreground">Business</p>
+            <p className="text-xs uppercase text-muted-foreground">Denumire firmă</p>
             <p className="text-sm">{formatValue(profile.businessName)}</p>
           </div>
           <div>
@@ -598,7 +690,7 @@ export default function ProviderDetailPage() {
             <p className="text-sm">{formatValue(profile.availabilitySummary)}</p>
           </div>
           <div className="md:col-span-2">
-            <p className="text-xs uppercase text-muted-foreground">Bio</p>
+            <p className="text-xs uppercase text-muted-foreground">Descriere</p>
             <p className="text-sm">{formatValue(profile.shortBio)}</p>
           </div>
         </CardContent>
@@ -615,9 +707,20 @@ export default function ProviderDetailPage() {
               <FileCheck2 className="h-3.5 w-3.5" />
               {identityMeta.label}
             </Badge>
-            <p className="mt-2 text-xs text-muted-foreground">
-              {provider.documents?.identity?.storagePath || "-"}
+            <p className="mt-2 break-all text-xs text-muted-foreground">
+              {getDocumentDisplayName(provider.documents?.identity)}
             </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="mt-3"
+              disabled={!canViewProviderDocument(provider.documents?.identity)}
+              onClick={() => openDocumentPreview("identity", "Document identitate")}
+            >
+              <FileSearch className="h-4 w-4" />
+              Vezi document
+            </Button>
           </div>
           <div>
             <p className="text-xs uppercase text-muted-foreground">Document profesional</p>
@@ -625,9 +728,20 @@ export default function ProviderDetailPage() {
               <FileCheck2 className="h-3.5 w-3.5" />
               {professionalMeta.label}
             </Badge>
-            <p className="mt-2 text-xs text-muted-foreground">
-              {provider.documents?.professional?.storagePath || "-"}
+            <p className="mt-2 break-all text-xs text-muted-foreground">
+              {getDocumentDisplayName(provider.documents?.professional)}
             </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="mt-3"
+              disabled={!canViewProviderDocument(provider.documents?.professional)}
+              onClick={() => openDocumentPreview("professional", "Document profesional")}
+            >
+              <FileSearch className="h-4 w-4" />
+              Vezi document
+            </Button>
           </div>
           <div>
             <p className="text-xs uppercase text-muted-foreground">Trimis la verificare</p>
@@ -636,7 +750,7 @@ export default function ProviderDetailPage() {
           <div>
             <p className="text-xs uppercase text-muted-foreground">Ultima decizie</p>
             <p className="text-sm">
-              {formatValue(provider.adminReview?.action)} • {formatAdminDateTime(provider.adminReview?.reviewedAt || provider.reviewState?.lastReviewedAt)}
+              {formatReviewAction(provider.adminReview?.action)} • {formatAdminDateTime(provider.adminReview?.reviewedAt || provider.reviewState?.lastReviewedAt)}
             </p>
           </div>
           <div>
@@ -652,14 +766,14 @@ export default function ProviderDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Date preînregistrare</CardTitle>
+          <CardTitle>Date din înscriere</CardTitle>
           <CardDescription>
-            Câmpurile capturate de formularul public rămân vizibile pentru context operațional.
+            Informațiile trimise de prestator în formularul de înscriere.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
           <div>
-            <p className="text-xs uppercase text-muted-foreground">Nume formular</p>
+            <p className="text-xs uppercase text-muted-foreground">Nume complet</p>
             <p className="text-sm">{formatValue(provider.fullName)}</p>
           </div>
           <div>
@@ -669,7 +783,7 @@ export default function ProviderDetailPage() {
             </p>
           </div>
           <div>
-            <p className="text-xs uppercase text-muted-foreground">Serviciu formular</p>
+            <p className="text-xs uppercase text-muted-foreground">Serviciu ales la înscriere</p>
             <p className="text-sm">{formatValue(provider.serviceType)}</p>
           </div>
           <div>
@@ -711,7 +825,7 @@ export default function ProviderDetailPage() {
             <Badge variant={legalConsentMeta.variant}>{legalConsentMeta.label}</Badge>
           </div>
           <div>
-            <p className="text-xs uppercase text-muted-foreground">Contact lansare</p>
+            <p className="text-xs uppercase text-muted-foreground">Acord contact lansare</p>
             <Badge variant={launchContactMeta.variant}>{launchContactMeta.label}</Badge>
           </div>
           <div>
@@ -727,14 +841,14 @@ export default function ProviderDetailPage() {
         </CardHeader>
         <CardContent className="grid gap-4 lg:grid-cols-2">
           <div>
-            <p className="mb-3 text-sm font-medium">Audit</p>
+            <p className="mb-3 text-sm font-medium">Istoric verificare</p>
             {!data?.recentAuditEvents?.length ? (
               <p className="text-sm text-muted-foreground">Nu există evenimente recente.</p>
             ) : (
               <div className="space-y-2">
                 {data.recentAuditEvents.slice(0, 5).map((event, index) => (
                   <div key={String(event.id || index)} className="rounded-lg border border-border p-3 text-sm">
-                    <p>{formatValue(event.action || event.type || event.message)}</p>
+                    <p>{formatActivityLabel(event.action || event.type || event.message)}</p>
                     <p className="text-xs text-muted-foreground">
                       {formatAdminDateTime(event.createdAt || event.at)}
                     </p>
@@ -744,7 +858,7 @@ export default function ProviderDetailPage() {
             )}
           </div>
           <div>
-            <p className="mb-3 text-sm font-medium">Servicii / booking-uri</p>
+            <p className="mb-3 text-sm font-medium">Servicii și programări</p>
             <p className="text-sm text-muted-foreground">
               {data?.services?.length || 0} servicii, {data?.recentBookings?.length || 0} booking-uri recente.
             </p>
@@ -768,6 +882,51 @@ export default function ProviderDetailPage() {
           return submitReview(dialogAction, reason);
         }}
       />
+
+      <Dialog open={documentPreviewOpen} onOpenChange={closeDocumentPreview}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>{documentPreviewTitle || "Document"}</DialogTitle>
+            <DialogDescription>Imagine disponibilă doar pentru administratori.</DialogDescription>
+          </DialogHeader>
+          <div className="flex min-h-[320px] items-center justify-center rounded-md border border-border bg-muted/30 p-3">
+            {documentPreviewLoading ? (
+              <p className="text-sm text-muted-foreground">Se încarcă documentul...</p>
+            ) : documentPreviewError ? (
+              <p className="text-sm text-rose-500">{documentPreviewError}</p>
+            ) : documentPreviewUrl ? (
+              <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={documentPreviewUrl}
+                alt={documentPreviewTitle || "Document prestator"}
+                className="max-h-[70vh] max-w-full rounded-sm object-contain"
+              />
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">Documentul nu poate fi încărcat.</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!documentPreviewUrl}
+              onClick={() => {
+                if (documentPreviewUrl) {
+                  window.open(documentPreviewUrl, "_blank", "noopener,noreferrer");
+                }
+              }}
+            >
+              <ExternalLink className="h-4 w-4" />
+              Deschide în tab nou
+            </Button>
+            <Button type="button" onClick={() => closeDocumentPreview(false)}>
+              Închide
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

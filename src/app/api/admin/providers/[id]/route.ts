@@ -8,19 +8,34 @@ export async function GET(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
-    await requireAdmin(request);
+    const admin = await requireAdmin(request);
     const { id } = await context.params;
 
-    const result = await callAdminCallable("getAdminProviderCase", {
+    console.info("[admin-provider-case] detail request", {
+      adminUid: admin.uid,
       providerId: id,
-    }, "Nu am putut încărca prestatorul.");
+    });
+
+    const result = await callAdminCallable(
+      "getAdminProviderCase",
+      {
+        providerId: id,
+      },
+      "Nu am putut încărca prestatorul.",
+      admin.idToken
+    );
 
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof AdminCallableError) {
+      console.error("[admin-provider-case] callable error", {
+        status: error.status,
+        message: error.message,
+      });
       return NextResponse.json({ error: error.message }, { status: error.status });
     }
 
+    console.error("[admin-provider-case] route error", error);
     captureServerException(error, { route: "api/admin/providers/[id]/route.ts" });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Nu am putut încărca prestatorul." },

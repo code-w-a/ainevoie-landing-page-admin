@@ -56,8 +56,41 @@ function isUploadedDocument(value: any) {
   );
 }
 
-function hasConfiguredAvailability(value: any) {
-  return value?.hasConfiguredAvailability === true && Boolean(value.availabilitySummary);
+function summarizeAvailabilityInput(input: unknown) {
+  const weekSchedule =
+    input && typeof input === "object" && Array.isArray((input as any).weekSchedule)
+      ? (input as any).weekSchedule
+      : [];
+
+  return {
+    hasWeekSchedule: Array.isArray(weekSchedule),
+    dayCount: weekSchedule.length,
+    enabledDays: weekSchedule
+      .filter((day: any) => day?.isEnabled === true)
+      .map((day: any) => ({
+        dayKey: typeof day?.dayKey === "string" ? day.dayKey : null,
+        rangesCount: Array.isArray(day?.timeRanges) ? day.timeRanges.length : 0,
+        ranges: Array.isArray(day?.timeRanges)
+          ? day.timeRanges.map((range: any) => ({
+              startTime: typeof range?.startTime === "string" ? range.startTime : null,
+              endTime: typeof range?.endTime === "string" ? range.endTime : null,
+            }))
+          : [],
+      })),
+  };
+}
+
+function logCallableError(handler: string, error: unknown, extra: Record<string, unknown>) {
+  const knownError = error instanceof HttpsError
+    ? { code: error.code, message: error.message, details: error.details ?? null }
+    : error instanceof Error
+      ? { name: error.name, message: error.message, stack: error.stack }
+      : { value: String(error) };
+
+  console.error(`[${handler}] failed`, {
+    ...extra,
+    error: knownError,
+  });
 }
 
 export const finalizeProviderAvatarUpload = onCall(
@@ -130,32 +163,64 @@ export const finalizeProviderDocumentUpload = onCall(
 export const saveProviderAvailabilityProfile = onCall(
   { region: REGION },
   withSentryFunction("saveProviderAvailabilityProfile", async (request: CallableRequest<any>) => {
-    const uid = requireUid(request);
-    const normalized = normalizeProviderAvailability(request.data || {});
-    const db = getDb();
-    const providerRef = db.collection("providers").doc(uid);
-    const providerSnap = await providerRef.get();
-    if (!providerSnap.exists) {
-      throw new HttpsError("not-found", "Profilul de prestator nu există.");
-    }
-
-    await providerRef.collection("availability").doc("profile").set({
-      ...normalized,
-      updatedAt: FieldValue.serverTimestamp(),
-      updatedBy: uid,
+    const uid = request.auth?.uid || null;
+    console.info("[saveProviderAvailabilityProfile] request received", {
+      uid,
+      authPresent: Boolean(uid),
+      input: summarizeAvailabilityInput(request.data || {}),
     });
-    await providerRef.set(
-      {
-        professionalProfile: {
-          availabilitySummary: normalized.availabilitySummary,
-        },
-        updatedAt: FieldValue.serverTimestamp(),
-        updatedBy: uid,
-      },
-      { merge: true }
-    );
 
-    return normalized;
+    try {
+      const requiredUid = requireUid(request);
+      const normalized = normalizeProviderAvailability(request.data || {});
+      console.info("[saveProviderAvailabilityProfile] normalized", {
+        uid: requiredUid,
+        enabledDays: normalized.availabilityDayChips,
+        summary: normalized.availabilitySummary,
+      });
+
+      const db = getDb();
+      const providerRef = db.collection("providers").doc(requiredUid);
+      const providerSnap = await providerRef.get();
+      console.info("[saveProviderAvailabilityProfile] provider lookup", {
+        uid: requiredUid,
+        exists: providerSnap.exists,
+      });
+      if (!providerSnap.exists) {
+        throw new HttpsError("not-found", "Profilul de prestator nu există.");
+      }
+
+      await providerRef.collection("availability").doc("profile").set({
+        ...normalized,
+        updatedAt: FieldValue.serverTimestamp(),
+        updatedBy: requiredUid,
+      });
+      console.info("[saveProviderAvailabilityProfile] availability document saved", {
+        uid: requiredUid,
+      });
+
+      await providerRef.set(
+        {
+          professionalProfile: {
+            availabilitySummary: normalized.availabilitySummary,
+          },
+          updatedAt: FieldValue.serverTimestamp(),
+          updatedBy: requiredUid,
+        },
+        { merge: true }
+      );
+      console.info("[saveProviderAvailabilityProfile] provider summary updated", {
+        uid: requiredUid,
+      });
+
+      return normalized;
+    } catch (error) {
+      logCallableError("saveProviderAvailabilityProfile", error, {
+        uid,
+        input: summarizeAvailabilityInput(request.data || {}),
+      });
+      throw error;
+    }
   })
 );
 
@@ -181,11 +246,6 @@ export const submitProviderOnboarding = onCall(
     }
     if (!isUploadedDocument(provider.documents?.identity) || !isUploadedDocument(provider.documents?.professional)) {
       throw new HttpsError("failed-precondition", "Documentele de verificare sunt obligatorii.");
-    }
-
-    const availabilitySnap = await providerRef.collection("availability").doc("profile").get();
-    if (!availabilitySnap.exists || !hasConfiguredAvailability(availabilitySnap.data())) {
-      throw new HttpsError("failed-precondition", "Disponibilitatea trebuie configurată înainte de trimitere.");
     }
 
     await providerRef.set(
