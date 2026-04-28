@@ -97,9 +97,7 @@ export default function AdminOverviewPage() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">Sumar newsletter</h1>
-          <p className="text-sm text-muted-foreground">
-            Draft → Test → Schedule/Send → Report.
-          </p>
+         
         </div>
         <Button asChild>
           <Link href="/admin/campaigns">Campanie nouă</Link>

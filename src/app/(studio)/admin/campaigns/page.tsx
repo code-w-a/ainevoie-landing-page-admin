@@ -1140,23 +1140,32 @@ export default function CampaignsPage() {
       return;
     }
     setRowAction(id, "duplicate");
+    const toastId = toast.loading("Se copiază campania ca draft...");
     try {
       const response = await adminFetch(`/api/admin/newsletter/campaigns/${id}/duplicate`, {
         method: "POST",
       });
       if (!response.ok) {
-        toast.error(await readErrorMessage(response, "Nu am putut duplica campania."));
+        toast.error(await readErrorMessage(response, "Nu am putut duplica campania."), {
+          id: toastId,
+        });
         return;
       }
       const data = (await response.json()) as { campaignId?: string | null };
       const newId = typeof data?.campaignId === "string" ? data.campaignId.trim() : "";
       if (!newId) {
-        toast.error("Copie creată, dar lipsește ID-ul noii campanii.");
+        toast.error("Copie creată, dar lipsește ID-ul noii campanii.", {
+          id: toastId,
+        });
         return;
       }
-      toast.success("Campania a fost copiată ca draft.");
+      toast.success("Campania a fost copiată ca draft.", { id: toastId });
       reload();
       router.push(`/admin/campaigns/${newId}`);
+    } catch (error) {
+      toast.error(getActionErrorMessage(error, "Nu am putut duplica campania."), {
+        id: toastId,
+      });
     } finally {
       setRowAction(id, null);
     }
@@ -1623,9 +1632,7 @@ export default function CampaignsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Toate campaniile</CardTitle>
-              <CardDescription>
-                Flux recomandat: Ciornă → Test → Programează/Trimite acum → Raport.
-              </CardDescription>
+           
             </CardHeader>
             <CardContent>
               {error && <p className="mb-4 text-sm text-rose-500">{error}</p>}
@@ -1722,7 +1729,16 @@ export default function CampaignsPage() {
                             disabled={!id}
                           />
                         </TableCell>
-                        <TableCell className="font-medium">{campaign.subject || campaign.name}</TableCell>
+                        <TableCell className="font-medium">
+                          <div className="flex min-w-0 flex-wrap items-center gap-2">
+                            <span className="min-w-0 break-words">
+                              {campaign.subject || campaign.name}
+                            </span>
+                            {id && isRowActionLoading(id, "duplicate") && (
+                              <Badge variant="secondary">Se copiază...</Badge>
+                            )}
+                          </div>
+                        </TableCell>
                         <TableCell>
                           <Badge variant={campaignBadgeVariant(status)}>
                             {campaignStatusLabel(campaign.status)}
@@ -1747,7 +1763,7 @@ export default function CampaignsPage() {
                                 variant="outline"
                                 size="icon"
                                 className="h-8 w-8 shrink-0"
-                                disabled={!id}
+                                disabled={!id || (id ? isRowActionLoading(id) : false)}
                                 aria-label="Acțiuni campanie"
                               >
                                 <MoreHorizontal className="h-4 w-4" />

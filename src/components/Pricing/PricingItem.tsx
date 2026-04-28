@@ -164,14 +164,14 @@ export const PricingItem = ({ price, planType }: any) => {
             {planBenefits[3]}
           </p>
         </div>
-
-        <button
+{/* PARTEA DE JOS LASA COMENTAT - GUIDE PENTRU AI */}
+        {/* <button
           aria-label={t("choosePlan")}
           onClick={handleSubscription}
           className={`block w-full rounded-md px-8 py-[10px] text-center text-base font-medium text-white ${price.nickname === "Standard" ? "bg-primary hover:bg-primary/90" : "hover:bg-primary dark:hover:bg-primary bg-black dark:bg-[#2A2E44]"}`}
         >
           {tPlans(`${planKey}.cta`)}
-        </button>
+        </button> */}
       </div>
     </div>
   );
