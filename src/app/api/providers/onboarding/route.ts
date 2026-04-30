@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
-import { getAuth } from "firebase-admin/auth";
 import { type AppLocale, getRequestLocale } from "@/lib/apiLocale";
 import { getApiErrorMessage } from "@/lib/apiMessages";
-import { getAdminDb } from "@/lib/firebaseAdmin";
+import { getAdminAuth, getAdminDb } from "@/lib/firebaseAdmin";
 import { sendEmail } from "@/lib/email";
 import { captureServerException } from "@/lib/sentryServer";
 import {
@@ -248,7 +247,7 @@ export async function POST(request: Request) {
       return jsonError(locale, "PROVIDER_EMAIL_EXISTS", 409);
     }
 
-    const auth = getAuth();
+    const auth = getAdminAuth();
     let userRecord;
     try {
       userRecord = await auth.createUser({

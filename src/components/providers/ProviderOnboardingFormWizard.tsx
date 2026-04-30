@@ -20,7 +20,7 @@ import { ChevronDown, Eye, EyeOff, FileCheck2, ImagePlus, UploadCloud } from "lu
 import { Link, useRouter } from "@/i18n/navigation";
 import Image from "next/image";
 import { useLocale, useTranslations } from "next-intl";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Cropper, { type Area } from "react-easy-crop";
 import { Controller, useForm } from "react-hook-form";
 import toast from "react-hot-toast";
@@ -65,6 +65,7 @@ type AvatarSource = {
   previewUrl: string;
   error: string | null;
 };
+type EmailStatus = "idle" | "checking" | "available" | "exists" | "error";
 
 const MAX_STEP = 6;
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
@@ -175,15 +176,15 @@ export default function ProviderOnboardingFormWizard({
   onStepChange,
 }: ProviderOnboardingFormWizardProps) {
   const t = useTranslations("ProviderWizard");
+  const apiErrors = useTranslations("ApiErrors");
   const locale = useLocale();
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [citySearch, setCitySearch] = useState("");
   const [cityDropdownOpen, setCityDropdownOpen] = useState(false);
-  const [newsletterStatusLoading, setNewsletterStatusLoading] = useState(false);
-  const [isActiveNewsletterSubscriber, setIsActiveNewsletterSubscriber] = useState(false);
-  const [newsletterStatusError, setNewsletterStatusError] = useState<string | null>(null);
+  const [emailStatus, setEmailStatus] = useState<EmailStatus>("idle");
+  const [emailStatusCheckedValue, setEmailStatusCheckedValue] = useState("");
   const [providerUid, setProviderUid] = useState<string | null>(null);
   const [accountCreating, setAccountCreating] = useState(false);
   const [avatarSource, setAvatarSource] = useState<AvatarSource | null>(null);
@@ -241,10 +242,18 @@ export default function ProviderOnboardingFormWizard({
   });
 
   const emailValue = watch("email");
+  const fullNameValue = watch("fullName");
+  const passwordValue = watch("password");
+  const confirmPasswordValue = watch("confirmPassword");
+  const phoneValue = watch("phone");
   const acceptTerms = watch("acceptTerms");
   const legalStatus = watch("legalStatus");
+  const companyNameValue = watch("companyName");
+  const cuiValue = watch("cui");
+  const estimatedSetupTimelineValue = watch("estimatedSetupTimeline");
   const selectedCountyCode = watch("countyCode");
   const selectedCityCode = watch("cityCode");
+  const selectedServiceType = watch("serviceType");
   const normalizedEmail = (emailValue || "").trim().toLowerCase();
   const hasValidEmailForNewsletter = isValidEmail(normalizedEmail);
   const isLegalEntityReady = legalStatus === "pfa_ready" || legalStatus === "srl_ready";
@@ -265,7 +274,59 @@ export default function ProviderOnboardingFormWizard({
     );
   }, [availableCities, normalizedCitySearch]);
   const busy = accountCreating || finalSubmitting;
-  const nextDisabled = busy || (currentStep === 3 && !providerUid && !acceptTerms);
+  const emailCheckBlocksStep =
+    currentStep === 1 &&
+    hasValidEmailForNewsletter &&
+    (emailStatus === "checking" ||
+      (emailStatus === "exists" && emailStatusCheckedValue === normalizedEmail));
+  const nextDisabled =
+    busy || emailCheckBlocksStep || (currentStep === 3 && !acceptTerms);
+  const contactComplete =
+    Boolean(fullNameValue?.trim()) &&
+    hasValidEmailForNewsletter &&
+    Boolean(phoneValue?.trim()) &&
+    Boolean(passwordValue) &&
+    passwordValue.length >= 8 &&
+    passwordValue === confirmPasswordValue;
+  const servicesComplete =
+    Boolean(selectedCountyCode) &&
+    Boolean(selectedCityRecord) &&
+    Boolean(
+      PROVIDER_SERVICE_ENTRIES.some((entry) => entry.value === selectedServiceType)
+    );
+  const legalComplete =
+    Boolean(legalStatus) &&
+    (!isLegalEntityReady ||
+      (Boolean(companyNameValue?.trim()) && Boolean(cuiValue?.trim()))) &&
+    (!isEntityInProgress || Boolean(estimatedSetupTimelineValue?.trim())) &&
+    acceptTerms;
+  const avatarComplete = isSlotReadyForSubmit(avatar) && avatar.status !== "error";
+  const documentsComplete =
+    isSlotReadyForSubmit(identityDocument) &&
+    isSlotReadyForSubmit(professionalDocument) &&
+    identityDocument.status !== "error" &&
+    professionalDocument.status !== "error";
+  const finalChecklist = [
+    { key: "contact", label: t("finalContact"), complete: contactComplete },
+    { key: "services", label: t("finalServices"), complete: servicesComplete },
+    { key: "confirmation", label: t("finalConfirmation"), complete: legalComplete },
+    { key: "avatar", label: t("finalAvatar"), complete: avatarComplete },
+    { key: "documents", label: t("finalDocuments"), complete: documentsComplete },
+  ];
+  const finalChecklistComplete = finalChecklist.every((item) => item.complete);
+  const checkProviderEmailStatus = useCallback(
+    async (email: string) => {
+      const response = await axios.get<{ exists?: boolean; source?: "provider" | "auth" }>(
+        "/api/providers/onboarding/email-status",
+        {
+          params: { email },
+          headers: { "x-next-intl-locale": locale },
+        }
+      );
+      return response.data;
+    },
+    [locale]
+  );
 
   useEffect(() => {
     setValue("cityCode", "", { shouldValidate: false });
@@ -301,45 +362,35 @@ export default function ProviderOnboardingFormWizard({
 
   useEffect(() => {
     if (!hasValidEmailForNewsletter || providerUid) {
-      setNewsletterStatusLoading(false);
-      setNewsletterStatusError(null);
-      setIsActiveNewsletterSubscriber(false);
+      setEmailStatus("idle");
+      setEmailStatusCheckedValue("");
       return;
     }
 
-    setNewsletterStatusLoading(true);
-    setNewsletterStatusError(null);
-    setIsActiveNewsletterSubscriber(false);
-
-    let isCancelled = false;
+    setEmailStatus("checking");
+    const checkedEmail = normalizedEmail;
+    let cancelled = false;
     const timerId = window.setTimeout(async () => {
       try {
-        const response = await axios.get<{ isActiveSubscriber?: boolean }>(
-          "/api/newsletter/status",
-          {
-            params: { email: normalizedEmail },
-            headers: { "x-next-intl-locale": locale },
-          }
-        );
-        if (isCancelled) return;
-        const isActive = response.data?.isActiveSubscriber === true;
-        setIsActiveNewsletterSubscriber(isActive);
-        if (isActive) setValue("newsletterOptIn", false);
-      } catch {
-        if (!isCancelled) {
-          setIsActiveNewsletterSubscriber(false);
-          setNewsletterStatusError(t("newsletterCheckError"));
-        }
-      } finally {
-        if (!isCancelled) setNewsletterStatusLoading(false);
+        const result = await checkProviderEmailStatus(checkedEmail);
+        if (cancelled) return;
+        setEmailStatus(result.exists ? "exists" : "available");
+        setEmailStatusCheckedValue(checkedEmail);
+      } catch (error) {
+        if (cancelled) return;
+        logOnboardingClientError("email status check failed", error, {
+          emailDomain: checkedEmail.split("@").pop() || null,
+        });
+        setEmailStatus("error");
+        setEmailStatusCheckedValue(checkedEmail);
       }
-    }, 300);
+    }, 350);
 
     return () => {
-      isCancelled = true;
+      cancelled = true;
       window.clearTimeout(timerId);
     };
-  }, [hasValidEmailForNewsletter, locale, normalizedEmail, providerUid, setValue, t]);
+  }, [checkProviderEmailStatus, hasValidEmailForNewsletter, normalizedEmail, providerUid]);
 
   function updateFileSlot(
     file: File | null,
@@ -449,7 +500,7 @@ export default function ProviderOnboardingFormWizard({
     }
   }
 
-  async function createProviderAccount() {
+  async function createProviderAccount({ showToast = true } = {}) {
     const values = getValues();
     const { confirmPassword, ...formPayload } = values;
     const selectedCity = findRomaniaCity(values.countyCode, values.cityCode);
@@ -492,7 +543,9 @@ export default function ProviderOnboardingFormWizard({
         welcomeEmailSent: res.data?.welcomeEmailSent === true,
         newsletterStatusAtSignup: res.data?.newsletterStatusAtSignup || null,
       });
-      toast.success(t("accountCreated"));
+      if (showToast) {
+        toast.success(t("accountCreated"));
+      }
       return true;
     } catch (error: unknown) {
       logOnboardingClientError("account create request failed", error, {
@@ -646,9 +699,29 @@ export default function ProviderOnboardingFormWizard({
       }
     }
 
-    if (currentStep === 3 && !providerUid) {
-      const created = await createProviderAccount();
-      if (!created) return;
+    if (currentStep === 1) {
+      if (!hasValidEmailForNewsletter) return;
+      setEmailStatus("checking");
+      try {
+        const result = await checkProviderEmailStatus(normalizedEmail);
+        setEmailStatus(result.exists ? "exists" : "available");
+        setEmailStatusCheckedValue(normalizedEmail);
+        if (result.exists) {
+          logOnboardingClient("step blocked by existing email", {
+            emailDomain: normalizedEmail.split("@").pop() || null,
+            source: result.source || null,
+          });
+          return;
+        }
+      } catch (error) {
+        logOnboardingClientError("email status check failed on step advance", error, {
+          emailDomain: normalizedEmail.split("@").pop() || null,
+        });
+        setEmailStatus("error");
+        setEmailStatusCheckedValue(normalizedEmail);
+        toast.error(t("emailCheckFailed"));
+        return;
+      }
     }
 
     if (currentStep === 4) {
@@ -728,8 +801,30 @@ export default function ProviderOnboardingFormWizard({
       professionalDocumentStatus: professionalDocument.status,
     });
     try {
+      const valid = await trigger([
+        "fullName",
+        "email",
+        "password",
+        "confirmPassword",
+        "phone",
+        "countyCode",
+        "cityCode",
+        "serviceType",
+        "legalStatus",
+        "companyName",
+        "cui",
+        "tradeRegisterNumber",
+        "estimatedSetupTimeline",
+        "hasAccountant",
+        "acceptTerms",
+      ]);
+      if (!valid) {
+        onStepChange(1);
+        throw new Error(t("toastGenericError"));
+      }
       if (!providerUid && !getFirebaseAuth().currentUser?.uid) {
-        throw new Error(t("accountMissing"));
+        const created = await createProviderAccount({ showToast: false });
+        if (!created) return;
       }
       if (!isSlotReadyForSubmit(avatar)) throw new Error(t("avatarRequired"));
       if (
@@ -982,8 +1077,23 @@ export default function ProviderOnboardingFormWizard({
                 required: t("emailRequired"),
                 validate: (value) => value.includes("@") || t("emailInvalid"),
               })}
-              errorMessages={errors.email?.message}
+              errorMessages={
+                errors.email?.message ||
+                (emailStatus === "exists" && emailStatusCheckedValue === normalizedEmail
+                  ? apiErrors("PROVIDER_EMAIL_EXISTS")
+                  : undefined)
+              }
             />
+            {hasValidEmailForNewsletter && emailStatus === "checking" && (
+              <p className="-mt-2 text-xs text-muted-foreground md:col-start-2">
+                {t("emailChecking")}
+              </p>
+            )}
+            {hasValidEmailForNewsletter && emailStatus === "error" && (
+              <p className="-mt-2 text-xs text-muted-foreground md:col-start-2">
+                {t("emailCheckFailed")}
+              </p>
+            )}
             <fieldset>
               <label htmlFor="provider-password" className="mb-2.5 inline-block text-sm">
                 {t("passwordLabel")}
@@ -1312,27 +1422,18 @@ export default function ProviderOnboardingFormWizard({
           {hasValidEmailForNewsletter && !providerUid && (
             <div className="rounded-md border border-border p-3 sm:p-4">
               <p className="mb-2 text-sm font-medium">{t("newsletterTitle")}</p>
-              {newsletterStatusLoading ? (
-                <p className="text-xs text-muted-foreground">{t("newsletterChecking")}</p>
-              ) : isActiveNewsletterSubscriber ? (
-                <p className="text-xs text-muted-foreground">{t("newsletterSubscribed")}</p>
-              ) : (
-                <Controller
-                  control={control}
-                  name="newsletterOptIn"
-                  render={({ field }) => (
-                    <Checkbox
-                      name={field.name}
-                      checked={field.value}
-                      onChange={(event) => field.onChange(event.target.checked)}
-                      label={t("newsletterOptIn")}
-                    />
-                  )}
-                />
-              )}
-              {newsletterStatusError && !newsletterStatusLoading && (
-                <p className="mt-2 text-xs text-muted-foreground">{newsletterStatusError}</p>
-              )}
+              <Controller
+                control={control}
+                name="newsletterOptIn"
+                render={({ field }) => (
+                  <Checkbox
+                    name={field.name}
+                    checked={field.value}
+                    onChange={(event) => field.onChange(event.target.checked)}
+                    label={t("newsletterOptIn")}
+                  />
+                )}
+              />
             </div>
           )}
 
@@ -1422,14 +1523,15 @@ export default function ProviderOnboardingFormWizard({
         <div className="space-y-4 rounded-xl border border-border p-4">
           <p className="text-sm text-muted-foreground">{t("finalReviewIntro")}</p>
           <ul className="space-y-2 text-sm">
-            <li>{isSlotReadyForSubmit(avatar) ? "✓" : "•"} {t("finalAvatar")}</li>
-            <li>
-              {isSlotReadyForSubmit(identityDocument) &&
-              isSlotReadyForSubmit(professionalDocument)
-                ? "✓"
-                : "•"}{" "}
-              {t("finalDocuments")}
-            </li>
+            {finalChecklist.map((item) => (
+              <li
+                key={item.key}
+                className={item.complete ? "text-emerald-700" : "text-muted-foreground"}
+              >
+                <span className="font-medium">{item.complete ? "✓" : "•"}</span>{" "}
+                {item.label}
+              </li>
+            ))}
           </ul>
           {finalError && <p className="text-sm text-red-500">{finalError}</p>}
         </div>
@@ -1456,7 +1558,7 @@ export default function ProviderOnboardingFormWizard({
         ) : (
           <button
             type="submit"
-            disabled={busy}
+            disabled={busy || !finalChecklistComplete}
             className="bg-primary hover:bg-primary/90 rounded-md px-5 py-2 text-sm font-medium text-white disabled:opacity-60"
           >
             {finalSubmitting ? t("submitting") : t("submitReview")}

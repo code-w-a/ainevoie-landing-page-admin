@@ -3,12 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   captureServerException: vi.fn(),
   getAdminDb: vi.fn(),
-  getAuth: vi.fn(),
+  getAdminAuth: vi.fn(),
   sendEmail: vi.fn(),
-}));
-
-vi.mock("firebase-admin/auth", () => ({
-  getAuth: mocks.getAuth,
 }));
 
 vi.mock("@/lib/email", () => ({
@@ -16,6 +12,7 @@ vi.mock("@/lib/email", () => ({
 }));
 
 vi.mock("@/lib/firebaseAdmin", () => ({
+  getAdminAuth: mocks.getAdminAuth,
   getAdminDb: mocks.getAdminDb,
 }));
 
@@ -227,14 +224,14 @@ describe("POST /api/providers/onboarding", () => {
     await expect(response.json()).resolves.toMatchObject({
       code: "PROVIDER_EMAIL_EXISTS",
     });
-    expect(mocks.getAuth).not.toHaveBeenCalled();
+    expect(mocks.getAdminAuth).not.toHaveBeenCalled();
   });
 
   it("creates a provider with county and city snapshots", async () => {
     const { providerEventAdd, providerSet } = firestoreForSuccessfulSignup();
     const createUser = vi.fn().mockResolvedValue({ uid: "provider-uid" });
     const setCustomUserClaims = vi.fn().mockResolvedValue(undefined);
-    mocks.getAuth.mockReturnValue({ createUser, setCustomUserClaims });
+    mocks.getAdminAuth.mockReturnValue({ createUser, setCustomUserClaims });
     mocks.sendEmail.mockResolvedValue(undefined);
 
     const response = await POST(request(validPayload));
