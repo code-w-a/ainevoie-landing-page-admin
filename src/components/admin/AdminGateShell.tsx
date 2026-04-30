@@ -16,8 +16,8 @@ export default function AdminGateShell({
   }
 
   return (
-    <AdminShell>
-      <AdminAuthGate>{children}</AdminAuthGate>
-    </AdminShell>
+    <AdminAuthGate>
+      <AdminShell>{children}</AdminShell>
+    </AdminAuthGate>
   );
 }

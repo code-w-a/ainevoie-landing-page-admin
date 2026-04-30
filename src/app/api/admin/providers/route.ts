@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/adminAuth";
+import { adminAuthErrorResponse, requireAdminOrSupport } from "@/lib/adminAuth";
 import { AdminCallableError, callAdminCallable } from "@/lib/adminCallables";
 import { captureServerException } from "@/lib/sentryServer";
 
@@ -13,7 +13,7 @@ function readPositiveNumber(value: string | null, fallback: number, max: number)
 
 export async function GET(request: Request) {
   try {
-    const admin = await requireAdmin(request);
+    const admin = await requireAdminOrSupport(request);
     const { searchParams } = new URL(request.url);
     const filters = {
       page: readPositiveNumber(searchParams.get("page"), 1, 10_000),
@@ -39,6 +39,11 @@ export async function GET(request: Request) {
 
     return NextResponse.json(result);
   } catch (error) {
+    const authResponse = adminAuthErrorResponse(error);
+    if (authResponse) {
+      return authResponse;
+    }
+
     if (error instanceof AdminCallableError) {
       console.error("[admin-providers] callable error", {
         status: error.status,

@@ -5,6 +5,7 @@ type EmailPayload = {
   subject: string;
   html: string;
   text?: string;
+  replyTo?: string;
 };
 
 type SmtpConfig = {
@@ -64,6 +65,17 @@ function getSmtpConfig(): SmtpConfig {
   return { host, port, secure, user, pass, from };
 }
 
+function parseOptionalTimeout(name: string, fallbackMs: number): number {
+  const raw = process.env[name]?.trim();
+  if (!raw) return fallbackMs;
+
+  const timeout = Number(raw);
+  if (!Number.isInteger(timeout) || timeout < 1000) {
+    throw new Error(`Invalid ${name} value: "${raw}"`);
+  }
+  return timeout;
+}
+
 function getTransporter(config: SmtpConfig): nodemailer.Transporter {
   const key = `${config.host}:${config.port}:${config.secure}:${config.user}`;
   if (cachedTransporter && cachedTransportKey === key) {
@@ -78,6 +90,9 @@ function getTransporter(config: SmtpConfig): nodemailer.Transporter {
       user: config.user,
       pass: config.pass,
     },
+    connectionTimeout: parseOptionalTimeout("EMAIL_CONNECTION_TIMEOUT_MS", 10000),
+    greetingTimeout: parseOptionalTimeout("EMAIL_GREETING_TIMEOUT_MS", 10000),
+    socketTimeout: parseOptionalTimeout("EMAIL_SOCKET_TIMEOUT_MS", 20000),
   });
   cachedTransportKey = key;
 

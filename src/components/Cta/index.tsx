@@ -3,10 +3,12 @@
 import Graphics from "@/components/Cta/Graphics";
 import PhoneMockup from "@/components/PhoneMockup";
 import { Link } from "@/i18n/navigation";
-import { useTranslations } from "next-intl";
+import { getLocalizedScreenshot } from "@/lib/localizedScreenshots";
+import { useLocale, useTranslations } from "next-intl";
 
 const Cta = () => {
   const t = useTranslations("Cta");
+  const locale = useLocale();
 
   return (
     <>
@@ -95,7 +97,7 @@ const Cta = () => {
                 >
                   <div className="absolute inset-x-0 -top-10 z-10 mx-auto w-full max-w-[300px] scale-[0.97] origin-top">
                     <PhoneMockup
-                      src="/images/screenshots/Onboarding_unu.jpg"
+                      src={getLocalizedScreenshot("onboarding1", locale)}
                       alt={t("ctaMockupAlt")}
                       sizes="290px"
                     />

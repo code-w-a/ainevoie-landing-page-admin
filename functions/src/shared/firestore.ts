@@ -1,11 +1,11 @@
 import crypto from "crypto";
-import { getApps, initializeApp } from "firebase-admin/app";
 import {
   FieldValue,
   Firestore,
   Timestamp,
   getFirestore,
 } from "firebase-admin/firestore";
+import { getDefaultFirebaseApp } from "./firebaseAdmin";
 import { NewsletterSubscriberStatus } from "./newsletterTypes";
 
 export type NewsletterLogLevel = "info" | "error" | "warning";
@@ -23,10 +23,7 @@ const LEGACY_CONSENT_TEXT_VERSION = "legacy-unknown";
 const CONSENT_METHOD = "single_opt_in";
 
 export function getDb(): Firestore {
-  if (!getApps().length) {
-    initializeApp();
-  }
-  return getFirestore();
+  return getFirestore(getDefaultFirebaseApp());
 }
 
 export function normalizeEmail(email: string): string {

@@ -26,7 +26,9 @@ export function SignUpForm() {
     formState: { errors },
     reset,
     control,
+    watch,
   } = useForm<Input>();
+  const privacyPolicyAccepted = watch("privacyPolicy");
 
   async function onSubmit({ privacyPolicy, ...payload }: Input) {
     if (!integrations?.isAuthEnabled) {
@@ -140,7 +142,11 @@ export function SignUpForm() {
         />
       </div>
 
-      <button className="bg-primary hover:bg-primary/90 flex w-full justify-center rounded-md p-3 text-base font-medium text-white">
+      <button
+        type="submit"
+        disabled={!privacyPolicyAccepted}
+        className="bg-primary hover:bg-primary/90 flex w-full justify-center rounded-md p-3 text-base font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+      >
         {t("signUpSubmit")}
       </button>
     </form>

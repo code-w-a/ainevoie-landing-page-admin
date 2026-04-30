@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/adminAuth";
+import { adminAuthErrorResponse, requireAdminOrSupport } from "@/lib/adminAuth";
 import { AdminCallableError, callAdminCallable } from "@/lib/adminCallables";
 import { captureServerException } from "@/lib/sentryServer";
 
@@ -8,7 +8,7 @@ export async function GET(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const admin = await requireAdmin(request);
+    const admin = await requireAdminOrSupport(request);
     const { id } = await context.params;
 
     console.info("[admin-provider-case] detail request", {
@@ -27,6 +27,11 @@ export async function GET(
 
     return NextResponse.json(result);
   } catch (error) {
+    const authResponse = adminAuthErrorResponse(error);
+    if (authResponse) {
+      return authResponse;
+    }
+
     if (error instanceof AdminCallableError) {
       console.error("[admin-provider-case] callable error", {
         status: error.status,

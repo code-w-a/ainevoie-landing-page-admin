@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/adminAuth";
+import { adminAuthErrorResponse, requireAdmin } from "@/lib/adminAuth";
 import { captureServerException } from "@/lib/sentryServer";
 
 export async function GET(request: Request) {
@@ -10,6 +10,11 @@ export async function GET(request: Request) {
       email: decoded.email ?? null,
     });
   } catch (error) {
+    const authResponse = adminAuthErrorResponse(error);
+    if (authResponse) {
+      return authResponse;
+    }
+
     captureServerException(error, { route: "api/admin/auth/session/route.ts" });
     return NextResponse.json({ error: "Neautorizat." }, { status: 401 });
   }

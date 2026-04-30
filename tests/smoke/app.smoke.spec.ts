@@ -48,11 +48,34 @@ test.describe("application smoke checks", () => {
 
     await expect(page.locator("#provider-county")).toBeVisible();
     await page.locator("#provider-county").selectOption("B");
+    await page.locator("#provider-city").click();
     await expect(page.locator("#provider-city-search")).toBeEnabled();
     await page.locator("#provider-city-search").fill("sector 6");
     await page.locator("#provider-city-listbox").getByRole("option", { name: "Sector 6" }).click();
 
     await expect(page.locator("#provider-city")).toContainText("Sector 6");
+    await page.getByRole("button", { name: /Continuă la pasul următor|Continue/ }).click();
+
+    const nextButton = page.getByRole("button", { name: /Continuă la pasul următor|Continue/ });
+    await expect(nextButton).toBeDisabled();
+    await page.locator('input[name="acceptTerms"]').check({ force: true });
+    await expect(nextButton).toBeEnabled();
+  });
+
+  test("footer newsletter signup requires terms checkbox before submit", async ({ page }) => {
+    await expectPageLoads(page, "/ro");
+
+    const newsletterForm = page.locator("form").filter({
+      has: page.locator('input[name="footerEmail"]'),
+    });
+    await newsletterForm.locator('input[name="footerEmail"]').scrollIntoViewIfNeeded();
+    const submitButton = newsletterForm.locator('button[type="submit"]');
+
+    await expect(submitButton).toBeDisabled();
+    await newsletterForm.locator('input[name="footerEmail"]').fill("smoke@example.com");
+    await expect(submitButton).toBeDisabled();
+    await newsletterForm.locator('input[name="footerAcceptTerms"]').check({ force: true });
+    await expect(submitButton).toBeEnabled();
   });
 
   test("auth and admin entry points load", async ({ page }) => {

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { devLogServerError } from "@/lib/devServerErrorLog";
 import { getAdminDb, serializeDoc } from "@/lib/firebaseAdmin";
-import { requireAdmin } from "@/lib/adminAuth";
+import { adminAuthErrorResponse, requireAdmin } from "@/lib/adminAuth";
 import { captureServerException } from "@/lib/sentryServer";
 
 export async function GET(request: Request) {
@@ -104,6 +104,11 @@ export async function GET(request: Request) {
       logs,
     });
   } catch (error) {
+    const authResponse = adminAuthErrorResponse(error);
+    if (authResponse) {
+      return authResponse;
+    }
+
     captureServerException(error, { route: "api/admin/newsletter/overview/route.ts" });
     devLogServerError("GET /api/admin/newsletter/overview", error);
     return NextResponse.json(

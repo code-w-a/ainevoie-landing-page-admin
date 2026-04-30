@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import { getAdminDb, serializeDoc } from "@/lib/firebaseAdmin";
-import { requireAdmin } from "@/lib/adminAuth";
+import { adminAuthErrorResponse, requireAdmin } from "@/lib/adminAuth";
 import {
   NEWSLETTER_SUBSCRIBER_STATUSES,
   type NewsletterSubscriberStatus,
@@ -142,6 +142,11 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ items, nextCursor });
   } catch (error) {
+    const authResponse = adminAuthErrorResponse(error);
+    if (authResponse) {
+      return authResponse;
+    }
+
     captureServerException(error, { route: "api/admin/newsletter/subscribers/route.ts" });
     return NextResponse.json(
       { error: "Nu am putut încărca abonații." },
@@ -286,6 +291,11 @@ export async function POST(request: Request) {
     const docRef = await db.collection("newsletter_subscribers").add(newDoc);
     return NextResponse.json({ id: docRef.id });
   } catch (error) {
+    const authResponse = adminAuthErrorResponse(error);
+    if (authResponse) {
+      return authResponse;
+    }
+
     captureServerException(error, { route: "api/admin/newsletter/subscribers/route.ts" });
     return NextResponse.json(
       { error: "Nu am putut crea abonatul." },

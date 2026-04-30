@@ -233,7 +233,8 @@ describe("POST /api/providers/onboarding", () => {
   it("creates a provider with county and city snapshots", async () => {
     const { providerEventAdd, providerSet } = firestoreForSuccessfulSignup();
     const createUser = vi.fn().mockResolvedValue({ uid: "provider-uid" });
-    mocks.getAuth.mockReturnValue({ createUser });
+    const setCustomUserClaims = vi.fn().mockResolvedValue(undefined);
+    mocks.getAuth.mockReturnValue({ createUser, setCustomUserClaims });
     mocks.sendEmail.mockResolvedValue(undefined);
 
     const response = await POST(request(validPayload));
@@ -284,12 +285,20 @@ describe("POST /api/providers/onboarding", () => {
           promoSystem: true,
         },
         phoneNumber: "0700000000",
+        adminReview: {
+          action: null,
+          reason: null,
+          reviewedAt: null,
+          reviewedBy: null,
+        },
+        lastLoginAt: expect.anything(),
+        lastPublishedAt: null,
         professionalProfile: {
           avatarPath: null,
-          availabilitySummary: null,
-          baseRateAmount: 0,
+          availabilitySummary: "",
+          baseRateAmount: null,
           baseRateCurrency: "RON",
-          businessName: null,
+          businessName: "",
           coverageArea: {
             centerLat: null,
             centerLng: null,
@@ -299,13 +308,13 @@ describe("POST /api/providers/onboarding", () => {
             countryName: "România",
             countyCode: "B",
             countyName: "București",
-            formattedAddress: null,
-            locationLabel: null,
-            placeId: null,
+            formattedAddress: "",
+            locationLabel: "",
+            placeId: "",
           },
           coverageAreaText: "România, București, Sector 6",
           displayName: "Provider Test",
-          shortBio: null,
+          shortBio: "",
           specialization: "Curatenie birouri",
         },
         reviewState: {
@@ -315,10 +324,20 @@ describe("POST /api/providers/onboarding", () => {
         role: "provider",
         schemaVersion: 1,
         status: "pre_registered",
+        suspension: null,
         onboardingStatus: "pre_registered",
+        privacyAcceptedAt: expect.anything(),
+        privacyVersion: "v1",
+        termsAcceptedAt: expect.anything(),
+        termsVersion: "v1",
         updatedBy: "provider-uid",
       }),
     );
+    expect(setCustomUserClaims).toHaveBeenCalledWith("provider-uid", {
+      role: "provider",
+      providerStatus: "pre_registered",
+      isSuspended: false,
+    });
     expect(providerEventAdd).toHaveBeenCalledWith(
       expect.objectContaining({
         toStatus: "pre_registered",

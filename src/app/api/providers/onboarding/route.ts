@@ -104,6 +104,26 @@ function resolveLocale(body: OnboardingPayload, request: Request): AppLocale {
   return getRequestLocale(request);
 }
 
+function getEmailDomain(email: string) {
+  const [, domain] = email.split("@");
+  return domain || null;
+}
+
+function logProviderOnboardingApi(event: string, details?: Record<string, unknown>) {
+  console.info(`[api/providers/onboarding] ${event}`, details || {});
+}
+
+function logProviderOnboardingApiError(error: unknown, details?: Record<string, unknown>) {
+  const err =
+    error instanceof Error
+      ? { name: error.name, message: error.message, stack: error.stack }
+      : { value: String(error) };
+  console.error("[api/providers/onboarding] failed", {
+    ...details,
+    error: err,
+  });
+}
+
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as OnboardingPayload;
@@ -124,6 +144,20 @@ export async function POST(request: Request) {
     const newsletterOptIn = body.newsletterOptIn === true;
     const launchContactConsent = body.launchContactConsent === true;
     const acceptTerms = body.acceptTerms === true;
+
+    logProviderOnboardingApi("request received", {
+      locale,
+      emailDomain: getEmailDomain(email),
+      hasFullName: Boolean(fullName),
+      hasPhone: Boolean(phone),
+      countyCode,
+      cityCode,
+      serviceType,
+      legalStatus,
+      newsletterOptIn,
+      launchContactConsent,
+      acceptTerms,
+    });
 
     if (
       !fullName ||
@@ -176,6 +210,15 @@ export async function POST(request: Request) {
       return jsonError(locale, "TERMS_NOT_ACCEPTED", 400);
     }
 
+    logProviderOnboardingApi("payload validated", {
+      locale,
+      emailDomain: getEmailDomain(email),
+      countyCode,
+      cityCode,
+      serviceType,
+      legalStatus,
+    });
+
     const countyName = selectedCounty.name;
     const cityName = selectedCity.cityName;
     const countyNameNormalized = normalizeRomaniaLocationName(countyName);
@@ -196,16 +239,26 @@ export async function POST(request: Request) {
       .limit(1)
       .get();
 
+    logProviderOnboardingApi("existing provider lookup completed", {
+      emailDomain: getEmailDomain(email),
+      exists: !existingProvider.empty,
+    });
+
     if (!existingProvider.empty) {
       return jsonError(locale, "PROVIDER_EMAIL_EXISTS", 409);
     }
 
+    const auth = getAuth();
     let userRecord;
     try {
-      userRecord = await getAuth().createUser({
+      userRecord = await auth.createUser({
         email,
         password,
         displayName: fullName,
+      });
+      logProviderOnboardingApi("firebase auth user created", {
+        uid: userRecord.uid,
+        emailDomain: getEmailDomain(email),
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : "create_user_failed";
@@ -216,6 +269,11 @@ export async function POST(request: Request) {
     }
 
     const welcomeEmailResult = await sendWelcomeEmail(email, fullName, locale);
+    logProviderOnboardingApi("welcome email attempted", {
+      uid: userRecord.uid,
+      sent: welcomeEmailResult.sent,
+      errorMessage: welcomeEmailResult.errorMessage || null,
+    });
 
     let newsletterStatusAtSignup: ProviderNewsletterStatusAtSignup = "skipped";
     let newsletterError: string | null = null;
@@ -280,8 +338,20 @@ export async function POST(request: Request) {
         newsletterStatusAtSignup = "error";
         newsletterError =
           error instanceof Error ? error.message : "newsletter_subscribe_failed";
+        logProviderOnboardingApiError(error, {
+          uid: userRecord.uid,
+          stage: "newsletter",
+          emailDomain: getEmailDomain(email),
+        });
       }
     }
+
+    logProviderOnboardingApi("newsletter processing completed", {
+      uid: userRecord.uid,
+      newsletterOptIn,
+      newsletterStatusAtSignup,
+      newsletterError,
+    });
 
     await db.collection("providers").doc(userRecord.uid).set({
       // Canonical provider document model aligned with docs/AInevoie-Firebase-Document-Model-Schema.md
@@ -295,10 +365,10 @@ export async function POST(request: Request) {
       locale,
       notificationPreferences,
       professionalProfile: {
-        businessName: companyName || null,
+        businessName: companyName || "",
         displayName: providerDisplayName,
-        specialization: serviceType,
-        baseRateAmount: 0,
+        specialization: serviceType || "",
+        baseRateAmount: null,
         baseRateCurrency: "RON",
         coverageArea: {
           countryCode: "RO",
@@ -307,15 +377,15 @@ export async function POST(request: Request) {
           countyName,
           cityCode: selectedCity.cityCode,
           cityName,
-          placeId: null,
-          locationLabel: null,
-          formattedAddress: null,
+          placeId: "",
+          locationLabel: "",
+          formattedAddress: "",
           centerLat: null,
           centerLng: null,
         },
         coverageAreaText,
-        shortBio: null,
-        availabilitySummary: null,
+        shortBio: "",
+        availabilitySummary: "",
         avatarPath: null,
       },
       documents: {
@@ -336,6 +406,15 @@ export async function POST(request: Request) {
         submittedAt: null,
         lastReviewedAt: null,
       },
+      adminReview: {
+        reviewedBy: null,
+        action: null,
+        reason: null,
+        reviewedAt: null,
+      },
+      suspension: null,
+      lastPublishedAt: null,
+      lastLoginAt: FieldValue.serverTimestamp(),
       schemaVersion: 1,
       createdBy: userRecord.uid,
       updatedBy: userRecord.uid,
@@ -381,6 +460,23 @@ export async function POST(request: Request) {
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     });
+    logProviderOnboardingApi("provider document saved", {
+      uid: userRecord.uid,
+      status: "pre_registered",
+      onboardingStatus: "pre_registered",
+    });
+
+    await auth.setCustomUserClaims(userRecord.uid, {
+      role: "provider",
+      providerStatus: "pre_registered",
+      isSuspended: false,
+    });
+    logProviderOnboardingApi("provider custom claims saved", {
+      uid: userRecord.uid,
+      role: "provider",
+      providerStatus: "pre_registered",
+    });
+
     await db.collection("providers").doc(userRecord.uid).collection("events").add({
       type: "status_changed",
       fromStatus: null,
@@ -388,6 +484,11 @@ export async function POST(request: Request) {
       actorUid: "system_onboarding",
       note: "Prestator inregistrat prin onboarding public.",
       createdAt: FieldValue.serverTimestamp(),
+    });
+    logProviderOnboardingApi("provider event saved", {
+      uid: userRecord.uid,
+      type: "status_changed",
+      toStatus: "pre_registered",
     });
 
     return NextResponse.json({
@@ -397,6 +498,9 @@ export async function POST(request: Request) {
       newsletterStatusAtSignup,
     });
   } catch (error) {
+    logProviderOnboardingApiError(error, {
+      route: "api/providers/onboarding/route.ts",
+    });
     captureServerException(error, { route: "api/providers/onboarding/route.ts" });
     const locale = getRequestLocale(request);
     return jsonError(locale, "SERVER_ERROR", 500);

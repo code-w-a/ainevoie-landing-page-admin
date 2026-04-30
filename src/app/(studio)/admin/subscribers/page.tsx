@@ -394,9 +394,22 @@ export default function SubscribersPage() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={hasConsent ? "success" : "danger"}>
-                        {hasConsent ? "Acordat" : "Retras"}
-                      </Badge>
+                      <div className="space-y-1">
+                        <Badge variant={hasConsent ? "success" : "danger"}>
+                          {hasConsent ? "Acordat" : "Retras"}
+                        </Badge>
+                        <p className="text-xs text-muted-foreground">
+                          Capturat: {formatAdminDateTime(subscriber.consentCapturedAt)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Sursă: {subscriber.consentSource || subscriber.source || "-"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Text: {subscriber.consentTextVersion || "-"} · Termeni:{" "}
+                          {subscriber.termsVersion || "-"} · Privacy:{" "}
+                          {subscriber.privacyVersion || "-"}
+                        </p>
+                      </div>
                     </TableCell>
                     <TableCell>{subscriber.statusReason || "-"}</TableCell>
                     <TableCell>

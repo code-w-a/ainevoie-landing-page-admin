@@ -18,10 +18,18 @@ export default function AdminAuthGate({
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
+    let active = true;
     const auth = getFirebaseAuth();
+
+    if (pathname !== "/admin/login") {
+      setReady(false);
+    }
+
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (pathname === "/admin/login") {
-        setReady(true);
+        if (active) {
+          setReady(true);
+        }
         return;
       }
 
@@ -30,17 +38,28 @@ export default function AdminAuthGate({
         return;
       }
 
-      const res = await adminFetch("/api/admin/auth/session");
-      if (!res.ok) {
-        await signOut(auth);
-        router.replace("/admin/login");
+      const res = await adminFetch("/api/admin/auth/session").catch(() => null);
+      if (!active) {
         return;
       }
 
-      setReady(true);
+      if (!res?.ok) {
+        await signOut(auth);
+        router.replace(
+          `/admin/login?reason=${res?.status === 403 ? "forbidden" : "expired"}`
+        );
+        return;
+      }
+
+      if (active) {
+        setReady(true);
+      }
     });
 
-    return () => unsub();
+    return () => {
+      active = false;
+      unsub();
+    };
   }, [router, pathname]);
 
   if (!ready && pathname !== "/admin/login") {

@@ -2,6 +2,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/adminAuth", () => ({
   requireAdmin: vi.fn().mockResolvedValue({ uid: "admin-uid" }),
+  requireAdminOrSupport: vi.fn().mockResolvedValue({
+    uid: "admin-uid",
+    idToken: "admin-token",
+  }),
+  adminAuthErrorResponse: vi.fn((error: unknown) =>
+    error instanceof Error && error.message === "not_admin"
+      ? Response.json({ error: "Nu ai drepturi de administrator pentru acest cont." }, { status: 403 })
+      : null
+  ),
 }));
 
 vi.mock("@/lib/sentryServer", () => ({
@@ -87,6 +96,23 @@ describe("admin provider callable proxy routes", () => {
         }),
       })
     );
+  });
+
+  it("returns 403 instead of 500 when the account is not admin", async () => {
+    const adminAuth = await import("@/lib/adminAuth");
+    vi.mocked(adminAuth.requireAdminOrSupport).mockRejectedValueOnce(
+      new Error("not_admin")
+    );
+
+    const { GET } = await import("../route");
+    const response = await GET(
+      new Request("https://example.com/api/admin/providers?page=1&pageSize=20")
+    );
+    const json = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(json.error).toBe("Nu ai drepturi de administrator pentru acest cont.");
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it("requires a reason before calling reject or suspend review actions", async () => {

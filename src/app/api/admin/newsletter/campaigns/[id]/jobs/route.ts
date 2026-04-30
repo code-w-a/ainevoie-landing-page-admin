@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { FieldPath } from "firebase-admin/firestore";
 import { getAdminDb, serializeDoc } from "@/lib/firebaseAdmin";
-import { requireAdmin } from "@/lib/adminAuth";
+import { adminAuthErrorResponse, requireAdmin } from "@/lib/adminAuth";
 import { captureServerException } from "@/lib/sentryServer";
 
 const DEFAULT_LIMIT = 100;
@@ -66,6 +66,11 @@ export async function GET(
       nextCursor,
     });
   } catch (error) {
+    const authResponse = adminAuthErrorResponse(error);
+    if (authResponse) {
+      return authResponse;
+    }
+
     captureServerException(error, { route: "api/admin/newsletter/campaigns/[id]/jobs/GET" });
     return NextResponse.json(
       { error: "Nu am putut încărca joburile campaniei." },

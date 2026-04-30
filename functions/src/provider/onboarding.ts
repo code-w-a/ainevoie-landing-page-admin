@@ -1,10 +1,12 @@
 import { getStorage } from "firebase-admin/storage";
 import { FieldValue } from "firebase-admin/firestore";
+import sharp from "sharp";
 import {
   CallableRequest,
   HttpsError,
   onCall,
 } from "firebase-functions/v2/https";
+import { getDefaultFirebaseApp } from "../shared/firebaseAdmin";
 import { getDb } from "../shared/firestore";
 import { withSentryFunction } from "../shared/sentry";
 import { normalizeProviderAvailability } from "./availability";
@@ -42,7 +44,10 @@ function assertStoragePath(path: string, expectedPrefix: string) {
 }
 
 async function assertFileExists(storagePath: string) {
-  const [exists] = await getStorage().bucket().file(storagePath).exists();
+  const [exists] = await getStorage(getDefaultFirebaseApp())
+    .bucket()
+    .file(storagePath)
+    .exists();
   if (!exists) {
     throw new HttpsError("not-found", "Fișierul încărcat nu a fost găsit.");
   }
@@ -93,70 +98,198 @@ function logCallableError(handler: string, error: unknown, extra: Record<string,
   });
 }
 
+function logCallableInfo(handler: string, event: string, extra: Record<string, unknown>) {
+  console.info(`[${handler}] ${event}`, extra);
+}
+
+function summarizeSubmitProviderOnboardingPayload(data: unknown) {
+  const payload = data && typeof data === "object" ? data as Record<string, any> : {};
+  const documents = payload.documents && typeof payload.documents === "object"
+    ? payload.documents as Record<string, any>
+    : {};
+  return {
+    payloadKeys: Object.keys(payload).sort(),
+    hasUid: typeof payload.uid === "string" && payload.uid.trim().length > 0,
+    hasProviderUid:
+      typeof payload.providerUid === "string" && payload.providerUid.trim().length > 0,
+    hasAvatarPath:
+      typeof payload.avatarPath === "string" && payload.avatarPath.trim().length > 0,
+    hasDocuments: Boolean(payload.documents && typeof payload.documents === "object"),
+    hasIdentityDocumentPath:
+      typeof documents.identity?.storagePath === "string" &&
+      documents.identity.storagePath.trim().length > 0,
+    hasProfessionalDocumentPath:
+      typeof documents.professional?.storagePath === "string" &&
+      documents.professional.storagePath.trim().length > 0,
+  };
+}
+
 export const finalizeProviderAvatarUpload = onCall(
   { region: REGION },
   withSentryFunction("finalizeProviderAvatarUpload", async (request: CallableRequest<any>) => {
-    const uid = requireUid(request);
-    const storagePath = readString(request.data?.storagePath, "storagePath");
-    assertStoragePath(storagePath, `providers/${uid}/avatar/`);
-    await assertFileExists(storagePath);
+    const authUid = request.auth?.uid || null;
+    const requestedStoragePath =
+      typeof request.data?.storagePath === "string" ? request.data.storagePath : null;
+    logCallableInfo("finalizeProviderAvatarUpload", "request received", {
+      uid: authUid,
+      storagePath: requestedStoragePath,
+    });
 
-    const db = getDb();
-    const providerRef = db.collection("providers").doc(uid);
-    const providerSnap = await providerRef.get();
-    if (!providerSnap.exists) {
-      throw new HttpsError("not-found", "Profilul de prestator nu există.");
-    }
+    try {
+      const uid = requireUid(request);
+      const storagePath = readString(request.data?.storagePath, "storagePath");
+      assertStoragePath(storagePath, `providers/${uid}/avatar/`);
+      logCallableInfo("finalizeProviderAvatarUpload", "storage path validated", {
+        uid,
+        storagePath,
+      });
 
-    await providerRef.set(
-      {
-        professionalProfile: {
-          avatarPath: storagePath,
+      await assertFileExists(storagePath);
+      logCallableInfo("finalizeProviderAvatarUpload", "source file exists", {
+        uid,
+        storagePath,
+      });
+
+      const avatarPath = `providers/${uid}/avatar/profile.jpg`;
+      const bucket = getStorage(getDefaultFirebaseApp()).bucket();
+      const [sourceBuffer] = await bucket.file(storagePath).download();
+      logCallableInfo("finalizeProviderAvatarUpload", "source file downloaded", {
+        uid,
+        storagePath,
+        sourceBytes: sourceBuffer.length,
+      });
+
+      const normalizedBuffer = await sharp(sourceBuffer)
+        .rotate()
+        .resize(1024, 1024, { fit: "cover", position: "centre" })
+        .jpeg({ quality: 92 })
+        .toBuffer();
+
+      await bucket.file(avatarPath).save(normalizedBuffer, {
+        contentType: "image/jpeg",
+        metadata: {
+          cacheControl: "public, max-age=3600",
         },
-        updatedAt: FieldValue.serverTimestamp(),
-        updatedBy: uid,
-      },
-      { merge: true }
-    );
+      });
+      logCallableInfo("finalizeProviderAvatarUpload", "normalized avatar saved", {
+        uid,
+        storagePath,
+        avatarPath,
+        normalizedBytes: normalizedBuffer.length,
+      });
 
-    return { status: "uploaded", storagePath };
+      const db = getDb();
+      const providerRef = db.collection("providers").doc(uid);
+      const providerSnap = await providerRef.get();
+      logCallableInfo("finalizeProviderAvatarUpload", "provider lookup completed", {
+        uid,
+        exists: providerSnap.exists,
+      });
+      if (!providerSnap.exists) {
+        throw new HttpsError("not-found", "Profilul de prestator nu există.");
+      }
+
+      await providerRef.set(
+        {
+          professionalProfile: {
+            avatarPath,
+          },
+          updatedAt: FieldValue.serverTimestamp(),
+          updatedBy: uid,
+        },
+        { merge: true }
+      );
+      logCallableInfo("finalizeProviderAvatarUpload", "provider avatar path saved", {
+        uid,
+        avatarPath,
+      });
+
+      return { status: "uploaded", storagePath, avatarPath };
+    } catch (error) {
+      logCallableError("finalizeProviderAvatarUpload", error, {
+        uid: authUid,
+        storagePath: requestedStoragePath,
+      });
+      throw error;
+    }
   })
 );
 
 export const finalizeProviderDocumentUpload = onCall(
   { region: REGION },
   withSentryFunction("finalizeProviderDocumentUpload", async (request: CallableRequest<any>) => {
-    const uid = requireUid(request);
-    const documentType = readDocumentType(request.data?.documentType);
-    const storagePath = readString(request.data?.storagePath, "storagePath");
-    const originalFileName = readString(request.data?.originalFileName, "originalFileName");
-    assertStoragePath(storagePath, `providers/${uid}/documents/${documentType}/`);
-    await assertFileExists(storagePath);
+    const authUid = request.auth?.uid || null;
+    const requestedDocumentType =
+      typeof request.data?.documentType === "string" ? request.data.documentType : null;
+    const requestedStoragePath =
+      typeof request.data?.storagePath === "string" ? request.data.storagePath : null;
+    logCallableInfo("finalizeProviderDocumentUpload", "request received", {
+      uid: authUid,
+      documentType: requestedDocumentType,
+      storagePath: requestedStoragePath,
+    });
 
-    const db = getDb();
-    const providerRef = db.collection("providers").doc(uid);
-    const providerSnap = await providerRef.get();
-    if (!providerSnap.exists) {
-      throw new HttpsError("not-found", "Profilul de prestator nu există.");
-    }
+    try {
+      const uid = requireUid(request);
+      const documentType = readDocumentType(request.data?.documentType);
+      const storagePath = readString(request.data?.storagePath, "storagePath");
+      const originalFileName = readString(request.data?.originalFileName, "originalFileName");
+      assertStoragePath(storagePath, `providers/${uid}/documents/${documentType}/`);
+      logCallableInfo("finalizeProviderDocumentUpload", "storage path validated", {
+        uid,
+        documentType,
+        storagePath,
+        originalFileName,
+      });
 
-    await providerRef.set(
-      {
-        documents: {
-          [documentType]: {
-            status: "uploaded",
-            storagePath,
-            originalFileName,
-            uploadedAt: FieldValue.serverTimestamp(),
+      await assertFileExists(storagePath);
+      logCallableInfo("finalizeProviderDocumentUpload", "source file exists", {
+        uid,
+        documentType,
+        storagePath,
+      });
+
+      const db = getDb();
+      const providerRef = db.collection("providers").doc(uid);
+      const providerSnap = await providerRef.get();
+      logCallableInfo("finalizeProviderDocumentUpload", "provider lookup completed", {
+        uid,
+        exists: providerSnap.exists,
+      });
+      if (!providerSnap.exists) {
+        throw new HttpsError("not-found", "Profilul de prestator nu există.");
+      }
+
+      await providerRef.set(
+        {
+          documents: {
+            [documentType]: {
+              status: "uploaded",
+              storagePath,
+              originalFileName,
+              uploadedAt: FieldValue.serverTimestamp(),
+            },
           },
+          updatedAt: FieldValue.serverTimestamp(),
+          updatedBy: uid,
         },
-        updatedAt: FieldValue.serverTimestamp(),
-        updatedBy: uid,
-      },
-      { merge: true }
-    );
+        { merge: true }
+      );
+      logCallableInfo("finalizeProviderDocumentUpload", "provider document metadata saved", {
+        uid,
+        documentType,
+        storagePath,
+      });
 
-    return { documentType, status: "uploaded", storagePath, originalFileName };
+      return { documentType, status: "uploaded", storagePath, originalFileName };
+    } catch (error) {
+      logCallableError("finalizeProviderDocumentUpload", error, {
+        uid: authUid,
+        documentType: requestedDocumentType,
+        storagePath: requestedStoragePath,
+      });
+      throw error;
+    }
   })
 );
 
@@ -227,50 +360,90 @@ export const saveProviderAvailabilityProfile = onCall(
 export const submitProviderOnboarding = onCall(
   { region: REGION },
   withSentryFunction("submitProviderOnboarding", async (request: CallableRequest<any>) => {
-    const uid = requireUid(request);
-    const db = getDb();
-    const providerRef = db.collection("providers").doc(uid);
-    const providerSnap = await providerRef.get();
-    if (!providerSnap.exists) {
-      throw new HttpsError("not-found", "Profilul de prestator nu există.");
-    }
-
-    const provider = providerSnap.data() || {};
-    if (provider.status !== "pre_registered" && provider.status !== "rejected") {
-      throw new HttpsError("failed-precondition", "Profilul nu poate fi trimis la verificare în statusul curent.");
-    }
-
-    const profile = provider.professionalProfile || {};
-    if (!profile.displayName || !profile.specialization || !profile.coverageAreaText || !profile.avatarPath) {
-      throw new HttpsError("failed-precondition", "Profilul profesional este incomplet.");
-    }
-    if (!isUploadedDocument(provider.documents?.identity) || !isUploadedDocument(provider.documents?.professional)) {
-      throw new HttpsError("failed-precondition", "Documentele de verificare sunt obligatorii.");
-    }
-
-    await providerRef.set(
-      {
-        status: "pending_review",
-        onboardingStatus: "pending_review",
-        reviewState: {
-          submittedAt: FieldValue.serverTimestamp(),
-          lastReviewedAt: provider.reviewState?.lastReviewedAt ?? null,
-        },
-        updatedAt: FieldValue.serverTimestamp(),
-        updatedBy: uid,
-      },
-      { merge: true }
-    );
-
-    await providerRef.collection("events").add({
-      type: "status_changed",
-      fromStatus: provider.status || null,
-      toStatus: "pending_review",
-      actorUid: uid,
-      note: "Prestator trimis la verificare.",
-      createdAt: FieldValue.serverTimestamp(),
+    const authUid = request.auth?.uid || null;
+    const payloadSummary = summarizeSubmitProviderOnboardingPayload(request.data || {});
+    logCallableInfo("submitProviderOnboarding", "request received", {
+      uid: authUid,
+      ...payloadSummary,
     });
 
-    return { status: "pending_review" };
+    try {
+      const uid = requireUid(request);
+      const db = getDb();
+      const providerRef = db.collection("providers").doc(uid);
+      const providerSnap = await providerRef.get();
+      logCallableInfo("submitProviderOnboarding", "provider lookup completed", {
+        uid,
+        exists: providerSnap.exists,
+      });
+      if (!providerSnap.exists) {
+        throw new HttpsError("not-found", "Profilul de prestator nu există.");
+      }
+
+      const provider = providerSnap.data() || {};
+      const profile = provider.professionalProfile || {};
+      logCallableInfo("submitProviderOnboarding", "precondition snapshot", {
+        uid,
+        status: provider.status || null,
+        hasDisplayName: Boolean(profile.displayName),
+        hasSpecialization: Boolean(profile.specialization),
+        hasCoverageAreaText: Boolean(profile.coverageAreaText),
+        hasAvatarPath: Boolean(profile.avatarPath),
+        identityDocumentUploaded: isUploadedDocument(provider.documents?.identity),
+        professionalDocumentUploaded: isUploadedDocument(provider.documents?.professional),
+      });
+
+      if (provider.status !== "pre_registered" && provider.status !== "rejected") {
+        throw new HttpsError("failed-precondition", "Profilul nu poate fi trimis la verificare în statusul curent.");
+      }
+
+      if (!profile.displayName || !profile.specialization || !profile.coverageAreaText || !profile.avatarPath) {
+        throw new HttpsError("failed-precondition", "Profilul profesional este incomplet.");
+      }
+      if (!isUploadedDocument(provider.documents?.identity) || !isUploadedDocument(provider.documents?.professional)) {
+        throw new HttpsError("failed-precondition", "Documentele de verificare sunt obligatorii.");
+      }
+
+      await providerRef.set(
+        {
+          status: "pending_review",
+          onboardingStatus: "pending_review",
+          reviewState: {
+            submittedAt: FieldValue.serverTimestamp(),
+            lastReviewedAt: provider.reviewState?.lastReviewedAt ?? null,
+          },
+          updatedAt: FieldValue.serverTimestamp(),
+          updatedBy: uid,
+        },
+        { merge: true }
+      );
+      logCallableInfo("submitProviderOnboarding", "provider status saved", {
+        uid,
+        fromStatus: provider.status || null,
+        toStatus: "pending_review",
+      });
+
+      await providerRef.collection("events").add({
+        type: "status_changed",
+        fromStatus: provider.status || null,
+        toStatus: "pending_review",
+        actorUid: uid,
+        note: "Prestator trimis la verificare.",
+        createdAt: FieldValue.serverTimestamp(),
+      });
+      logCallableInfo("submitProviderOnboarding", "provider event saved", {
+        uid,
+        type: "status_changed",
+        toStatus: "pending_review",
+      });
+
+      return { status: "pending_review" };
+    } catch (error) {
+      logCallableError("submitProviderOnboarding", error, {
+        uid: authUid,
+        ...payloadSummary,
+      });
+      throw error;
+    }
   })
 );

@@ -3,10 +3,12 @@
 import Graphics from "@/components/About/Graphics";
 import PhoneMockup from "@/components/PhoneMockup";
 import { Link } from "@/i18n/navigation";
-import { useTranslations } from "next-intl";
+import { getLocalizedScreenshot } from "@/lib/localizedScreenshots";
+import { useLocale, useTranslations } from "next-intl";
 
 const About = () => {
   const t = useTranslations("About");
+  const locale = useLocale();
 
   return (
     <>
@@ -20,7 +22,7 @@ const About = () => {
                   data-wow-delay=".2s"
                 >
                   <PhoneMockup
-                    src="/images/screenshots/utilizator_ecran_prestator.jpg"
+                    src={getLocalizedScreenshot("providerProfile", locale)}
                     alt={t("mockupClientAlt")}
                     sizes="(min-width: 1024px) 294px, (min-width: 768px) 280px, 260px"
                   />
@@ -165,7 +167,7 @@ const About = () => {
                   data-wow-delay=".3s"
                 >
                   <PhoneMockup
-                    src="/images/screenshots/Prestator_cereri.jpg"
+                    src={getLocalizedScreenshot("providerRequests", locale)}
                     alt={t("mockupProviderAlt")}
                     sizes="(min-width: 1024px) 294px, (min-width: 768px) 280px, 260px"
                   />

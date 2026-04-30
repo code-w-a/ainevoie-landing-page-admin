@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireEnv } from "@/lib/firebaseAdmin";
-import { requireAdmin } from "@/lib/adminAuth";
+import { adminAuthErrorResponse, requireAdmin } from "@/lib/adminAuth";
 import {
   parseCallableErrorResponse,
   readCallableErrorMessage,
@@ -111,6 +111,11 @@ export async function POST(
       scheduleTaskId: result?.scheduleTaskId || null,
     });
   } catch (error) {
+    const authResponse = adminAuthErrorResponse(error);
+    if (authResponse) {
+      return authResponse;
+    }
+
     captureServerException(error, { route: "api/admin/newsletter/campaigns/[id]/schedule/route.ts" });
     return NextResponse.json(
       { error: "Nu am putut programa campania." },

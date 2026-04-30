@@ -1,4 +1,5 @@
 import * as Sentry from "@sentry/nextjs";
+import { isAdminAuthError } from "@/lib/adminAuth";
 
 type CaptureContext = {
   route: string;
@@ -7,12 +8,16 @@ type CaptureContext = {
 };
 
 function isExpectedBusinessError(error: unknown): boolean {
+  if (isAdminAuthError(error)) {
+    return true;
+  }
+
   if (!(error instanceof Error)) {
     return false;
   }
 
   const message = error.message.trim().toLowerCase();
-  return ["missing_token", "not_admin", "email-already-exists"].includes(message);
+  return ["missing_token", "invalid_token", "not_admin", "email-already-exists"].includes(message);
 }
 
 export function captureServerException(error: unknown, context: CaptureContext): void {

@@ -4,11 +4,13 @@ import { Badge } from "@/components/ui/badge";
 import PhoneMockup from "@/components/PhoneMockup";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
-import { useTranslations } from "next-intl";
+import { getLocalizedScreenshot } from "@/lib/localizedScreenshots";
+import { useLocale, useTranslations } from "next-intl";
 import { useMemo } from "react";
 
 export default function ProviderIntroHero() {
   const t = useTranslations("ProviderIntro");
+  const locale = useLocale();
   const miniTitles = useMemo(
     () => [t("mini1"), t("mini2"), t("mini3")],
     [t]
@@ -62,7 +64,7 @@ export default function ProviderIntroHero() {
         <div className="w-full px-4 lg:w-5/12">
           <div className="relative z-10 mx-auto w-full max-w-[530px] pt-8 lg:mr-0">
             <PhoneMockup
-              src="/images/screenshots/Prestator_calendar.jpg"
+              src={getLocalizedScreenshot("providerCalendar", locale)}
               alt={t("phoneAlt")}
               priority={true}
               sizes="(min-width: 1280px) 360px, (min-width: 1024px) 320px, 280px"

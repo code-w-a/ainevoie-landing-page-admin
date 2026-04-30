@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireEnv } from "@/lib/firebaseAdmin";
-import { requireAdmin } from "@/lib/adminAuth";
+import { adminAuthErrorResponse, requireAdmin } from "@/lib/adminAuth";
 import { parseCallableErrorResponse } from "@/lib/newsletterAdmin";
 import { captureServerException } from "@/lib/sentryServer";
 
@@ -45,6 +45,11 @@ export async function POST(
     const data = await response.json();
     return NextResponse.json(data);
   } catch (error) {
+    const authResponse = adminAuthErrorResponse(error);
+    if (authResponse) {
+      return authResponse;
+    }
+
     captureServerException(error, { route: "api/admin/newsletter/campaigns/[id]/requeue/route.ts" });
     return NextResponse.json(
       { error: "Nu am putut recoada joburile eșuate." },

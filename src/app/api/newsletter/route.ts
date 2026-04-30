@@ -7,7 +7,10 @@ import { captureServerException } from "@/lib/sentryServer";
 
 export async function POST(req: Request) {
   const locale = getRequestLocale(req);
-  const { email } = (await req.json()) as { email?: string };
+  const { acceptTerms, email } = (await req.json()) as {
+    acceptTerms?: boolean;
+    email?: string;
+  };
   const normalizedEmail =
     typeof email === "string" ? email.trim().toLowerCase() : "";
 
@@ -17,6 +20,10 @@ export async function POST(req: Request) {
 
   if (!normalizedEmail.includes("@")) {
     return jsonApiError(locale, "NEWSLETTER_INVALID_EMAIL", 400);
+  }
+
+  if (acceptTerms !== true) {
+    return jsonApiError(locale, "TERMS_NOT_ACCEPTED", 400);
   }
 
   try {
@@ -48,6 +55,10 @@ export async function POST(req: Request) {
         consentTextVersion: "v1",
         consentMethod: "single_opt_in",
         consentWithdrawnAt: null,
+        termsAcceptedAt: FieldValue.serverTimestamp(),
+        termsVersion: "v1",
+        privacyAcceptedAt: FieldValue.serverTimestamp(),
+        privacyVersion: "v1",
         updatedAt: FieldValue.serverTimestamp(),
       });
       return NextResponse.json({ status: "already_subscribed" }, { status: 200 });
@@ -65,6 +76,10 @@ export async function POST(req: Request) {
       consentTextVersion: "v1",
       consentMethod: "single_opt_in",
       consentWithdrawnAt: null,
+      termsAcceptedAt: FieldValue.serverTimestamp(),
+      termsVersion: "v1",
+      privacyAcceptedAt: FieldValue.serverTimestamp(),
+      privacyVersion: "v1",
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     });

@@ -1,59 +1,108 @@
-**Last updated:** 30 January 2026
+**Last updated:** 29 April 2026
 
-Welcome to AInevoie. These Terms & Conditions (“**Terms**”) govern your use of the AInevoie platform (“**Platform**”, “**Service**”) — a marketplace that connects customers with local service providers, including cleaning and related services.
+These Terms & Conditions ("**Terms**") govern access to and use of the AInevoie website, provider onboarding flow, account areas, newsletter, contact form, and any related marketplace features that are made available from time to time (together, the "**Platform**"). AInevoie is a marketplace for connecting customers with independent service providers, including cleaning and related services.
 
-By accessing or using the Platform, you agree to these Terms. If you do not agree, please do not use the Service.
+By using the Platform or creating an account, you confirm that you have read and accepted these Terms and the Privacy Policy. If you use the Platform on behalf of a company or other organisation, you confirm that you are authorised to bind that organisation.
 
-## 1. Who we are
+## 1. Operator and contact
 
-AInevoie is operated from Romania. Contact details published on the website apply.
+The Platform is operated by the legal entity responsible for AInevoie, established in Romania and identified in the public contact details of the Platform. Until full company details are published in the dedicated legal notice, you can contact us at **contact@ai-nevoie.ro**.
 
-## 2. Eligibility and accounts
+## 2. Eligibility
 
-You must provide accurate information when registering. You are responsible for safeguarding your credentials and for activity under your account. Notify us promptly of any unauthorised use.
+You must be at least 18 years old to create an account, submit provider onboarding information, request services, or use paid features. You must provide accurate, complete, and current information and must not impersonate another person or entity.
 
-## 3. Customers and providers
+## 3. Nature of the Platform
 
-**Customers** may request services, compare options and interact with providers through the Platform.
+AInevoie facilitates discovery, communication, onboarding, scheduling, and, where enabled, payment or subscription flows. Unless expressly stated otherwise, AInevoie does not itself provide the cleaning or related services displayed on the Platform and is not a party to the service contract between a customer and an independent provider.
 
-**Providers** deliver services under their own agreements with customers and in line with applicable law. The Platform helps users find one another and communicate; unless we say otherwise, AInevoie is not a party to the contract between a customer and a provider.
+Providers are independent professionals or businesses. They are responsible for the legality, quality, safety, price, tax treatment, insurance, authorisations, and performance of their services.
 
-## 4. Acceptable use
+## 4. Accounts and security
 
-You agree not to misuse the Platform, including by: violating law; infringing rights; distributing malware; scraping or overloading systems; impersonating others; or circumventing security or usage limits.
+You are responsible for keeping your login credentials confidential and for all activity under your account. You must notify us promptly if you suspect unauthorised access, misuse, or a security incident involving your account.
 
-We may suspend or terminate access for breaches.
+We may refuse registration, request additional information, suspend access, or close an account where reasonably necessary to protect users, comply with law, investigate suspected abuse, or enforce these Terms.
 
-## 5. Fees and payments
+## 5. Provider onboarding and verification
 
-Where the Platform enables payments, additional terms may apply at checkout. Taxes and third-party fees may apply as disclosed.
+Provider onboarding may require contact details, business or professional details, service area, legal status, company identifiers, profile images, availability, and verification documents. You confirm that all information and files submitted are true, lawful, current, and that you have the right to provide them.
 
-## 6. Intellectual property
+Submitting information does not guarantee approval, visibility, ranking, access to bookings, or availability of paid features. We may approve, reject, suspend, or request corrections to a provider profile where necessary for trust, safety, legal compliance, or platform quality.
 
-Content, branding, and software on the Platform are protected by intellectual property laws. You receive a limited, revocable licence to use the Service as intended. No licence is granted beyond that.
+## 6. Customer and provider responsibilities
 
-## 7. Third-party services
+Customers must provide accurate request information, communicate respectfully, comply with agreed bookings, and pay applicable fees where payment is enabled.
 
-The Service may link to or integrate third-party tools. Their terms and privacy practices govern those services.
+Providers must comply with applicable laws, hold required licences or registrations, issue invoices or receipts where required, maintain suitable insurance where applicable, and perform services with professional care.
 
-## 8. Disclaimers
+Both customers and providers are responsible for resolving practical service details such as access, scope, timing, cancellation, rescheduling, quality issues, and any safety requirements.
 
-The Platform is provided “as is” and “as available” to the fullest extent permitted by law. We do not guarantee uninterrupted or error-free operation. Provider quality and service outcomes are primarily matters between users and providers.
+## 7. Bookings, cancellations, and availability
 
-## 9. Limitation of liability
+Booking, cancellation, and rescheduling rules may be displayed in the Platform, in the relevant flow, or communicated separately. Repeated no-shows, abusive cancellations, inaccurate availability, or failure to attend agreed appointments may result in account restrictions.
 
-To the extent permitted by applicable law, AInevoie and its affiliates shall not be liable for indirect, incidental, special, consequential, or punitive damages, or for loss of profits, data, or goodwill, arising from your use of the Platform.
+Features may be released gradually. Some functionality described on the website may be in prelaunch, testing, or limited availability.
 
-Nothing in these Terms excludes liability that cannot be excluded under mandatory law.
+## 8. Payments, subscriptions, and third-party payment providers
 
-## 10. Changes
+Where payments or subscriptions are enabled, they may be processed by Stripe or another payment provider. AInevoie does not store full card details. Payment provider terms, privacy notices, and authentication requirements may apply.
 
-We may update these Terms. We will post the revised version with a new “Last updated” date. Continued use after changes constitutes acceptance where permitted by law.
+Prices, taxes, subscription terms, commissions, renewal rules, cancellation rules, and refund conditions will be shown in the relevant purchase or subscription flow where applicable. Providers remain responsible for their own taxes and legal accounting obligations unless mandatory law provides otherwise.
 
-## 11. Governing law
+## 9. Reviews, ratings, and user content
 
-These Terms are governed by the laws of Romania, without regard to conflict-of-law rules, subject to mandatory consumer protections where applicable.
+You may be able to submit profile content, messages, reviews, ratings, images, documents, or other content. You must not submit illegal, misleading, abusive, defamatory, discriminatory, spam, malware, or rights-infringing content.
 
-## 12. Contact
+You retain your rights in your content, but grant AInevoie a non-exclusive, worldwide, royalty-free licence to host, store, reproduce, display, adapt, and use that content as needed to operate, secure, improve, and promote the Platform, subject to the Privacy Policy and applicable law.
 
-For questions about these Terms, use the contact options on the website (e.g. **contact@ai-nevoie.ro** where published).
+We may moderate, hide, remove, or restrict content that appears to breach these Terms, the law, platform safety rules, or third-party rights.
+
+## 10. Acceptable use
+
+You must not misuse the Platform. This includes:
+
+- unlawful, fraudulent, deceptive, or harmful activity;
+- scraping, harvesting, or using other users' data without a valid legal basis;
+- attempting to bypass authentication, security, rate limits, or access controls;
+- uploading malware, harmful files, or documents that you are not entitled to share;
+- manipulating ratings, reviews, search results, subscriptions, payments, or referrals;
+- interfering with the availability or integrity of the Platform.
+
+## 11. Intellectual property
+
+The AInevoie name, logo, interface, text, graphics, software, and other Platform materials are owned by AInevoie or its licensors and are protected by intellectual property laws. You receive only a limited, revocable, non-transferable right to use the Platform for its intended purpose.
+
+## 12. Third-party services
+
+The Platform may rely on or link to third-party services such as Firebase/Google Cloud, Stripe, email delivery services, hosting, analytics, error monitoring, or content tools. Their own terms and privacy notices may apply. We are not responsible for third-party services outside our control.
+
+## 13. Disclaimers
+
+The Platform is provided on an "as is" and "as available" basis to the maximum extent permitted by law. We do not guarantee uninterrupted operation, error-free functionality, continuous availability of any provider, or any specific service outcome.
+
+Nothing in these Terms limits statutory consumer rights or liability that cannot be excluded under mandatory law.
+
+## 14. Limitation of liability
+
+To the maximum extent permitted by law, AInevoie is not liable for indirect, incidental, special, consequential, punitive, or loss-of-profit damages arising from use of the Platform. Where liability cannot be excluded, it is limited to the extent permitted by applicable law.
+
+AInevoie is not responsible for the conduct, omissions, service quality, tax compliance, insurance, authorisations, or statements of independent customers or providers, except where mandatory law states otherwise.
+
+## 15. Account suspension and termination
+
+We may suspend or terminate access where necessary to enforce these Terms, protect users, prevent fraud or abuse, comply with law, or respond to security risks. You may request account deletion by contacting us or using available account settings. Certain records may be retained where required by law, dispute handling, fraud prevention, accounting, or security.
+
+## 16. Changes to the Terms
+
+We may update these Terms. We will publish the new version and update the date above. Material changes may also be communicated by email, notice, or in-app message where appropriate. Continued use after the effective date means acceptance of the updated Terms, where permitted by law.
+
+## 17. Governing law and disputes
+
+These Terms are governed by Romanian law, without prejudice to mandatory consumer protections that may apply in your country of residence. The competent Romanian courts will have jurisdiction, unless mandatory law provides another forum.
+
+Before starting formal proceedings, we encourage you to contact us so we can try to resolve the issue amicably.
+
+## 18. Contact
+
+For questions about these Terms, contact **contact@ai-nevoie.ro**.

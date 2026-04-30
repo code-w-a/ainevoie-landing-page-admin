@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/adminAuth";
+import { adminAuthErrorResponse, requireAdmin } from "@/lib/adminAuth";
 import { getAdminDb, requireEnv } from "@/lib/firebaseAdmin";
 import {
   isCampaignTemplateId,
@@ -131,6 +131,11 @@ export async function POST(request: Request) {
     const data = await response.json();
     return NextResponse.json(data);
   } catch (error) {
+    const authResponse = adminAuthErrorResponse(error);
+    if (authResponse) {
+      return authResponse;
+    }
+
     captureServerException(error, { route: "api/admin/newsletter/campaigns/test/route.ts" });
     return NextResponse.json(
       { error: "Nu am putut trimite emailul de test." },

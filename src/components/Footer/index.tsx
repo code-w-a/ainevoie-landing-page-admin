@@ -1,5 +1,6 @@
 "use client";
 
+import { Checkbox } from "@/components/ui/checkbox";
 import FooterBottom from "@/components/Footer/FooterBottom";
 import { Link } from "@/i18n/navigation";
 import { FooterMenu } from "@/types/footerMenu";
@@ -20,7 +21,7 @@ const Footer = () => {
           { label: t("navProduct"), route: "/#home" },
           { label: t("navBenefits"), route: "/#features" },
           { label: t("navHow"), route: "/#work-process" },
-          { label: t("navPlans"), route: "/#pricing" },
+          // Pricing is temporarily hidden until plan details are ready to publish.
           { label: t("navScreens"), route: "/#screens" },
         ],
       },
@@ -41,7 +42,7 @@ const Footer = () => {
           { label: t("navOnboarding"), route: "/providers/onboarding/form" },
           { label: t("navRequests"), route: "/#work-process" },
           { label: t("navScheduling"), route: "/#work-process" },
-          { label: t("navPlans"), route: "/#pricing" },
+          // Pricing is temporarily hidden until plan details are ready to publish.
         ],
       },
     ],
@@ -49,6 +50,7 @@ const Footer = () => {
   );
 
   const [footerEmail, setFooterEmail] = useState("");
+  const [footerAcceptTerms, setFooterAcceptTerms] = useState(false);
   const [footerStatus, setFooterStatus] = useState<
     "idle" | "loading" | "success" | "error"
   >("idle");
@@ -64,6 +66,11 @@ const Footer = () => {
       toast.error(t("toastEmailRequired"));
       return;
     }
+    if (!footerAcceptTerms) {
+      setFooterStatus("error");
+      toast.error(t("toastTermsRequired"));
+      return;
+    }
 
     try {
       setFooterStatus("loading");
@@ -74,7 +81,7 @@ const Footer = () => {
           "Content-Type": "application/json",
           "x-next-intl-locale": locale,
         },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ acceptTerms: footerAcceptTerms, email }),
       });
 
       if (res.ok) {
@@ -87,6 +94,7 @@ const Footer = () => {
         );
         setFooterStatus("success");
         setFooterEmail("");
+        setFooterAcceptTerms(false);
         return;
       }
 
@@ -187,9 +195,30 @@ const Footer = () => {
                             className="border-stroke text-body focus:border-primary dark:focus:border-primary w-full rounded-sm border bg-white px-4 py-3 text-sm outline-hidden dark:border-[#34374A] dark:bg-[#2A2E44]"
                             disabled={footerStatus === "loading"}
                           />
+                          <div className="text-xs leading-relaxed">
+                            <Checkbox
+                              name="footerAcceptTerms"
+                              checked={footerAcceptTerms}
+                              disabled={footerStatus === "loading"}
+                              onChange={(event) => setFooterAcceptTerms(event.target.checked)}
+                              label={
+                                <>
+                                  {t("consentAgree")}{" "}
+                                  <Link href="/terms" className="text-primary hover:underline">
+                                    {t("terms")}
+                                  </Link>{" "}
+                                  {t("consentAnd")}{" "}
+                                  <Link href="/privacy" className="text-primary hover:underline">
+                                    {t("privacy")}
+                                  </Link>
+                                  {t("consentEnd")}
+                                </>
+                              }
+                            />
+                          </div>
                           <button
                             type="submit"
-                            disabled={footerStatus === "loading"}
+                            disabled={footerStatus === "loading" || !footerAcceptTerms}
                             className="bg-primary hover:bg-primary/90 w-full rounded-sm px-5 py-3 text-sm font-medium text-white disabled:opacity-60"
                           >
                             {footerStatus === "loading"

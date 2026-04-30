@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/adminAuth";
+import { adminAuthErrorResponse, requireAdminOrSupport } from "@/lib/adminAuth";
 import { getAdminDb, getAdminStorageBucket } from "@/lib/firebaseAdmin";
 import { captureServerException } from "@/lib/sentryServer";
 
@@ -17,7 +17,7 @@ export async function GET(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
-    await requireAdmin(request);
+    await requireAdminOrSupport(request);
     const { id } = await context.params;
 
     const providerSnap = await getAdminDb().collection("providers").doc(id).get();
@@ -59,6 +59,11 @@ export async function GET(
       },
     });
   } catch (error) {
+    const authResponse = adminAuthErrorResponse(error);
+    if (authResponse) {
+      return authResponse;
+    }
+
     console.error("[admin-provider-avatar] route error", error);
     captureServerException(error, {
       route: "api/admin/providers/[id]/avatar/route.ts",

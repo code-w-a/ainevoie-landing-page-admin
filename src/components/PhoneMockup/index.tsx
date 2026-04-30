@@ -27,15 +27,14 @@ const PhoneMockup = ({
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-[2.25rem] bg-black">
+          <div className="relative aspect-[1080/2316] overflow-hidden rounded-[2.25rem] bg-black">
             <Image
-              width={1080}
-              height={2316}
+              fill
               src={src}
               alt={alt}
               priority={priority}
               sizes={sizes}
-              className="h-auto w-full"
+              className="object-cover object-center"
             />
           </div>
         </div>

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAdminDb, requireEnv } from "@/lib/firebaseAdmin";
-import { requireAdmin } from "@/lib/adminAuth";
+import { adminAuthErrorResponse, requireAdmin } from "@/lib/adminAuth";
 import {
   isCampaignTemplateId,
   normalizePublicBaseUrl,
@@ -155,6 +155,11 @@ export async function POST(
       status: result?.status || "draft",
     });
   } catch (error) {
+    const authResponse = adminAuthErrorResponse(error);
+    if (authResponse) {
+      return authResponse;
+    }
+
     captureServerException(error, {
       route: "api/admin/newsletter/campaigns/[id]/duplicate/route.ts",
     });

@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/adminAuth", () => ({
   requireAdmin: vi.fn().mockResolvedValue({ uid: "admin-uid" }),
+  requireAdminOrSupport: vi.fn().mockResolvedValue({ uid: "admin-uid" }),
+  adminAuthErrorResponse: vi.fn(() => null),
 }));
 
 vi.mock("@/lib/sentryServer", () => ({

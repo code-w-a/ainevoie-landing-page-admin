@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
-import { requireAdmin } from "@/lib/adminAuth";
+import { adminAuthErrorResponse, requireAdmin } from "@/lib/adminAuth";
 import { getAdminDb } from "@/lib/firebaseAdmin";
 import { captureServerException } from "@/lib/sentryServer";
 import { devLogServerError } from "@/lib/devServerErrorLog";
@@ -94,6 +94,11 @@ export async function GET(request: Request) {
       defaults: getDefaultEmailTemplateConfig(),
     });
   } catch (error) {
+    const authResponse = adminAuthErrorResponse(error);
+    if (authResponse) {
+      return authResponse;
+    }
+
     captureServerException(error, {
       route: "api/admin/email-templates/route.ts",
     });
@@ -132,6 +137,11 @@ export async function PUT(request: Request) {
       status: "ok",
     });
   } catch (error) {
+    const authResponse = adminAuthErrorResponse(error);
+    if (authResponse) {
+      return authResponse;
+    }
+
     captureServerException(error, {
       route: "api/admin/email-templates/route.ts",
     });

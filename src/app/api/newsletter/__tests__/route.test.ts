@@ -86,7 +86,7 @@ describe("POST /api/newsletter", () => {
   });
 
   it("returns 400 when email is invalid", async () => {
-    const response = await POST(request({ email: "not-an-email" }));
+    const response = await POST(request({ acceptTerms: true, email: "not-an-email" }));
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toMatchObject({
@@ -95,10 +95,32 @@ describe("POST /api/newsletter", () => {
     expect(mocks.getAdminDb).not.toHaveBeenCalled();
   });
 
+  it("returns 400 when terms are missing", async () => {
+    const response = await POST(request({ email: "user@example.com" }));
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      code: "TERMS_NOT_ACCEPTED",
+    });
+    expect(mocks.getAdminDb).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 when terms are not accepted", async () => {
+    const response = await POST(
+      request({ acceptTerms: false, email: "user@example.com" }),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      code: "TERMS_NOT_ACCEPTED",
+    });
+    expect(mocks.getAdminDb).not.toHaveBeenCalled();
+  });
+
   it("creates a new active subscriber", async () => {
     const db = firestoreWithSnapshots([emptySnapshot(), emptySnapshot()]);
 
-    const response = await POST(request({ email: " User@Example.com " }));
+    const response = await POST(request({ acceptTerms: true, email: " User@Example.com " }));
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ status: "subscribed" });
@@ -106,8 +128,10 @@ describe("POST /api/newsletter", () => {
       expect.objectContaining({
         email: "user@example.com",
         emailNormalized: "user@example.com",
+        privacyVersion: "v1",
         source: "landing_form",
         status: "active",
+        termsVersion: "v1",
       }),
     );
   });
@@ -116,7 +140,7 @@ describe("POST /api/newsletter", () => {
     const existing = subscriberSnapshot("inactive");
     firestoreWithSnapshots([existing.snapshot]);
 
-    const response = await POST(request({ email: "user@example.com" }));
+    const response = await POST(request({ acceptTerms: true, email: "user@example.com" }));
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ status: "already_subscribed" });
@@ -124,8 +148,10 @@ describe("POST /api/newsletter", () => {
       expect.objectContaining({
         email: "user@example.com",
         emailNormalized: "user@example.com",
+        privacyVersion: "v1",
         source: "landing_form",
         status: "active",
+        termsVersion: "v1",
       }),
     );
   });
@@ -135,7 +161,7 @@ describe("POST /api/newsletter", () => {
       throw new Error("db down");
     });
 
-    const response = await POST(request({ email: "user@example.com" }));
+    const response = await POST(request({ acceptTerms: true, email: "user@example.com" }));
 
     expect(response.status).toBe(500);
     await expect(response.json()).resolves.toMatchObject({

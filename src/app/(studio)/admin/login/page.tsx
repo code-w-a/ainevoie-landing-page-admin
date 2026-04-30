@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { signInWithEmailAndPassword, signOut } from "firebase/auth";
 import Image from "next/image";
 import Link from "next/link";
 
 import { getFirebaseAuth } from "@/lib/firebaseClient";
-import { adminFetch } from "@/components/admin/adminApi";
+import { adminFetch, readAdminResponseError } from "@/components/admin/adminApi";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,6 +19,13 @@ export default function AdminLoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    const reason = new URLSearchParams(window.location.search).get("reason");
+    if (reason === "forbidden") {
+      setError("Contul autentificat nu are drepturi de admin.");
+    }
+  }, []);
+
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setLoading(true);
@@ -29,7 +36,13 @@ export default function AdminLoginPage() {
       await signInWithEmailAndPassword(auth, email, password);
       const session = await adminFetch("/api/admin/auth/session");
       if (!session.ok) {
-        setError("Contul nu are drepturi de admin.");
+        await signOut(auth);
+        setError(
+          await readAdminResponseError(
+            session,
+            "Contul nu are drepturi de admin."
+          )
+        );
         return;
       }
       router.replace("/admin");

@@ -15,7 +15,7 @@ export function Checkbox({ label, ...props }: PropsType) {
       <input id={inputId} type="checkbox" className="peer sr-only" {...props} />
 
       <span className="group flex h-[1lh] shrink-0 items-center">
-        <span className="border-stroke dark:border-stroke-dark group-peer-checked:bg-primary flex size-[22px] shrink-0 items-center justify-center rounded-sm border-[.7px]">
+        <span className="group-peer-checked:bg-primary flex size-[22px] shrink-0 items-center justify-center rounded-sm border-[.7px] border-neutral-700 dark:border-neutral-400">
           <CheckMarkIcon className="hidden group-peer-checked:block" />
         </span>
       </span>

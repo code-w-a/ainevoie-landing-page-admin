@@ -1,7 +1,9 @@
 "use client";
 // import dynamic from "next/dynamic";
 import PhoneMockup from "@/components/PhoneMockup";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Link } from "@/i18n/navigation";
+import { getLocalizedScreenshot } from "@/lib/localizedScreenshots";
 import { useLocale, useTranslations } from "next-intl";
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
@@ -17,6 +19,7 @@ const HeroArea = () => {
   // const [toggler, setToggler] = useState(false);
   const [showNewsletterDialog, setShowNewsletterDialog] = useState(false);
   const [newsletterEmail, setNewsletterEmail] = useState("");
+  const [newsletterAcceptTerms, setNewsletterAcceptTerms] = useState(false);
   const [newsletterStatus, setNewsletterStatus] = useState<
     "idle" | "loading" | "success" | "error"
   >("idle");
@@ -40,6 +43,11 @@ const HeroArea = () => {
       toast.error(t("toastEmailRequired"));
       return;
     }
+    if (!newsletterAcceptTerms) {
+      setNewsletterStatus("error");
+      toast.error(t("toastTermsRequired"));
+      return;
+    }
 
     try {
       setNewsletterStatus("loading");
@@ -50,7 +58,7 @@ const HeroArea = () => {
           "Content-Type": "application/json",
           "x-next-intl-locale": locale,
         },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ acceptTerms: newsletterAcceptTerms, email }),
       });
 
       if (res.ok) {
@@ -63,6 +71,7 @@ const HeroArea = () => {
         );
         setNewsletterStatus("success");
         setNewsletterEmail("");
+        setNewsletterAcceptTerms(false);
         setTimeout(() => {
           setShowNewsletterDialog(false);
           setNewsletterStatus("idle");
@@ -169,7 +178,7 @@ const HeroArea = () => {
                 data-wow-delay=".3s"
               >
                 <PhoneMockup
-                  src="/images/screenshots/utilizator_ecran_home.jpg"
+                  src={getLocalizedScreenshot("home", locale)}
                   alt={t("mockupAlt")}
                   priority={true}
                   sizes="(min-width: 1280px) 360px, (min-width: 1024px) 320px, 280px"
@@ -297,9 +306,31 @@ const HeroArea = () => {
                 autoFocus
               />
 
+              <div className="mb-4 text-sm">
+                <Checkbox
+                  name="newsletterAcceptTerms"
+                  checked={newsletterAcceptTerms}
+                  disabled={newsletterStatus === "loading"}
+                  onChange={(event) => setNewsletterAcceptTerms(event.target.checked)}
+                  label={
+                    <>
+                      {t("consentAgree")}{" "}
+                      <Link href="/terms" className="text-primary hover:underline">
+                        {t("termsLink")}
+                      </Link>{" "}
+                      {t("consentAnd")}{" "}
+                      <Link href="/privacy" className="text-primary hover:underline">
+                        {t("privacyLink")}
+                      </Link>
+                      {t("consentEnd")}
+                    </>
+                  }
+                />
+              </div>
+
               <button
                 type="submit"
-                disabled={newsletterStatus === "loading"}
+                disabled={newsletterStatus === "loading" || !newsletterAcceptTerms}
                 className="bg-primary hover:bg-primary/90 w-full rounded-md px-8 py-4 text-base font-medium text-white disabled:opacity-60"
               >
                 {newsletterStatus === "loading"

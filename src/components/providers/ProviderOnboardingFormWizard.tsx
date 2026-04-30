@@ -2,6 +2,7 @@
 
 import { Checkbox } from "@/components/ui/checkbox";
 import { InputGroup } from "@/components/ui/input-group";
+import { createSquareAvatarFile } from "@/lib/cropImage";
 import { getFirebaseAuth, getFirebaseFunctions, getFirebaseStorage } from "@/lib/firebaseClient";
 import { PROVIDER_SERVICE_ENTRIES } from "@/lib/providers";
 import {
@@ -20,6 +21,7 @@ import { Link, useRouter } from "@/i18n/navigation";
 import Image from "next/image";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useMemo, useRef, useState } from "react";
+import Cropper, { type Area } from "react-easy-crop";
 import { Controller, useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 
@@ -58,6 +60,11 @@ type FileSlot = {
   storagePath: string | null;
   error: string | null;
 };
+type AvatarSource = {
+  file: File;
+  previewUrl: string;
+  error: string | null;
+};
 
 const MAX_STEP = 6;
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
@@ -81,6 +88,14 @@ function sanitizeFileName(file: File) {
   return `${Date.now()}-${safeName || "upload.jpg"}`;
 }
 
+function buildAvatarUploadPath(uid: string) {
+  const random =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : Math.random().toString(36).slice(2);
+  return `providers/${uid}/avatar/${Date.now()}-${random}.jpg`;
+}
+
 function assertImageFile(file: File, errorMessage: string) {
   if (!file.type.startsWith("image/") || file.size > MAX_IMAGE_BYTES) {
     throw new Error(errorMessage);
@@ -90,9 +105,69 @@ function assertImageFile(file: File, errorMessage: string) {
 function readCallableError(error: unknown, fallback: string) {
   const err = error as { message?: string; code?: string; details?: unknown };
   if (typeof err.message === "string" && err.message.trim()) {
-    return err.message;
+    const code = typeof err.code === "string" && err.code.trim() ? err.code.trim() : "";
+    return code ? `${err.message} (${code})` : err.message;
   }
   return fallback;
+}
+
+function revokeTrackedPreviewUrl(ref: React.MutableRefObject<string | null>) {
+  if (!ref.current) return;
+  URL.revokeObjectURL(ref.current);
+  ref.current = null;
+}
+
+function createTrackedPreviewUrl(file: File, ref: React.MutableRefObject<string | null>) {
+  revokeTrackedPreviewUrl(ref);
+  const previewUrl = URL.createObjectURL(file);
+  ref.current = previewUrl;
+  return previewUrl;
+}
+
+function logOnboardingClient(event: string, details?: Record<string, unknown>) {
+  console.info(`[provider-onboarding] ${event}`, details || {});
+}
+
+function serializeOnboardingError(error: unknown) {
+  if (!error || typeof error !== "object") {
+    return { value: String(error) };
+  }
+
+  const record = error as Record<string, unknown>;
+  const serialized: Record<string, unknown> = {};
+  for (const key of Object.getOwnPropertyNames(error)) {
+    serialized[key] = record[key];
+  }
+
+  const known = error as {
+    name?: unknown;
+    message?: unknown;
+    code?: unknown;
+    details?: unknown;
+    customData?: unknown;
+    stack?: unknown;
+  };
+
+  return {
+    name: typeof known.name === "string" ? known.name : serialized.name,
+    message: typeof known.message === "string" ? known.message : serialized.message,
+    code: typeof known.code === "string" ? known.code : serialized.code,
+    details: known.details ?? serialized.details ?? null,
+    customData: known.customData ?? serialized.customData ?? null,
+    stack: typeof known.stack === "string" ? known.stack : serialized.stack,
+    properties: serialized,
+  };
+}
+
+function logOnboardingClientError(event: string, error: unknown, details?: Record<string, unknown>) {
+  console.error(`[provider-onboarding] ${event}`, {
+    ...details,
+    error: serializeOnboardingError(error),
+  }, error);
+}
+
+function isSlotReadyForSubmit(slot: FileSlot) {
+  return slot.status === "uploaded" || Boolean(slot.file);
 }
 
 export default function ProviderOnboardingFormWizard({
@@ -111,6 +186,11 @@ export default function ProviderOnboardingFormWizard({
   const [newsletterStatusError, setNewsletterStatusError] = useState<string | null>(null);
   const [providerUid, setProviderUid] = useState<string | null>(null);
   const [accountCreating, setAccountCreating] = useState(false);
+  const [avatarSource, setAvatarSource] = useState<AvatarSource | null>(null);
+  const [avatarCrop, setAvatarCrop] = useState({ x: 0, y: 0 });
+  const [avatarZoom, setAvatarZoom] = useState(1);
+  const [avatarCroppedAreaPixels, setAvatarCroppedAreaPixels] = useState<Area | null>(null);
+  const [avatarCropping, setAvatarCropping] = useState(false);
   const [avatar, setAvatar] = useState<FileSlot>(() => emptyFileSlot());
   const [identityDocument, setIdentityDocument] = useState<FileSlot>(() => emptyFileSlot());
   const [professionalDocument, setProfessionalDocument] = useState<FileSlot>(() => emptyFileSlot());
@@ -118,6 +198,10 @@ export default function ProviderOnboardingFormWizard({
   const [finalError, setFinalError] = useState<string | null>(null);
   const cityComboRef = useRef<HTMLDivElement>(null);
   const citySearchInputRef = useRef<HTMLInputElement>(null);
+  const avatarSourcePreviewUrlRef = useRef<string | null>(null);
+  const avatarPreviewUrlRef = useRef<string | null>(null);
+  const identityPreviewUrlRef = useRef<string | null>(null);
+  const professionalPreviewUrlRef = useRef<string | null>(null);
 
   const legalStatusOptions = useMemo(
     () => [
@@ -157,6 +241,7 @@ export default function ProviderOnboardingFormWizard({
   });
 
   const emailValue = watch("email");
+  const acceptTerms = watch("acceptTerms");
   const legalStatus = watch("legalStatus");
   const selectedCountyCode = watch("countyCode");
   const selectedCityCode = watch("cityCode");
@@ -180,6 +265,7 @@ export default function ProviderOnboardingFormWizard({
     );
   }, [availableCities, normalizedCitySearch]);
   const busy = accountCreating || finalSubmitting;
+  const nextDisabled = busy || (currentStep === 3 && !providerUid && !acceptTerms);
 
   useEffect(() => {
     setValue("cityCode", "", { shouldValidate: false });
@@ -189,11 +275,12 @@ export default function ProviderOnboardingFormWizard({
 
   useEffect(() => {
     return () => {
-      if (avatar.previewUrl) URL.revokeObjectURL(avatar.previewUrl);
-      if (identityDocument.previewUrl) URL.revokeObjectURL(identityDocument.previewUrl);
-      if (professionalDocument.previewUrl) URL.revokeObjectURL(professionalDocument.previewUrl);
+      revokeTrackedPreviewUrl(avatarSourcePreviewUrlRef);
+      revokeTrackedPreviewUrl(avatarPreviewUrlRef);
+      revokeTrackedPreviewUrl(identityPreviewUrlRef);
+      revokeTrackedPreviewUrl(professionalPreviewUrlRef);
     };
-  }, [avatar.previewUrl, identityDocument.previewUrl, professionalDocument.previewUrl]);
+  }, []);
 
   useEffect(() => {
     if (!cityDropdownOpen) return;
@@ -256,29 +343,110 @@ export default function ProviderOnboardingFormWizard({
 
   function updateFileSlot(
     file: File | null,
-    setter: React.Dispatch<React.SetStateAction<FileSlot>>
+    setter: React.Dispatch<React.SetStateAction<FileSlot>>,
+    previewUrlRef: React.MutableRefObject<string | null>
   ) {
-    setter((previous) => {
-      if (previous.previewUrl) URL.revokeObjectURL(previous.previewUrl);
-      if (!file) return emptyFileSlot();
-      try {
-        assertImageFile(file, t("uploadImageInvalid"));
-      } catch (error) {
-        return {
-          ...emptyFileSlot(),
-          file,
-          status: "error",
-          error: error instanceof Error ? error.message : t("uploadImageInvalid"),
-        };
-      }
-      return {
+    revokeTrackedPreviewUrl(previewUrlRef);
+
+    if (!file) {
+      setter(emptyFileSlot());
+      return;
+    }
+
+    try {
+      assertImageFile(file, t("uploadImageInvalid"));
+    } catch (error) {
+      setter({
+        ...emptyFileSlot(),
         file,
-        previewUrl: URL.createObjectURL(file),
+        status: "error",
+        error: error instanceof Error ? error.message : t("uploadImageInvalid"),
+      });
+      return;
+    }
+
+    setter({
+      file,
+      previewUrl: createTrackedPreviewUrl(file, previewUrlRef),
+      status: "added",
+      storagePath: null,
+      error: null,
+    });
+  }
+
+  function updateAvatarSource(file: File | null) {
+    revokeTrackedPreviewUrl(avatarSourcePreviewUrlRef);
+    revokeTrackedPreviewUrl(avatarPreviewUrlRef);
+
+    if (!file) {
+      setAvatarSource(null);
+      setAvatarCrop({ x: 0, y: 0 });
+      setAvatarZoom(1);
+      setAvatarCroppedAreaPixels(null);
+      setAvatar(emptyFileSlot());
+      return;
+    }
+
+    try {
+      assertImageFile(file, t("uploadImageInvalid"));
+      setAvatarSource({
+        file,
+        previewUrl: createTrackedPreviewUrl(file, avatarSourcePreviewUrlRef),
+        error: null,
+      });
+    } catch (error) {
+      setAvatarSource({
+        file,
+        previewUrl: "",
+        error: error instanceof Error ? error.message : t("uploadImageInvalid"),
+      });
+    }
+    setAvatarCrop({ x: 0, y: 0 });
+    setAvatarZoom(1);
+    setAvatarCroppedAreaPixels(null);
+    setAvatar(emptyFileSlot());
+  }
+
+  async function confirmAvatarCrop() {
+    if (!avatarSource?.previewUrl || !avatarCroppedAreaPixels) {
+      setAvatar((previous) => ({ ...previous, status: "error", error: t("avatarCropRequired") }));
+      return;
+    }
+
+    setAvatarCropping(true);
+    logOnboardingClient("avatar crop started", {
+      sourceFileName: avatarSource.file.name,
+      sourceFileSize: avatarSource.file.size,
+      croppedAreaPixels: avatarCroppedAreaPixels,
+    });
+    try {
+      const file = await createSquareAvatarFile(
+        avatarSource.previewUrl,
+        avatarCroppedAreaPixels,
+        "provider-avatar.jpg"
+      );
+      setAvatar({
+        file,
+        previewUrl: createTrackedPreviewUrl(file, avatarPreviewUrlRef),
         status: "added",
         storagePath: null,
         error: null,
-      };
-    });
+      });
+      logOnboardingClient("avatar crop ready", {
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type,
+      });
+    } catch (error) {
+      logOnboardingClientError("avatar crop failed", error);
+      setAvatar((previous) => ({
+        ...previous,
+        status: "error",
+        error: error instanceof Error ? error.message : t("avatarCropFailed"),
+      }));
+    } finally {
+      setAvatarCropping(false);
+    }
   }
 
   async function createProviderAccount() {
@@ -293,6 +461,16 @@ export default function ProviderOnboardingFormWizard({
     }
 
     setAccountCreating(true);
+    logOnboardingClient("account create request started", {
+      locale,
+      emailDomain: values.email.includes("@") ? values.email.split("@").pop()?.toLowerCase() : null,
+      countyCode: values.countyCode,
+      cityCode: values.cityCode,
+      serviceType: values.serviceType,
+      legalStatus: values.legalStatus,
+      newsletterOptIn: values.newsletterOptIn,
+      launchContactConsent: values.launchContactConsent,
+    });
     try {
       const res = await axios.post(
         "/api/providers/onboarding",
@@ -309,9 +487,19 @@ export default function ProviderOnboardingFormWizard({
       const uid = typeof res.data?.uid === "string" ? res.data.uid : null;
       await signInWithEmailAndPassword(getFirebaseAuth(), values.email.trim(), values.password);
       setProviderUid(uid || getFirebaseAuth().currentUser?.uid || null);
+      logOnboardingClient("account create request completed", {
+        uid: uid || getFirebaseAuth().currentUser?.uid || null,
+        welcomeEmailSent: res.data?.welcomeEmailSent === true,
+        newsletterStatusAtSignup: res.data?.newsletterStatusAtSignup || null,
+      });
       toast.success(t("accountCreated"));
       return true;
     } catch (error: unknown) {
+      logOnboardingClientError("account create request failed", error, {
+        status: (error as { response?: { status?: number } }).response?.status || null,
+        code:
+          (error as { response?: { data?: { code?: string } } }).response?.data?.code || null,
+      });
       const ax = error as {
         response?: { data?: { error?: string; code?: string } };
       };
@@ -328,38 +516,54 @@ export default function ProviderOnboardingFormWizard({
   }
 
   async function uploadSlot(
+    label: string,
     slot: FileSlot,
     setter: React.Dispatch<React.SetStateAction<FileSlot>>,
     storagePath: string,
-    finalize: () => Promise<void>
+    finalize: () => Promise<string | void>
   ) {
-    if (slot.status === "uploaded" && slot.storagePath) return true;
+    if (slot.status === "uploaded" && slot.storagePath) return slot.storagePath;
     if (!slot.file) {
       setter((previous) => ({ ...previous, status: "error", error: t("uploadRequired") }));
-      return false;
+      logOnboardingClient("upload missing file", { label, storagePath });
+      return null;
     }
 
     try {
       assertImageFile(slot.file, t("uploadImageInvalid"));
       setter((previous) => ({ ...previous, status: "uploading", error: null }));
+      logOnboardingClient("storage upload started", {
+        label,
+        storagePath,
+        fileName: slot.file.name,
+        fileSize: slot.file.size,
+        fileType: slot.file.type,
+      });
       await uploadBytes(ref(getFirebaseStorage(), storagePath), slot.file, {
         contentType: slot.file.type,
       });
-      await finalize();
+      logOnboardingClient("storage upload completed", { label, storagePath });
+      const finalizedPath = await finalize();
+      logOnboardingClient("firebase finalize completed", {
+        label,
+        storagePath,
+        finalizedPath: finalizedPath || storagePath,
+      });
       setter((previous) => ({
         ...previous,
         status: "uploaded",
-        storagePath,
+        storagePath: finalizedPath || storagePath,
         error: null,
       }));
-      return true;
+      return finalizedPath || storagePath;
     } catch (error) {
+      logOnboardingClientError("upload/finalize failed", error, { label, storagePath });
       setter((previous) => ({
         ...previous,
         status: "error",
         error: readCallableError(error, t("uploadFailed")),
       }));
-      return false;
+      return null;
     }
   }
 
@@ -367,13 +571,20 @@ export default function ProviderOnboardingFormWizard({
     const uid = providerUid || getFirebaseAuth().currentUser?.uid;
     if (!uid || !avatar.file) {
       setAvatar((previous) => ({ ...previous, status: "error", error: t("uploadRequired") }));
-      return false;
+      logOnboardingClient("avatar upload blocked", {
+        hasUid: Boolean(uid),
+        hasFile: Boolean(avatar.file),
+      });
+      return null;
     }
-    const storagePath =
-      avatar.storagePath || `providers/${uid}/avatar/${sanitizeFileName(avatar.file)}`;
-    return uploadSlot(avatar, setAvatar, storagePath, async () => {
-      const callable = httpsCallable(getFirebaseFunctions(), "finalizeProviderAvatarUpload");
-      await callable({ storagePath });
+    const storagePath = avatar.storagePath || buildAvatarUploadPath(uid);
+    return uploadSlot("avatar", avatar, setAvatar, storagePath, async () => {
+      const callable = httpsCallable<
+        { storagePath: string },
+        { avatarPath?: string; status?: string; storagePath?: string }
+      >(getFirebaseFunctions(), "finalizeProviderAvatarUpload");
+      const result = await callable({ storagePath });
+      return result.data.avatarPath || result.data.storagePath;
     });
   }
 
@@ -385,12 +596,17 @@ export default function ProviderOnboardingFormWizard({
     const uid = providerUid || getFirebaseAuth().currentUser?.uid;
     if (!uid || !slot.file) {
       setter((previous) => ({ ...previous, status: "error", error: t("uploadRequired") }));
-      return false;
+      logOnboardingClient("document upload blocked", {
+        documentType,
+        hasUid: Boolean(uid),
+        hasFile: Boolean(slot.file),
+      });
+      return null;
     }
     const storagePath =
       slot.storagePath ||
       `providers/${uid}/documents/${documentType}/${sanitizeFileName(slot.file)}`;
-    return uploadSlot(slot, setter, storagePath, async () => {
+    return uploadSlot(documentType, slot, setter, storagePath, async () => {
       const callable = httpsCallable(getFirebaseFunctions(), "finalizeProviderDocumentUpload");
       await callable({
         documentType,
@@ -401,6 +617,13 @@ export default function ProviderOnboardingFormWizard({
   }
 
   async function goNextStep() {
+    logOnboardingClient("next step requested", {
+      currentStep,
+      hasProviderUid: Boolean(providerUid),
+      avatarStatus: avatar.status,
+      identityDocumentStatus: identityDocument.status,
+      professionalDocumentStatus: professionalDocument.status,
+    });
     const stepFields: Record<number, Array<keyof FormValues>> = {
       1: ["fullName", "email", "password", "confirmPassword", "phone"],
       2: ["countyCode", "cityCode", "serviceType"],
@@ -417,7 +640,10 @@ export default function ProviderOnboardingFormWizard({
 
     if (currentStep <= 3) {
       const valid = await trigger(stepFields[currentStep]);
-      if (!valid) return;
+      if (!valid) {
+        logOnboardingClient("step validation failed", { currentStep });
+        return;
+      }
     }
 
     if (currentStep === 3 && !providerUid) {
@@ -426,47 +652,134 @@ export default function ProviderOnboardingFormWizard({
     }
 
     if (currentStep === 4) {
-      const uploaded = await ensureAvatarUploaded();
-      if (!uploaded) return;
+      if (!avatar.file && avatar.status !== "uploaded") {
+        setAvatar((previous) => ({ ...previous, status: "error", error: t("avatarRequired") }));
+        logOnboardingClient("avatar local validation failed", {
+          hasFile: Boolean(avatar.file),
+          status: avatar.status,
+        });
+        return;
+      }
+      if (avatar.status === "error") {
+        logOnboardingClient("avatar local validation blocked by error", {
+          error: avatar.error,
+        });
+        return;
+      }
+      logOnboardingClient("avatar local validation passed", {
+        status: avatar.status,
+        fileName: avatar.file?.name || null,
+      });
     }
 
     if (currentStep === 5) {
-      const identityUploaded = await ensureDocumentUploaded(
-        "identity",
-        identityDocument,
-        setIdentityDocument
+      let documentsReady = true;
+      if (!identityDocument.file && identityDocument.status !== "uploaded") {
+        documentsReady = false;
+        setIdentityDocument((previous) => ({
+          ...previous,
+          status: "error",
+          error: t("uploadRequired"),
+        }));
+      }
+      if (!professionalDocument.file && professionalDocument.status !== "uploaded") {
+        documentsReady = false;
+        setProfessionalDocument((previous) => ({
+          ...previous,
+          status: "error",
+          error: t("uploadRequired"),
+        }));
+      }
+      if (identityDocument.status === "error" || professionalDocument.status === "error") {
+        documentsReady = false;
+      }
+      logOnboardingClient(
+        documentsReady
+          ? "documents local validation passed"
+          : "documents local validation failed",
+        {
+          identityStatus: identityDocument.status,
+          identityHasFile: Boolean(identityDocument.file),
+          professionalStatus: professionalDocument.status,
+          professionalHasFile: Boolean(professionalDocument.file),
+        }
       );
-      const professionalUploaded = await ensureDocumentUploaded(
-        "professional",
-        professionalDocument,
-        setProfessionalDocument
-      );
-      if (!identityUploaded || !professionalUploaded) return;
+      if (!documentsReady) return;
     }
 
-    onStepChange(Math.min(MAX_STEP, currentStep + 1));
+    const nextStep = Math.min(MAX_STEP, currentStep + 1);
+    logOnboardingClient("step advanced", { fromStep: currentStep, toStep: nextStep });
+    onStepChange(nextStep);
   }
 
   function goBackStep() {
-    onStepChange(Math.max(1, currentStep - 1));
+    const previousStep = Math.max(1, currentStep - 1);
+    logOnboardingClient("back step requested", { fromStep: currentStep, toStep: previousStep });
+    onStepChange(previousStep);
   }
 
   async function onSubmit() {
     setFinalSubmitting(true);
     setFinalError(null);
+    logOnboardingClient("final submit started", {
+      hasProviderUid: Boolean(providerUid || getFirebaseAuth().currentUser?.uid),
+      avatarStatus: avatar.status,
+      identityDocumentStatus: identityDocument.status,
+      professionalDocumentStatus: professionalDocument.status,
+    });
     try {
       if (!providerUid && !getFirebaseAuth().currentUser?.uid) {
         throw new Error(t("accountMissing"));
       }
-      if (avatar.status !== "uploaded") throw new Error(t("avatarRequired"));
-      if (identityDocument.status !== "uploaded" || professionalDocument.status !== "uploaded") {
+      if (!isSlotReadyForSubmit(avatar)) throw new Error(t("avatarRequired"));
+      if (
+        !isSlotReadyForSubmit(identityDocument) ||
+        !isSlotReadyForSubmit(professionalDocument)
+      ) {
         throw new Error(t("documentsRequired"));
       }
-      const callable = httpsCallable(getFirebaseFunctions(), "submitProviderOnboarding");
-      await callable({});
+
+      logOnboardingClient("final uploads started", {
+        avatarStatus: avatar.status,
+        identityDocumentStatus: identityDocument.status,
+        professionalDocumentStatus: professionalDocument.status,
+      });
+      const avatarPath = await ensureAvatarUploaded();
+      if (!avatarPath) {
+        setFinalError(t("uploadFailed"));
+        toast.error(t("uploadFailed"));
+        return;
+      }
+      const identityDocumentPath = await ensureDocumentUploaded(
+        "identity",
+        identityDocument,
+        setIdentityDocument
+      );
+      const professionalDocumentPath = await ensureDocumentUploaded(
+        "professional",
+        professionalDocument,
+        setProfessionalDocument
+      );
+      if (!identityDocumentPath || !professionalDocumentPath) {
+        setFinalError(t("uploadFailed"));
+        toast.error(t("uploadFailed"));
+        return;
+      }
+
+      const uid = providerUid || getFirebaseAuth().currentUser?.uid || null;
+      const submitPayloadSummary = {
+        uid,
+        hasAvatarPath: Boolean(avatarPath),
+        hasIdentityDocumentPath: Boolean(identityDocumentPath),
+        hasProfessionalDocumentPath: Boolean(professionalDocumentPath),
+      };
+
+      logOnboardingClient("pre-registration uploads finalized", submitPayloadSummary);
+      logOnboardingClient("final submit completed");
       toast.success(t("toastSuccess"));
       router.push("/providers/onboarding/success");
     } catch (error) {
+      logOnboardingClientError("final submit failed", error);
       const message = readCallableError(error, t("toastGenericError"));
       setFinalError(message);
       toast.error(message);
@@ -479,7 +792,8 @@ export default function ProviderOnboardingFormWizard({
     title: string,
     description: string,
     slot: FileSlot,
-    setter: React.Dispatch<React.SetStateAction<FileSlot>>
+    setter: React.Dispatch<React.SetStateAction<FileSlot>>,
+    previewUrlRef: React.MutableRefObject<string | null>
   ) {
     return (
       <div className="rounded-xl border border-border p-4">
@@ -512,7 +826,9 @@ export default function ProviderOnboardingFormWizard({
           type="file"
           accept="image/*"
           disabled={busy}
-          onChange={(event) => updateFileSlot(event.target.files?.[0] || null, setter)}
+          onChange={(event) =>
+            updateFileSlot(event.target.files?.[0] || null, setter, previewUrlRef)
+          }
           className="block w-full text-sm file:mr-4 file:rounded-md file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:font-medium file:text-white"
         />
 
@@ -521,9 +837,126 @@ export default function ProviderOnboardingFormWizard({
             ? t("uploadStatusUploaded")
             : slot.status === "uploading"
               ? t("uploadStatusUploading")
-              : slot.file?.name || t("uploadStatusEmpty")}
+              : slot.file
+                ? t("uploadStatusReady")
+                : t("uploadStatusEmpty")}
         </p>
         {slot.error && <p className="mt-2 text-xs text-red-500">{slot.error}</p>}
+      </div>
+    );
+  }
+
+  function renderAvatarPicker() {
+    return (
+      <div className="space-y-4">
+        <div className="rounded-xl border border-border p-4">
+          <div className="mb-3 flex items-start gap-3">
+            <span className="bg-primary/10 text-primary flex h-10 w-10 shrink-0 items-center justify-center rounded-full">
+              {avatar.status === "uploaded" ? (
+                <FileCheck2 className="h-5 w-5" />
+              ) : (
+                <UploadCloud className="h-5 w-5" />
+              )}
+            </span>
+            <div>
+              <p className="font-medium text-black dark:text-white">{t("avatarTitle")}</p>
+              <p className="text-sm text-muted-foreground">{t("avatarDescription")}</p>
+            </div>
+          </div>
+
+          <input
+            type="file"
+            accept="image/*"
+            disabled={busy || avatarCropping}
+            onChange={(event) => {
+              updateAvatarSource(event.target.files?.[0] || null);
+              event.currentTarget.value = "";
+            }}
+            className="block w-full text-sm file:mr-4 file:rounded-md file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:font-medium file:text-white"
+          />
+          {avatarSource?.error && (
+            <p className="mt-2 text-xs text-red-500">{avatarSource.error}</p>
+          )}
+        </div>
+
+        {avatarSource?.previewUrl ? (
+          <div className="rounded-xl border border-border p-4">
+            <div className="mb-3">
+              <p className="font-medium text-black dark:text-white">{t("avatarCropTitle")}</p>
+              <p className="text-sm text-muted-foreground">{t("avatarCropDescription")}</p>
+            </div>
+            <div className="relative h-72 overflow-hidden rounded-lg bg-black sm:h-80">
+              <Cropper
+                image={avatarSource.previewUrl}
+                crop={avatarCrop}
+                zoom={avatarZoom}
+                aspect={1}
+                cropShape="rect"
+                showGrid={false}
+                onCropChange={setAvatarCrop}
+                onZoomChange={setAvatarZoom}
+                onCropComplete={(_, croppedAreaPixels) =>
+                  setAvatarCroppedAreaPixels(croppedAreaPixels)
+                }
+              />
+            </div>
+            <label htmlFor="avatar-zoom" className="mt-4 block text-sm font-medium">
+              {t("avatarCropZoom")}
+            </label>
+            <input
+              id="avatar-zoom"
+              type="range"
+              min={1}
+              max={3}
+              step={0.05}
+              value={avatarZoom}
+              disabled={busy || avatarCropping}
+              onChange={(event) => setAvatarZoom(Number(event.target.value))}
+              className="mt-2 w-full accent-primary"
+            />
+            <button
+              type="button"
+              disabled={busy || avatarCropping || !avatarCroppedAreaPixels}
+              onClick={confirmAvatarCrop}
+              className="bg-primary hover:bg-primary/90 mt-4 rounded-md px-5 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {avatarCropping ? t("avatarCropping") : t("avatarCropConfirm")}
+            </button>
+          </div>
+        ) : null}
+
+        {avatar.previewUrl ? (
+          <div className="rounded-xl border border-border p-4">
+            <p className="mb-3 text-sm font-medium text-black dark:text-white">
+              {t("avatarCropReady")}
+            </p>
+            <div>
+              <p className="mb-2 text-xs text-muted-foreground">
+                {t("avatarCropPreviewCircle")}
+              </p>
+              <Image
+                src={avatar.previewUrl}
+                alt=""
+                width={176}
+                height={176}
+                unoptimized
+                className="size-44 rounded-2xl object-cover"
+              />
+            </div>
+            <p className="mt-3 text-xs text-muted-foreground">
+              {avatar.status === "uploaded"
+                ? t("uploadStatusUploaded")
+                : avatar.status === "uploading"
+                  ? t("uploadStatusUploading")
+                  : avatar.file
+                    ? t("uploadStatusReady")
+                    : t("uploadStatusEmpty")}
+            </p>
+            {avatar.error && <p className="mt-2 text-xs text-red-500">{avatar.error}</p>}
+          </div>
+        ) : avatar.error ? (
+          <p className="text-xs text-red-500">{avatar.error}</p>
+        ) : null}
       </div>
     );
   }
@@ -962,7 +1395,7 @@ export default function ProviderOnboardingFormWizard({
             <ImagePlus className="text-primary h-5 w-5" />
             <p className="text-sm text-muted-foreground">{t("avatarIntro")}</p>
           </div>
-          {renderFilePicker(t("avatarTitle"), t("avatarDescription"), avatar, setAvatar)}
+          {renderAvatarPicker()}
         </div>
       )}
 
@@ -972,13 +1405,15 @@ export default function ProviderOnboardingFormWizard({
             t("identityDocumentTitle"),
             t("identityDocumentDescription"),
             identityDocument,
-            setIdentityDocument
+            setIdentityDocument,
+            identityPreviewUrlRef
           )}
           {renderFilePicker(
             t("professionalDocumentTitle"),
             t("professionalDocumentDescription"),
             professionalDocument,
-            setProfessionalDocument
+            setProfessionalDocument,
+            professionalPreviewUrlRef
           )}
         </div>
       )}
@@ -987,10 +1422,10 @@ export default function ProviderOnboardingFormWizard({
         <div className="space-y-4 rounded-xl border border-border p-4">
           <p className="text-sm text-muted-foreground">{t("finalReviewIntro")}</p>
           <ul className="space-y-2 text-sm">
-            <li>{avatar.status === "uploaded" ? "✓" : "•"} {t("finalAvatar")}</li>
+            <li>{isSlotReadyForSubmit(avatar) ? "✓" : "•"} {t("finalAvatar")}</li>
             <li>
-              {identityDocument.status === "uploaded" &&
-              professionalDocument.status === "uploaded"
+              {isSlotReadyForSubmit(identityDocument) &&
+              isSlotReadyForSubmit(professionalDocument)
                 ? "✓"
                 : "•"}{" "}
               {t("finalDocuments")}
@@ -1013,7 +1448,7 @@ export default function ProviderOnboardingFormWizard({
           <button
             type="button"
             onClick={goNextStep}
-            disabled={busy}
+            disabled={nextDisabled}
             className="bg-primary hover:bg-primary/90 rounded-md px-5 py-2 text-sm font-medium text-white disabled:opacity-60"
           >
             {accountCreating ? t("submitting") : t("next")}

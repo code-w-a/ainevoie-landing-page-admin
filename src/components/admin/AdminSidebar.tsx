@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import {
   Activity,
   BarChart2,
+  CalendarClock,
   ChevronDown,
   Mail,
   BriefcaseBusiness,
@@ -23,12 +24,13 @@ const newsletterItems = [
 
 const providerItems = [
   { href: "/admin/prestatori", label: "Prestatori", icon: BriefcaseBusiness },
+  { href: "/admin/programari", label: "Programări", icon: CalendarClock },
 ];
 
 export default function AdminSidebar() {
   const pathname = usePathname();
   const isNewsletterRoute = pathname.startsWith("/admin");
-  const isProviderRoute = pathname.startsWith("/admin/prestatori");
+  const isProviderRoute = pathname.startsWith("/admin/prestatori") || pathname.startsWith("/admin/programari");
   const [newsletterOpen, setNewsletterOpen] = useState(isNewsletterRoute);
   const [providerOpen, setProviderOpen] = useState(isProviderRoute);
   const isNewsletterActive = useMemo(

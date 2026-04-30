@@ -1,26 +1,30 @@
 "use client";
 
 import Graphics from "@/components/Screens/Graphics";
+import {
+  getLocalizedScreenshot,
+  type ScreenshotKey,
+} from "@/lib/localizedScreenshots";
 import Image from "next/image";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import "swiper/css";
 import "swiper/css/navigation";
 import { Navigation } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/react";
 
-const SCREEN_SRCS = [
-  "/images/screenshots/splash.jpg",
-  "/images/screenshots/Onboarding_unu.jpg",
-  "/images/screenshots/Onboarding_doi.jpg",
-  "/images/screenshots/Onboarding_trei.jpg",
-  "/images/screenshots/utilizator_ecran_home.jpg",
-  "/images/screenshots/utilizator_ecran_prestator.jpg",
-  "/images/screenshots/utilizator_ecran_confirmare_rezervare.jpg",
-  "/images/screenshots/utilizator_ecran_chat.jpg",
-  "/images/screenshots/Prestator_cereri.jpg",
-  "/images/screenshots/Prestator_calendar.jpg",
-  "/images/screenshots/Prestator_ecran_recenzii.jpg",
-] as const;
+const SCREENSHOT_KEYS = [
+  "splash",
+  "onboarding1",
+  "onboarding2",
+  "onboarding3",
+  "home",
+  "providerProfile",
+  "bookingConfirmation",
+  "chat",
+  "providerRequests",
+  "providerCalendar",
+  "providerReviews",
+] satisfies readonly ScreenshotKey[];
 
 const ALT_KEYS = [
   "alt0",
@@ -59,6 +63,7 @@ const PhoneFrameOverlay = () => {
 
 const Screens = () => {
   const t = useTranslations("Screens");
+  const locale = useLocale();
 
   return (
     <>
@@ -105,22 +110,24 @@ const Screens = () => {
             >
               <PhoneFrameOverlay />
 
-              {SCREEN_SRCS.map((src, i) => (
-                <SwiperSlide key={src}>
-                  <div className="mx-auto w-[272px] max-w-full px-[12px] pt-[45px] pb-[15px]">
-                    <div className="overflow-hidden rounded-[2.25rem] bg-black">
-                      <Image
-                        width={1080}
-                        height={2316}
-                        src={src}
-                        alt={t(ALT_KEYS[i])}
-                        sizes="248px"
-                        className="h-auto w-full"
-                      />
+              {SCREENSHOT_KEYS.map((key, i) => {
+                const src = getLocalizedScreenshot(key, locale);
+                return (
+                  <SwiperSlide key={key}>
+                    <div className="mx-auto w-[272px] max-w-full px-[12px] pt-[45px] pb-[15px]">
+                      <div className="relative aspect-[1080/2316] overflow-hidden rounded-[2.25rem] bg-black">
+                        <Image
+                          fill
+                          src={src}
+                          alt={t(ALT_KEYS[i])}
+                          sizes="248px"
+                          className="object-cover object-center"
+                        />
+                      </div>
                     </div>
-                  </div>
-                </SwiperSlide>
-              ))}
+                  </SwiperSlide>
+                );
+              })}
 
               <div className="flex items-center justify-center gap-x-4 pt-20">
                 <button className="swiper-button-prev">

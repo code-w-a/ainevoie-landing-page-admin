@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { devLogServerError } from "@/lib/devServerErrorLog";
 import { getAdminDb, requireEnv, serializeDoc } from "@/lib/firebaseAdmin";
-import { requireAdmin } from "@/lib/adminAuth";
+import { adminAuthErrorResponse, requireAdmin } from "@/lib/adminAuth";
 import {
   isCampaignTemplateId,
   normalizePublicBaseUrl,
@@ -90,6 +90,11 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ items, nextCursor });
   } catch (error) {
+    const authResponse = adminAuthErrorResponse(error);
+    if (authResponse) {
+      return authResponse;
+    }
+
     captureServerException(error, { route: "api/admin/newsletter/campaigns/route.ts" });
     devLogServerError("GET /api/admin/newsletter/campaigns", error);
     return NextResponse.json(
@@ -234,6 +239,11 @@ export async function POST(request: Request) {
       status: result?.status || "draft",
     });
   } catch (error) {
+    const authResponse = adminAuthErrorResponse(error);
+    if (authResponse) {
+      return authResponse;
+    }
+
     captureServerException(error, { route: "api/admin/newsletter/campaigns/route.ts" });
     return NextResponse.json(
       { error: "Nu am putut crea campania." },

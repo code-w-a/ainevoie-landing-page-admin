@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import { getAdminDb, serializeDoc } from "@/lib/firebaseAdmin";
-import { requireAdmin } from "@/lib/adminAuth";
+import { adminAuthErrorResponse, requireAdmin } from "@/lib/adminAuth";
 import {
   isCampaignTemplateId,
   normalizePublicBaseUrl,
@@ -59,6 +59,11 @@ export async function GET(
 
     return NextResponse.json({ item });
   } catch (error) {
+    const authResponse = adminAuthErrorResponse(error);
+    if (authResponse) {
+      return authResponse;
+    }
+
     captureServerException(error, { route: "api/admin/newsletter/campaigns/[id]/GET" });
     return NextResponse.json(
       { error: "Nu am putut încărca campania." },
@@ -214,6 +219,11 @@ export async function PATCH(
     await docRef.update(sanitizePayload(updates));
     return NextResponse.json({ status: "ok" });
   } catch (error) {
+    const authResponse = adminAuthErrorResponse(error);
+    if (authResponse) {
+      return authResponse;
+    }
+
     captureServerException(error, { route: "api/admin/newsletter/campaigns/[id]/route.ts" });
     return NextResponse.json(
       { error: "Nu am putut actualiza campania." },
@@ -233,6 +243,11 @@ export async function DELETE(
     await db.collection("newsletter_campaigns").doc(id).delete();
     return NextResponse.json({ status: "ok" });
   } catch (error) {
+    const authResponse = adminAuthErrorResponse(error);
+    if (authResponse) {
+      return authResponse;
+    }
+
     captureServerException(error, { route: "api/admin/newsletter/campaigns/[id]/route.ts" });
     return NextResponse.json(
       { error: "Nu am putut șterge campania." },

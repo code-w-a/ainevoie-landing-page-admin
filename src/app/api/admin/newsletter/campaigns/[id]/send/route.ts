@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireEnv } from "@/lib/firebaseAdmin";
-import { requireAdmin } from "@/lib/adminAuth";
+import { adminAuthErrorResponse, requireAdmin } from "@/lib/adminAuth";
 import { parseCallableErrorResponse } from "@/lib/newsletterAdmin";
 import { captureServerException } from "@/lib/sentryServer";
 
@@ -65,6 +65,11 @@ export async function POST(
       counts: result?.counts || null,
     });
   } catch (error) {
+    const authResponse = adminAuthErrorResponse(error);
+    if (authResponse) {
+      return authResponse;
+    }
+
     captureServerException(error, { route: "api/admin/newsletter/campaigns/[id]/send/route.ts" });
     return NextResponse.json(
       { error: "Nu am putut porni trimiterea campaniei." },

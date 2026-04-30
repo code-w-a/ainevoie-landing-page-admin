@@ -1,4 +1,5 @@
 import markdownToHtml from "@/lib/markdownToHtml";
+import { routing, type AppLocale } from "@/i18n/routing";
 import { readFile } from "fs/promises";
 import path from "path";
 
@@ -6,14 +7,19 @@ export type LegalMarkdownSlug = "terms" | "privacy" | "cookies" | "gdpr";
 
 type Props = {
   slug: LegalMarkdownSlug;
+  locale?: AppLocale | string;
 };
 
-export async function LegalMarkdown({ slug }: Props) {
+function resolveLocale(locale?: AppLocale | string): AppLocale {
+  return routing.locales.includes(locale as AppLocale) ? (locale as AppLocale) : "en";
+}
+
+export async function LegalMarkdown({ slug, locale = "en" }: Props) {
   const filePath = path.join(
     process.cwd(),
     "content",
     "legal",
-    "en",
+    resolveLocale(locale),
     `${slug}.md`
   );
   const md = await readFile(filePath, "utf8");

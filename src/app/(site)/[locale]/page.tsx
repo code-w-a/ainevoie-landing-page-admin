@@ -5,7 +5,6 @@ import Cta from "@/components/Cta";
 import Faq from "@/components/Faq";
 import Features from "@/components/Features";
 import HeroArea from "@/components/HeroArea";
-import Pricing from "@/components/Pricing";
 import Screens from "@/components/Screens";
 import Testimonials from "@/components/Testimonials";
 import WorkProcess from "@/components/WorkProcess";
@@ -40,7 +39,7 @@ export default function Home() {
       <Features />
       <About />
       <WorkProcess />
-      <Pricing />
+      {/* Pricing is temporarily hidden until plan details are ready to publish. */}
       <Screens />
       <Cta />
       <Testimonials />

@@ -19,7 +19,7 @@ const Header = () => {
       { label: t("navFeatures"), route: "/#features" },
       { label: t("navAbout"), route: "/#about" },
       { label: t("navWork"), route: "/#work-process" },
-      { label: t("navPricing"), route: "/#pricing" },
+      // Pricing is temporarily hidden until plan details are ready to publish.
       { label: t("navScreens"), route: "/#screens" },
       { label: t("navTestimonials"), route: "/#testimonials" },
       { label: t("navFaq"), route: "/#faq" },

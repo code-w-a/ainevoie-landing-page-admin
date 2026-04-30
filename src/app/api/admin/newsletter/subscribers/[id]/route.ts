@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import { getAdminDb } from "@/lib/firebaseAdmin";
-import { requireAdmin } from "@/lib/adminAuth";
+import { adminAuthErrorResponse, requireAdmin } from "@/lib/adminAuth";
 import {
   NEWSLETTER_SUBSCRIBER_STATUSES,
   type NewsletterSubscriberStatus,
@@ -213,6 +213,11 @@ export async function PATCH(
     await docRef.update(sanitizePayload(updates));
     return NextResponse.json({ status: "ok" });
   } catch (error) {
+    const authResponse = adminAuthErrorResponse(error);
+    if (authResponse) {
+      return authResponse;
+    }
+
     captureServerException(error, { route: "api/admin/newsletter/subscribers/[id]/route.ts" });
     return NextResponse.json(
       { error: "Nu am putut actualiza abonatul." },
@@ -232,6 +237,11 @@ export async function DELETE(
     await db.collection("newsletter_subscribers").doc(id).delete();
     return NextResponse.json({ status: "ok" });
   } catch (error) {
+    const authResponse = adminAuthErrorResponse(error);
+    if (authResponse) {
+      return authResponse;
+    }
+
     captureServerException(error, { route: "api/admin/newsletter/subscribers/[id]/route.ts" });
     return NextResponse.json(
       { error: "Nu am putut șterge abonatul." },

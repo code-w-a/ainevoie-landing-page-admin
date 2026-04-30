@@ -119,6 +119,7 @@ type ProviderDocument = {
   launchContactConsentAt?: string | null;
   launchContactConsentVersion?: string | null;
   onboardingStatus?: string;
+  source?: string | null;
   internalNotes?: string;
 };
 
@@ -1029,7 +1030,10 @@ export default function ProviderDetailPage() {
     provider.hasAccountant === "yes" ? true : provider.hasAccountant === "no" ? false : null,
     { yes: "Da", no: "Nu", missing: provider.hasAccountant === "unsure" ? "Încă nu" : "Lipsă" }
   );
-  const shortBioWarning = isShortOrTestDescription(profile.shortBio);
+  const shouldValidatePublicProfileCopy =
+    provider.status === "pending_review" || provider.status === "approved";
+  const shortBioWarning =
+    shouldValidatePublicProfileCopy && isShortOrTestDescription(profile.shortBio);
 
   return (
     <div className="space-y-6">
@@ -1435,7 +1439,19 @@ export default function ProviderDetailPage() {
               <FieldValue label="Nr. Registrul Comerțului" value={formatValue(provider.tradeRegisterNumber)} />
               <FieldValue label="Estimare înființare" value={formatValue(provider.estimatedSetupTimeline)} />
               <FieldValue label="Are contabil" value={<Badge variant={accountantMeta.variant}>{accountantMeta.label}</Badge>} />
-              <FieldValue label="Termeni / politică" value={<Badge variant={legalConsentMeta.variant}>{legalConsentMeta.label}</Badge>} />
+              <FieldValue
+                label="Termeni acceptați"
+                value={`${formatAdminDateTime(provider.termsAcceptedAt)} · versiune ${provider.termsVersion || "-"}`}
+              />
+              <FieldValue
+                label="Politică acceptată"
+                value={`${formatAdminDateTime(provider.privacyAcceptedAt)} · versiune ${provider.privacyVersion || "-"}`}
+              />
+              <FieldValue
+                label="Status consimțăminte"
+                value={<Badge variant={legalConsentMeta.variant}>{legalConsentMeta.label}</Badge>}
+              />
+              <FieldValue label="Sursă înscriere" value={formatValue(provider.source, "landing_onboarding")} />
               <FieldValue label="Acord contact lansare" value={<Badge variant={launchContactMeta.variant}>{launchContactMeta.label}</Badge>} />
               <FieldValue label="Creat la" value={formatAdminDateTime(provider.createdAt)} />
             </div>

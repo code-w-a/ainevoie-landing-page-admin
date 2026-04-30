@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/adminAuth";
+import { adminAuthErrorResponse, requireAdmin } from "@/lib/adminAuth";
 import { AdminCallableError, callAdminCallable } from "@/lib/adminCallables";
 import { captureServerException } from "@/lib/sentryServer";
 
@@ -61,6 +61,11 @@ export async function POST(
 
     return NextResponse.json(result);
   } catch (error) {
+    const authResponse = adminAuthErrorResponse(error);
+    if (authResponse) {
+      return authResponse;
+    }
+
     if (error instanceof AdminCallableError) {
       console.error("[admin-provider-review] callable error", {
         status: error.status,
