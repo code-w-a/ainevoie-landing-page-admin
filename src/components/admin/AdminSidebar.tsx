@@ -10,35 +10,43 @@ import {
   ChevronDown,
   Mail,
   BriefcaseBusiness,
+  LayoutDashboard,
   Settings,
   Users,
 } from "lucide-react";
 
+const operationsItems = [
+  { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
+  { href: "/admin/prestatori", label: "Prestatori", icon: BriefcaseBusiness },
+  { href: "/admin/programari", label: "Programări", icon: CalendarClock },
+];
+
 const newsletterItems = [
-  { href: "/admin", label: "Sumar", icon: BarChart2 },
+  { href: "/admin/newsletter", label: "Sumar newsletter", icon: BarChart2 },
   { href: "/admin/campaigns", label: "Campanii", icon: Mail },
   { href: "/admin/subscribers", label: "Abonați", icon: Users },
   { href: "/admin/logs", label: "Loguri", icon: Activity },
   { href: "/admin/settings", label: "Setări", icon: Settings },
 ];
 
-const providerItems = [
-  { href: "/admin/prestatori", label: "Prestatori", icon: BriefcaseBusiness },
-  { href: "/admin/programari", label: "Programări", icon: CalendarClock },
-];
-
 export default function AdminSidebar() {
   const pathname = usePathname();
-  const isNewsletterRoute = pathname.startsWith("/admin");
-  const isProviderRoute = pathname.startsWith("/admin/prestatori") || pathname.startsWith("/admin/programari");
-  const [newsletterOpen, setNewsletterOpen] = useState(isNewsletterRoute);
-  const [providerOpen, setProviderOpen] = useState(isProviderRoute);
-  const isNewsletterActive = useMemo(
-    () => newsletterItems.some((item) => item.href === pathname),
+  const isOperationsRoute = useMemo(
+    () =>
+      operationsItems.some((item) =>
+        item.exact ? pathname === item.href : pathname.startsWith(item.href)
+      ),
     [pathname]
   );
-  const isProviderActive = useMemo(
-    () => providerItems.some((item) => pathname.startsWith(item.href)),
+  const isNewsletterRoute = useMemo(
+    () => newsletterItems.some((item) => pathname.startsWith(item.href)),
+    [pathname]
+  );
+  const [operationsOpen, setOperationsOpen] = useState(isOperationsRoute);
+  const [newsletterOpen, setNewsletterOpen] = useState(isNewsletterRoute);
+  const isOperationsActive = isOperationsRoute;
+  const isNewsletterActive = useMemo(
+    () => newsletterItems.some((item) => pathname.startsWith(item.href)),
     [pathname]
   );
 
@@ -54,25 +62,25 @@ export default function AdminSidebar() {
       <nav className="space-y-4">
         <button
           type="button"
-          onClick={() => setNewsletterOpen((prev) => !prev)}
+          onClick={() => setOperationsOpen((prev) => !prev)}
           className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm transition-colors ${
-            isNewsletterActive
+            isOperationsActive
               ? "bg-primary/10 text-primary"
               : "text-muted-foreground hover:bg-muted"
           }`}
         >
-          <span className="font-medium">Newsletter</span>
+          <span className="font-medium">Operațiuni</span>
           <ChevronDown
             className={`h-4 w-4 transition-transform ${
-              newsletterOpen ? "rotate-180" : ""
+              operationsOpen || isOperationsActive ? "rotate-180" : ""
             }`}
           />
         </button>
 
-        {newsletterOpen && (
+        {(operationsOpen || isOperationsActive) && (
           <div className="space-y-1 pl-1">
-            {newsletterItems.map((item) => {
-              const isActive = pathname === item.href;
+            {operationsItems.map((item) => {
+              const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href);
               const Icon = item.icon;
               return (
                 <Link
@@ -94,24 +102,24 @@ export default function AdminSidebar() {
 
         <button
           type="button"
-          onClick={() => setProviderOpen((prev) => !prev)}
+          onClick={() => setNewsletterOpen((prev) => !prev)}
           className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm transition-colors ${
-            isProviderActive
+            isNewsletterActive
               ? "bg-primary/10 text-primary"
               : "text-muted-foreground hover:bg-muted"
           }`}
         >
-          <span className="font-medium">Prestatori</span>
+          <span className="font-medium">Newsletter</span>
           <ChevronDown
             className={`h-4 w-4 transition-transform ${
-              providerOpen ? "rotate-180" : ""
+              newsletterOpen || isNewsletterActive ? "rotate-180" : ""
             }`}
           />
         </button>
 
-        {providerOpen && (
+        {(newsletterOpen || isNewsletterActive) && (
           <div className="space-y-1 pl-1">
-            {providerItems.map((item) => {
+            {newsletterItems.map((item) => {
               const isActive = pathname.startsWith(item.href);
               const Icon = item.icon;
               return (

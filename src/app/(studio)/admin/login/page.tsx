@@ -91,7 +91,7 @@ export default function AdminLoginPage() {
               <label className="text-sm font-medium">Email</label>
               <Input
                 type="email"
-                placeholder="admin@ainevoie.ro"
+                placeholder="admin@ai-nevoie.ro"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
               />

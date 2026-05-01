@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import {
   AlertTriangle,
@@ -142,6 +142,10 @@ type ProviderCase = {
 };
 
 type ReviewAction = "approve" | "reject" | "suspend" | "reinstate";
+type ReviewResult = {
+  providerId?: string | null;
+  status?: string | null;
+};
 type BadgeVariant = "default" | "secondary" | "outline" | "success" | "warning" | "danger";
 type ChecklistState = "complete" | "missing" | "review";
 
@@ -160,24 +164,24 @@ const actionMeta: Record<
   approve: {
     label: "Aprobă",
     title: "Aprobă prestatorul",
-    description: "Sistemul verifică profilul, documentele și disponibilitatea înainte de aprobare.",
+    description: "Confirmă aprobarea acestui prestator.",
   },
   reject: {
     label: "Respinge",
     title: "Respinge prestatorul",
-    description: "Prestatorul va putea corecta profilul și retrimite pentru verificare.",
+    description: "Adaugă un motiv scurt pentru decizie.",
     destructive: true,
   },
   suspend: {
     label: "Suspendă",
     title: "Suspendă prestatorul",
-    description: "Prestatorul aprobat va fi retras din publicare până la reintegrare.",
+    description: "Adaugă un motiv scurt pentru suspendare.",
     destructive: true,
   },
   reinstate: {
     label: "Reactivează",
     title: "Reactivează prestatorul",
-    description: "Prestatorul va redeveni vizibil pentru clienți dacă datele necesare sunt complete.",
+    description: "Confirmă reactivarea acestui prestator.",
   },
 };
 
@@ -360,10 +364,87 @@ function formatActivityLabel(value: unknown) {
 }
 
 function getAvailableActions(status: string): ReviewAction[] {
-  if (status === "pending_review") return ["approve", "reject"];
   if (status === "approved") return ["suspend"];
   if (status === "suspended") return ["reinstate"];
-  return [];
+  if (status === "pending_review" || status === "in_review") return ["approve", "reject"];
+  return ["approve"];
+}
+
+function readReviewResult(payload: unknown): ReviewResult | null {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  const result = payload as Record<string, unknown>;
+  const status = typeof result.status === "string" && result.status.trim() ? result.status.trim() : null;
+  const providerId =
+    typeof result.providerId === "string" && result.providerId.trim() ? result.providerId.trim() : null;
+
+  return status ? { providerId, status } : null;
+}
+
+function mergeProviderReviewResult(
+  provider: ProviderDocument | null | undefined,
+  result: ReviewResult,
+  action?: ReviewAction,
+  reason?: string
+) {
+  if (!provider || !result.status) {
+    return provider;
+  }
+
+  const reviewedAt = new Date().toISOString();
+  const nextReason = typeof reason === "string" && reason.trim() ? reason.trim() : null;
+  return {
+    ...provider,
+    status: result.status,
+    onboardingStatus: result.status,
+    adminReview: action
+      ? {
+          ...provider.adminReview,
+          action,
+          reason: nextReason,
+          reviewedAt,
+        }
+      : provider.adminReview,
+    reviewState: {
+      ...provider.reviewState,
+      lastReviewedAt: reviewedAt,
+    },
+    suspension:
+      result.status === "suspended"
+        ? {
+            ...provider.suspension,
+            reason: nextReason,
+            suspendedAt: reviewedAt,
+          }
+        : result.status === "approved"
+          ? null
+          : provider.suspension,
+    lastPublishedAt: result.status === "approved" ? reviewedAt : provider.lastPublishedAt,
+  };
+}
+
+function mergeCaseReviewResult(
+  data: ProviderCase | null,
+  result: ReviewResult | null,
+  action?: ReviewAction,
+  reason?: string
+): ProviderCase | null {
+  if (!data || !result?.status) {
+    return data;
+  }
+
+  const caseProviderId = getProviderId(data.provider || data.item || null);
+  if (result.providerId && caseProviderId && result.providerId !== caseProviderId) {
+    return data;
+  }
+
+  return {
+    ...data,
+    provider: mergeProviderReviewResult(data.provider, result, action, reason),
+    item: mergeProviderReviewResult(data.item, result, action, reason),
+  };
 }
 
 function getInitials(value: string) {
@@ -657,13 +738,13 @@ function ReviewDecisionDialog({
         </DialogHeader>
         {requiresReason && (
           <div>
-            <label className="mb-2 inline-block text-sm font-medium">Motiv obligatoriu</label>
+            <label className="mb-2 inline-block text-sm font-medium">Motiv</label>
             <textarea
               className="min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               value={reason}
               disabled={loading}
               onChange={(event) => setReason(event.target.value)}
-              placeholder="Scrie motivul care va fi salvat pentru această decizie..."
+              placeholder="Notează pe scurt motivul deciziei..."
             />
           </div>
         )}
@@ -779,10 +860,17 @@ export default function ProviderDetailPage() {
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
   const [avatarPreviewLoading, setAvatarPreviewLoading] = useState(false);
   const [avatarPreviewError, setAvatarPreviewError] = useState<string | null>(null);
+  const latestReviewResultRef = useRef<ReviewResult | null>(null);
 
-  const loadDetails = useCallback(async () => {
+  const loadDetails = useCallback(async (options: { showLoading?: boolean } = {}) => {
     if (!id) return;
-    setLoading(true);
+    if (latestReviewResultRef.current?.providerId && latestReviewResultRef.current.providerId !== id) {
+      latestReviewResultRef.current = null;
+    }
+    const showLoading = options.showLoading ?? true;
+    if (showLoading) {
+      setLoading(true);
+    }
     setError(null);
     try {
       const res = await adminFetch(`/api/admin/providers/${id}`, {
@@ -791,11 +879,14 @@ export default function ProviderDetailPage() {
       if (!res.ok) {
         throw new Error(await readAdminResponseError(res, "Nu am putut încărca fișa prestatorului."));
       }
-      setData((await res.json()) as ProviderCase);
+      const nextData = (await res.json()) as ProviderCase;
+      setData(mergeCaseReviewResult(nextData, latestReviewResultRef.current));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Nu am putut încărca fișa prestatorului.");
     } finally {
-      setLoading(false);
+      if (showLoading) {
+        setLoading(false);
+      }
     }
   }, [id]);
 
@@ -891,7 +982,12 @@ export default function ProviderDetailPage() {
       if (!res.ok) {
         throw new Error(await readAdminResponseError(res, "Nu am putut procesa decizia."));
       }
-      await loadDetails();
+      const result = readReviewResult(await res.json().catch(() => null));
+      if (result) {
+        latestReviewResultRef.current = result;
+        setData((current) => mergeCaseReviewResult(current, result, action, reason));
+      }
+      void loadDetails({ showLoading: false });
       return true;
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Nu am putut procesa decizia.");
@@ -1259,7 +1355,7 @@ export default function ProviderDetailPage() {
           <CardContent className="space-y-3">
             {availableActions.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                Nu există acțiuni disponibile pentru starea curentă.
+                Nu există acțiuni disponibile acum pentru acest status.
               </p>
             ) : (
               <div className="flex flex-wrap gap-2">
@@ -1287,9 +1383,6 @@ export default function ProviderDetailPage() {
                 })}
               </div>
             )}
-            <p className="text-xs text-muted-foreground">
-              Pentru respingere și suspendare, motivul este obligatoriu și este validat și server-side.
-            </p>
           </CardContent>
         </Card>
       </div>
