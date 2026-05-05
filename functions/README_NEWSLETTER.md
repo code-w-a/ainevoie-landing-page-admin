@@ -48,7 +48,7 @@ SMTP_PORT=465
 SMTP_SECURE=true
 SMTP_USER=no-reply@ai-nevoie.ro
 SMTP_PASS=<parola_contului_mail>
-NEWSLETTER_FROM_NAME=AInevoie
+NEWSLETTER_FROM_NAME=Ainevoie
 NEWSLETTER_FROM_EMAIL=no-reply@ai-nevoie.ro
 NEWSLETTER_REPLY_TO=<adresa_monitorizata_ex_contact@ai-nevoie.ro>
 PUBLIC_BASE_URL=https://ainevoie.ro
@@ -65,7 +65,7 @@ printf '%s' '465' | firebase functions:secrets:set SMTP_PORT --data-file=-
 printf '%s' 'true' | firebase functions:secrets:set SMTP_SECURE --data-file=-
 printf '%s' 'no-reply@ai-nevoie.ro' | firebase functions:secrets:set SMTP_USER --data-file=-
 printf '%s' 'PAROLA_AICI' | firebase functions:secrets:set SMTP_PASS --data-file=-
-printf '%s' 'AInevoie' | firebase functions:secrets:set NEWSLETTER_FROM_NAME --data-file=-
+printf '%s' 'Ainevoie' | firebase functions:secrets:set NEWSLETTER_FROM_NAME --data-file=-
 printf '%s' 'no-reply@ai-nevoie.ro' | firebase functions:secrets:set NEWSLETTER_FROM_EMAIL --data-file=-
 # opțional:
 printf '%s' 'contact@ai-nevoie.ro' | firebase functions:secrets:set NEWSLETTER_REPLY_TO --data-file=-
@@ -81,7 +81,7 @@ SMTP_PORT=465
 SMTP_SECURE=true
 SMTP_USER=<gmail>
 SMTP_PASS=<gmail_app_password>
-NEWSLETTER_FROM_NAME=AInevoie
+NEWSLETTER_FROM_NAME=Ainevoie
 NEWSLETTER_FROM_EMAIL=<gmail>
 NEWSLETTER_REPLY_TO=<gmail>
 PUBLIC_BASE_URL=https://ainevoie.ro
@@ -128,13 +128,13 @@ firebase emulators:start --only functions,firestore
 Example payload:
 ```json
 {
-  "subject": "Noutăți AInevoie",
+  "subject": "Noutăți Ainevoie",
   "previewText": "",
   "html": "<h1>Salut!</h1><p>Avem noutăți.</p>",
   "text": "Salut! Avem noutăți.",
   "filters": { "tags": ["bucuresti"] },
   "sendConfig": { "maxPerSecond": 5, "maxConcurrent": 50 },
-  "fromName": "AInevoie",
+  "fromName": "Ainevoie",
   "fromEmail": "no-reply@ai-nevoie.ro",
   "replyTo": "contact@ai-nevoie.ro",
   "adminApiKey": "<optional>"

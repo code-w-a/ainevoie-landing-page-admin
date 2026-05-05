@@ -5,10 +5,10 @@ import { getLocale } from "next-intl/server";
 
 export const metadata: Metadata = {
   metadataBase: getMetadataBase(),
-  applicationName: "AInevoie",
+  applicationName: "Ainevoie",
   openGraph: {
     type: "website",
-    siteName: "AInevoie",
+    siteName: "Ainevoie",
   },
 };
 

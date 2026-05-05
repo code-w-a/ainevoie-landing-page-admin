@@ -1,7 +1,7 @@
-# AInevoie UI Roadmap Pe Sprinturi (Mock Flows Only)
+# Ainevoie UI Roadmap Pe Sprinturi (Mock Flows Only)
 
 Acest roadmap este pentru implementare UI/front-end cu mock data și logică minimă, fără backend real.
-Toate ecranele trebuie implementate conform [AInevoie-Design-System-Guide.md](/Users/code-with-a/Dev/AINEVOIE-CODECANYON/COMPLET%20APP/AI%20NEVOIE%20APP/docs/AInevoie-Design-System-Guide.md).
+Toate ecranele trebuie implementate conform [Ainevoie-Design-System-Guide.md](/Users/code-with-a/Dev/AINEVOIE-CODECANYON/COMPLET%20APP/AI%20NEVOIE%20APP/docs/AInevoie-Design-System-Guide.md).
 
 ## Presupuneri
 - Sprint = 2 săptămâni (poate fi ajustat).
@@ -9,7 +9,7 @@ Toate ecranele trebuie implementate conform [AInevoie-Design-System-Guide.md](/U
 - Mock-urile trebuie structurate astfel încât integrarea backend să nu forțeze rescrierea ecranelor.
 
 ## Definition Of Done (Pentru Orice Sprint)
-- ecranele sunt coerente cu sistemul de design AInevoie (light-only, premium/business, spacing calm);
+- ecranele sunt coerente cu sistemul de design Ainevoie (light-only, premium/business, spacing calm);
 - există stări clare: loading, empty, error, success și statusuri specifice zonei;
 - navigarea este completă (rute, back, deep links interne unde e cazul);
 - formularele au validare UI și mesaje de eroare utilizabile;

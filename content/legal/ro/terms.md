@@ -1,12 +1,12 @@
 **Ultima actualizare:** 29 aprilie 2026
 
-Acești Termeni și Condiții („**Termeni**”) reglementează accesarea și utilizarea website-ului AInevoie, fluxului de onboarding pentru prestatori, zonelor de cont, newsletterului, formularului de contact și oricăror funcționalități marketplace conexe puse la dispoziție periodic (împreună, „**Platforma**”). AInevoie este un marketplace care facilitează conectarea clienților cu prestatori independenți, inclusiv pentru servicii de curățenie și servicii conexe.
+Acești Termeni și Condiții („**Termeni**”) reglementează accesarea și utilizarea website-ului Ainevoie, fluxului de onboarding pentru prestatori, zonelor de cont, newsletterului, formularului de contact și oricăror funcționalități marketplace conexe puse la dispoziție periodic (împreună, „**Platforma**”). Ainevoie este un marketplace care facilitează conectarea clienților cu prestatori independenți, inclusiv pentru servicii de curățenie și servicii conexe.
 
 Prin utilizarea Platformei sau crearea unui cont, confirmi că ai citit și accepți acești Termeni și Politica de confidențialitate. Dacă folosești Platforma în numele unei companii sau al altei organizații, confirmi că ai dreptul să o reprezinți.
 
 ## 1. Operator și contact
 
-Platforma este operată de entitatea juridică responsabilă pentru AInevoie, stabilită în România și identificată prin datele publice de contact ale Platformei. Până la publicarea datelor complete ale societății în nota legală dedicată, ne poți contacta la **contact@ai-nevoie.ro**.
+Platforma este operată de entitatea juridică responsabilă pentru Ainevoie, stabilită în România și identificată prin datele publice de contact ale Platformei. Până la publicarea datelor complete ale societății în nota legală dedicată, ne poți contacta la **contact@ai-nevoie.ro**.
 
 ## 2. Eligibilitate
 
@@ -14,7 +14,7 @@ Trebuie să ai cel puțin 18 ani pentru a crea un cont, pentru a transmite infor
 
 ## 3. Natura Platformei
 
-AInevoie facilitează descoperirea, comunicarea, onboardingul, programarea și, acolo unde este activat, plata sau abonarea. Cu excepția cazului în care se precizează expres altfel, AInevoie nu prestează direct serviciile de curățenie sau serviciile conexe afișate în Platformă și nu este parte la contractul de prestări servicii dintre client și prestatorul independent.
+Ainevoie facilitează descoperirea, comunicarea, onboardingul, programarea și, acolo unde este activat, plata sau abonarea. Cu excepția cazului în care se precizează expres altfel, Ainevoie nu prestează direct serviciile de curățenie sau serviciile conexe afișate în Platformă și nu este parte la contractul de prestări servicii dintre client și prestatorul independent.
 
 Prestatorii sunt profesioniști sau companii independente. Ei răspund pentru legalitatea, calitatea, siguranța, prețul, tratamentul fiscal, asigurările, autorizațiile și executarea serviciilor lor.
 
@@ -46,7 +46,7 @@ Funcționalitățile pot fi lansate gradual. Unele funcții descrise pe website 
 
 ## 8. Plăți, abonamente și furnizori de plată terți
 
-Acolo unde plățile sau abonamentele sunt active, acestea pot fi procesate prin Stripe sau alt furnizor de plată. AInevoie nu stochează datele complete ale cardului. Se pot aplica termenii, politicile de confidențialitate și cerințele de autentificare ale furnizorului de plată.
+Acolo unde plățile sau abonamentele sunt active, acestea pot fi procesate prin Stripe sau alt furnizor de plată. Ainevoie nu stochează datele complete ale cardului. Se pot aplica termenii, politicile de confidențialitate și cerințele de autentificare ale furnizorului de plată.
 
 Prețurile, taxele, condițiile abonamentelor, comisioanele, regulile de reînnoire, anulare și rambursare vor fi afișate în fluxul relevant de achiziție sau abonare, unde este cazul. Prestatorii rămân responsabili pentru propriile obligații fiscale și contabile, dacă legea nu prevede altfel.
 
@@ -54,7 +54,7 @@ Prețurile, taxele, condițiile abonamentelor, comisioanele, regulile de reînno
 
 Poți transmite conținut de profil, mesaje, recenzii, evaluări, imagini, documente sau alte materiale. Nu ai voie să transmiți conținut ilegal, înșelător, abuziv, defăimător, discriminatoriu, spam, malware sau conținut care încalcă drepturile altora.
 
-Îți păstrezi drepturile asupra conținutului propriu, dar acorzi AInevoie o licență neexclusivă, globală și gratuită de a găzdui, stoca, reproduce, afișa, adapta și utiliza acel conținut în măsura necesară pentru operarea, securizarea, îmbunătățirea și promovarea Platformei, cu respectarea Politicii de confidențialitate și a legii aplicabile.
+Îți păstrezi drepturile asupra conținutului propriu, dar acorzi Ainevoie o licență neexclusivă, globală și gratuită de a găzdui, stoca, reproduce, afișa, adapta și utiliza acel conținut în măsura necesară pentru operarea, securizarea, îmbunătățirea și promovarea Platformei, cu respectarea Politicii de confidențialitate și a legii aplicabile.
 
 Putem modera, ascunde, elimina sau restricționa conținutul care pare să încalce acești Termeni, legea, regulile de siguranță ale Platformei sau drepturile terților.
 
@@ -71,7 +71,7 @@ Nu ai voie să utilizezi abuziv Platforma. Sunt interzise, printre altele:
 
 ## 11. Proprietate intelectuală
 
-Numele AInevoie, logo-ul, interfața, textele, grafica, software-ul și celelalte materiale ale Platformei aparțin AInevoie sau licențiatorilor săi și sunt protejate de legislația privind proprietatea intelectuală. Primești doar un drept limitat, revocabil și netransferabil de a utiliza Platforma în scopul pentru care a fost creată.
+Numele Ainevoie, logo-ul, interfața, textele, grafica, software-ul și celelalte materiale ale Platformei aparțin Ainevoie sau licențiatorilor săi și sunt protejate de legislația privind proprietatea intelectuală. Primești doar un drept limitat, revocabil și netransferabil de a utiliza Platforma în scopul pentru care a fost creată.
 
 ## 12. Servicii terțe
 
@@ -85,9 +85,9 @@ Nimic din acești Termeni nu limitează drepturile legale ale consumatorilor sau
 
 ## 14. Limitarea răspunderii
 
-În măsura maximă permisă de lege, AInevoie nu răspunde pentru daune indirecte, incidentale, speciale, consecutive, punitive sau pierderi de profit rezultate din utilizarea Platformei. Acolo unde răspunderea nu poate fi exclusă, aceasta este limitată în măsura permisă de lege.
+În măsura maximă permisă de lege, Ainevoie nu răspunde pentru daune indirecte, incidentale, speciale, consecutive, punitive sau pierderi de profit rezultate din utilizarea Platformei. Acolo unde răspunderea nu poate fi exclusă, aceasta este limitată în măsura permisă de lege.
 
-AInevoie nu răspunde pentru conduita, omisiunile, calitatea serviciilor, conformitatea fiscală, asigurările, autorizațiile sau declarațiile clienților sau prestatorilor independenți, cu excepția cazurilor în care legea obligatorie prevede altfel.
+Ainevoie nu răspunde pentru conduita, omisiunile, calitatea serviciilor, conformitatea fiscală, asigurările, autorizațiile sau declarațiile clienților sau prestatorilor independenți, cu excepția cazurilor în care legea obligatorie prevede altfel.
 
 ## 15. Suspendarea și închiderea contului
 

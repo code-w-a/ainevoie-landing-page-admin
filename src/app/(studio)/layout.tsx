@@ -3,7 +3,7 @@ import "../../css/style.css";
 import StudioProviders from "@/app/(studio)/studio-providers";
 
 export const metadata = {
-  title: "AInevoie Admin",
+  title: "Ainevoie Admin",
   description: "Admin dashboard",
 };
 

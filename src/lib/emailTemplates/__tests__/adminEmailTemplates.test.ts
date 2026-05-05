@@ -105,7 +105,9 @@ describe("renderTemplate", () => {
       vars: { fullName: "Test", email: "t@example.com" },
     });
     expect(rendered.html).not.toContain("border-left:3px solid #d35400");
-    expect(rendered.text.replace(baseConfig.providerWelcome.ro.signature, "")).not.toContain("AInevoie");
+    expect(rendered.text.replace(baseConfig.providerWelcome.ro.signature, "")).not.toContain(
+      "Momentan suntem în prelaunch",
+    );
   });
 
   it("includes the note block when note is filled and replaces placeholders", () => {

@@ -33,7 +33,7 @@ export const unsubscribe = onRequest(
     });
 
     res.status(200).send(
-      "<html><body><h1>Dezabonare confirmată</h1><p>Nu vei mai primi emailuri de la AInevoie.</p></body></html>"
+      "<html><body><h1>Dezabonare confirmată</h1><p>Nu vei mai primi emailuri de la Ainevoie.</p></body></html>"
     );
   })
 );

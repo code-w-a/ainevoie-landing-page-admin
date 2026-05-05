@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 const benefitChips = [
   "Înregistrare rapidă, fără drumuri",
   "Cont reutilizabil în aplicația mobilă",
-  "Date validate de echipa AInevoie",
+  "Date validate de echipa Ainevoie",
 ];
 
 export default function ProviderOnboardingHero() {
@@ -13,7 +13,7 @@ export default function ProviderOnboardingHero() {
         Pentru prestatori de servicii
       </span>
       <h1 className="mb-3 text-3xl font-bold text-black dark:text-white sm:mb-4 sm:text-4xl md:text-[44px] md:leading-tight">
-        Intră în rețeaua AInevoie și primește clienți mai ușor
+        Intră în rețeaua Ainevoie și primește clienți mai ușor
       </h1>
       <p className="text-body mx-auto max-w-[760px] text-sm sm:text-base">
         Completezi onboarding-ul în câțiva pași, iar contul tău este pregătit pentru activare.

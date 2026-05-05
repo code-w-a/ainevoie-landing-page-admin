@@ -56,7 +56,7 @@ export default function AdminSidebar() {
         <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
           A
         </span>
-        <span>AInevoie Admin</span>
+        <span>Ainevoie Admin</span>
       </div>
 
       <nav className="space-y-4">

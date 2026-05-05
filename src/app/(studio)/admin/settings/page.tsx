@@ -204,7 +204,7 @@ export default function SettingsPage() {
                       Nume expeditor
                     </label>
                     <Input
-                      placeholder="AInevoie"
+                      placeholder="Ainevoie"
                       value={newsletterState.fromName}
                       onChange={(event) =>
                         setNewsletterState((prev) => ({

@@ -43,7 +43,7 @@ test.describe("application smoke checks", () => {
     await page.locator('input[name="email"]').fill("provider-smoke@example.com");
     await page.locator("#provider-password").fill("Passw0rd!");
     await page.locator("#provider-confirm-password").fill("Passw0rd!");
-    await page.locator('input[name="phone"]').fill("0700000000");
+    await page.locator("#provider-phone-input").fill("+40701234567");
     await page.getByRole("button", { name: /Continuă la pasul următor|Continue/ }).click();
 
     await expect(page.locator("#provider-county")).toBeVisible();

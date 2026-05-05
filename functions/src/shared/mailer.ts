@@ -104,7 +104,7 @@ function appendFooter(html: string, unsubscribeUrl: string): string {
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-top:24px;border-top:1px solid #e2e8f0;">
       <tr>
         <td style="padding:14px 20px 0 20px;font-size:12px;line-height:1.6;color:#64748b;">
-          Primești acest email deoarece te-ai înscris pe lista AInevoie.
+          Primești acest email deoarece te-ai înscris pe lista Ainevoie.
           <br />
           Dacă nu mai dorești să primești mesaje, te poți dezabona:
           <a href="${unsubscribeUrl}" style="color:#d35400;font-weight:700;">Dezabonare</a>

@@ -6,9 +6,9 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 const ro = {
   Metadata: {
-    homeTitle: "AInevoie — conectează rapid clienții cu firme de curățenie",
+    homeTitle: "Ainevoie — conectează rapid clienții cu firme de curățenie",
     homeDescription:
-      "AInevoie este o platformă care conectează persoane și companii cu firme de curățenie: cauți, compari, programezi și plătești simplu, direct din aplicație.",
+      "Ainevoie este o platformă care conectează persoane și companii cu firme de curățenie: cauți, compari, programezi și plătești simplu, direct din aplicație.",
   },
   LanguageSwitcher: { ro: "RO", en: "EN", label: "Limbă" },
   Header: {
@@ -27,7 +27,7 @@ const ro = {
   },
   Footer: {
     tagline:
-      "AInevoie conectează clienții cu furnizori de servicii locali. Simplu, rapid și transparent: cerere, programare, plată și feedback.",
+      "Ainevoie conectează clienții cu furnizori de servicii locali. Simplu, rapid și transparent: cerere, programare, plată și feedback.",
     colProduct: "Produs",
     colClients: "Pentru clienți",
     colProviders: "Pentru furnizori",
@@ -49,12 +49,12 @@ const ro = {
     emailPlaceholder: "Email",
     subscribe: "Abonează-te",
     subscribing: "...",
-    copyright: "© 2026 AInevoie. Toate drepturile rezervate",
+    copyright: "© 2026 Ainevoie. Toate drepturile rezervate",
     privacy: "Politica de confidențialitate",
     terms: "Termeni și condiții",
   },
   Hero: {
-    badge: "AInevoie • Market Servicii",
+    badge: "Ainevoie • Market Servicii",
     titleBefore: "De la",
     titleHighlight: "nevoie",
     titleAfter: "la rezolvare.",
@@ -77,12 +77,12 @@ const ro = {
     dialogSubmit: "Înscrie-te",
     dialogSubmitting: "Se trimite…",
     dialogClose: "Închide",
-    mockupAlt: "Ecranul principal al aplicației AInevoie",
+    mockupAlt: "Ecranul principal al aplicației Ainevoie",
   },
   Features: {
     title: "Tot ce îți trebuie ca să rezolvi sau să oferi un serviciu",
     subtitle:
-      "AInevoie face lucrurile simple: ceri, programezi, plătești și la final evaluezi.",
+      "Ainevoie face lucrurile simple: ceri, programezi, plătești și la final evaluezi.",
     i1t: "Căutare rapidă",
     i1d:
       "Găsești rapid furnizori după categorie, zonă și recenzii. Alegi informat, fără să pierzi timp.",
@@ -138,7 +138,7 @@ const ro = {
     title: "Arată bine. Se folosește ușor.",
     subtitle:
       "De la căutare și programare, până la plăți și recenzii — totul e gândit să fie intuitiv.",
-    alt0: "Ecran splash AInevoie",
+    alt0: "Ecran splash Ainevoie",
     alt1: "Primul ecran de onboarding",
     alt2: "Al doilea ecran de onboarding",
     alt3: "Al treilea ecran de onboarding",
@@ -151,7 +151,7 @@ const ro = {
     alt10: "Ecran cu recenzii pentru prestator",
   },
   Cta: {
-    title: "Instalează AInevoie și rezolvă mai repede",
+    title: "Instalează Ainevoie și rezolvă mai repede",
     subtitle:
       "Cauți servicii sau oferi servicii? Aplicația te ajută să te conectezi, să programezi și să finalizezi fără complicații.",
     soon: "Disponibil în curând",
@@ -160,7 +160,7 @@ const ro = {
   },
   Testimonials: {
     title: "Ce spun utilizatorii",
-    subtitle: "Experiențe reale din comunitatea AInevoie.",
+    subtitle: "Experiențe reale din comunitatea Ainevoie.",
     t1: "Am găsit rapid un instalator disponibil în aceeași zi. Programarea a fost simplă și totul a fost clar din start.",
     t1name: "Andreea M.",
     t1role: "Client",
@@ -201,7 +201,7 @@ const ro = {
   Faq: {
     title: "Întrebări frecvente",
     subtitle: "Răspunsuri rapide, ca să începi fără dubii.",
-    q1t: "AInevoie este pentru clienți sau pentru firme?",
+    q1t: "Ainevoie este pentru clienți sau pentru firme?",
     q1d:
       "Pentru ambele. Clienții găsesc servicii și fac programări, iar furnizorii primesc cereri și își gestionează activitatea din aplicație.",
     q2t: "Cum aleg furnizorul potrivit?",
@@ -225,7 +225,7 @@ const ro = {
     q8t: "Furnizorii sunt verificați?",
     q8d:
       "Furnizorii își creează cont și completează datele necesare pentru profil. În funcție de categorie, pot exista pași suplimentari de validare.",
-    q9t: "Cum devin furnizor pe AInevoie?",
+    q9t: "Cum devin furnizor pe Ainevoie?",
     q9d:
       "Îți faci cont, completezi profilul (servicii, zonă, disponibilitate) și ești gata să primești cereri.",
     q10t: "Abonamentele sunt pentru clienți sau pentru furnizori?",
@@ -256,9 +256,9 @@ const ro = {
 
 const en = {
   Metadata: {
-    homeTitle: "AInevoie — connect customers with cleaning businesses fast",
+    homeTitle: "Ainevoie — connect customers with cleaning businesses fast",
     homeDescription:
-      "AInevoie is a platform that connects people and companies with cleaning providers: search, compare, book and pay simply, right in the app.",
+      "Ainevoie is a platform that connects people and companies with cleaning providers: search, compare, book and pay simply, right in the app.",
   },
   LanguageSwitcher: { ro: "RO", en: "EN", label: "Language" },
   Header: {
@@ -277,7 +277,7 @@ const en = {
   },
   Footer: {
     tagline:
-      "AInevoie connects customers with local service providers. Simple, fast and transparent: request, booking, payment and feedback.",
+      "Ainevoie connects customers with local service providers. Simple, fast and transparent: request, booking, payment and feedback.",
     colProduct: "Product",
     colClients: "For customers",
     colProviders: "For providers",
@@ -299,12 +299,12 @@ const en = {
     emailPlaceholder: "Email",
     subscribe: "Subscribe",
     subscribing: "...",
-    copyright: "© 2026 AInevoie. All rights reserved",
+    copyright: "© 2026 Ainevoie. All rights reserved",
     privacy: "Privacy policy",
     terms: "Terms & conditions",
   },
   Hero: {
-    badge: "AInevoie • Services marketplace",
+    badge: "Ainevoie • Services marketplace",
     titleBefore: "From",
     titleHighlight: "need",
     titleAfter: "to done.",
@@ -325,12 +325,12 @@ const en = {
     dialogSubmit: "Subscribe",
     dialogSubmitting: "Sending…",
     dialogClose: "Close",
-    mockupAlt: "AInevoie app home screen",
+    mockupAlt: "Ainevoie app home screen",
   },
   Features: {
     title: "Everything you need to book or offer a service",
     subtitle:
-      "AInevoie keeps it simple: request, schedule, pay and review.",
+      "Ainevoie keeps it simple: request, schedule, pay and review.",
     i1t: "Fast search",
     i1d:
       "Find providers by category, area and reviews. Decide with confidence, without wasting time.",
@@ -370,7 +370,7 @@ const en = {
     mockupProviderAlt: "New requests for provider",
   },
   WorkProcess: {
-    title: "How AInevoie works in 3 steps",
+    title: "How Ainevoie works in 3 steps",
     subtitle: "Simple for customers. Efficient for providers.",
     s1t: "Say what you need",
     s1d:
@@ -386,7 +386,7 @@ const en = {
     title: "Looks good. Easy to use.",
     subtitle:
       "From search and booking to payments and reviews — designed to be intuitive.",
-    alt0: "AInevoie splash screen",
+    alt0: "Ainevoie splash screen",
     alt1: "First onboarding screen",
     alt2: "Second onboarding screen",
     alt3: "Third onboarding screen",
@@ -399,7 +399,7 @@ const en = {
     alt10: "Provider reviews screen",
   },
   Cta: {
-    title: "Install AInevoie and get things done faster",
+    title: "Install Ainevoie and get things done faster",
     subtitle:
       "Looking for services or offering them? The app helps you connect, schedule and finish without hassle.",
     soon: "Coming soon",
@@ -408,7 +408,7 @@ const en = {
   },
   Testimonials: {
     title: "What users say",
-    subtitle: "Real experiences from the AInevoie community.",
+    subtitle: "Real experiences from the Ainevoie community.",
     t1: "I quickly found an installer available the same day. Booking was simple and everything was clear from the start.",
     t1name: "Andreea M.",
     t1role: "Customer",
@@ -449,7 +449,7 @@ const en = {
   Faq: {
     title: "Frequently asked questions",
     subtitle: "Quick answers so you can start with confidence.",
-    q1t: "Is AInevoie for customers or businesses?",
+    q1t: "Is Ainevoie for customers or businesses?",
     q1d:
       "Both. Customers find services and book; providers receive requests and manage work in the app.",
     q2t: "How do I choose the right provider?",
@@ -473,7 +473,7 @@ const en = {
     q8t: "Are providers verified?",
     q8d:
       "Providers create an account and complete profile details. Depending on category, extra validation steps may apply.",
-    q9t: "How do I become a provider on AInevoie?",
+    q9t: "How do I become a provider on Ainevoie?",
     q9d:
       "Create an account, complete your profile (services, area, availability) and you are ready to receive requests.",
     q10t: "Are subscriptions for customers or providers?",

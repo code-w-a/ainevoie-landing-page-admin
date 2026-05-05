@@ -1500,7 +1500,7 @@ export default function CampaignsPage() {
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Subiect</label>
                   <Input
-                    placeholder="Noutăți AInevoie"
+                    placeholder="Noutăți Ainevoie"
                     value={subject}
                     onChange={(event) => setSubject(event.target.value)}
                   />

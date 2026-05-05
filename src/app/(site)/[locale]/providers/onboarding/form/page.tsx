@@ -1,26 +1,18 @@
-"use client";
+import { ProviderOnboardingFormView } from "./ProviderOnboardingFormView";
+import { Suspense } from "react";
 
-import ProviderOnboardingFormCard from "@/components/providers/ProviderOnboardingFormCard";
-import ProviderOnboardingSideInfo from "@/components/providers/ProviderOnboardingSideInfo";
-import { useState } from "react";
+function OnboardingFormSkeleton() {
+  return (
+    <main className="min-h-[480px] animate-pulse pb-16 pt-[140px] sm:pb-24 sm:pt-[160px]">
+      <div className="mx-auto max-w-5xl rounded-xl border border-border bg-muted/40 px-4 py-20 sm:px-6" />
+    </main>
+  );
+}
 
 export default function ProviderOnboardingFormPage() {
-  const [currentStep, setCurrentStep] = useState(1);
-
   return (
-    <main className="pb-16 pt-[140px] sm:pb-24 sm:pt-[160px]">
-      <section className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8">
-        <div className="mx-auto w-full max-w-5xl">
-          <ProviderOnboardingFormCard
-            currentStep={currentStep}
-            onStepChange={setCurrentStep}
-          />
-
-          <div className="mt-6 grid gap-4 md:grid-cols-2">
-            <ProviderOnboardingSideInfo />
-          </div>
-        </div>
-      </section>
-    </main>
+    <Suspense fallback={<OnboardingFormSkeleton />}>
+      <ProviderOnboardingFormView />
+    </Suspense>
   );
 }

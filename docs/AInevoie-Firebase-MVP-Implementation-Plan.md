@@ -1,7 +1,7 @@
-# AInevoie Firebase MVP Implementation Plan
+# Ainevoie Firebase MVP Implementation Plan
 
 ## Scop
-Acest document definește planul progresiv de implementare pentru backend-ul MVP AInevoie pe Firebase, fără a presupune doar happy path.
+Acest document definește planul progresiv de implementare pentru backend-ul MVP Ainevoie pe Firebase, fără a presupune doar happy path.
 
 Documentul este gândit pentru:
 - aplicația mobilă Expo/React Native din acest repo
@@ -10,7 +10,7 @@ Documentul este gândit pentru:
 
 ## Regulă de aliniere cu schema bazei de date
 Acest plan nu este sursa finală pentru structura datelor. Sursa de adevăr pentru modelul de date este:
-- [AInevoie-Firebase-Document-Model-Schema.md](/Users/code-with-a/Dev/AINEVOIE-CODECANYON/COMPLET%20APP/AI%20NEVOIE%20APP/docs/AInevoie-Firebase-Document-Model-Schema.md)
+- [Ainevoie-Firebase-Document-Model-Schema.md](/Users/code-with-a/Dev/AINEVOIE-CODECANYON/COMPLET%20APP/AI%20NEVOIE%20APP/docs/AInevoie-Firebase-Document-Model-Schema.md)
 
 Regulă obligatorie:
 - orice schimbare de colecții, câmpuri, enum-uri, ownership, statusuri sau denormalizări trebuie actualizată întâi sau simultan în schema document model

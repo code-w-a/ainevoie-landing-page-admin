@@ -118,6 +118,8 @@ export function SignUpForm() {
                     {t("privacyAgree")}{" "}
                     <Link
                       href="/terms"
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="text-primary hover:underline"
                     >
                       {t("termsLink")}
@@ -125,6 +127,8 @@ export function SignUpForm() {
                     {t("andWith")}{" "}
                     <Link
                       href="/privacy"
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="text-primary hover:underline"
                     >
                       {t("privacyLink")}

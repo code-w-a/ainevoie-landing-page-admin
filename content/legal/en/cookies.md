@@ -1,6 +1,6 @@
 **Last updated:** 30 January 2026
 
-This Cookie Policy explains how AInevoie uses cookies and similar technologies on our website.
+This Cookie Policy explains how Ainevoie uses cookies and similar technologies on our website.
 
 ## 1. What are cookies?
 

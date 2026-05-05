@@ -71,7 +71,7 @@ describe("POST /api/contact", () => {
       expect.objectContaining({
         to: "support@example.com",
         replyTo: "ana@example.com",
-        subject: "Mesaj contact AInevoie de la Ana Pop",
+        subject: "Mesaj contact Ainevoie de la Ana Pop",
       })
     );
   });
@@ -106,8 +106,8 @@ describe("POST /api/contact", () => {
     expect(response.status).toBe(200);
     expect(mocks.sendEmail).toHaveBeenCalledWith(
       expect.objectContaining({
-        subject: "AInevoie contact message from John Smith",
-        text: expect.stringContaining("New message from the AInevoie contact form"),
+        subject: "Ainevoie contact message from John Smith",
+        text: expect.stringContaining("New message from the Ainevoie contact form"),
       })
     );
   });

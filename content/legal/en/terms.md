@@ -1,12 +1,12 @@
 **Last updated:** 29 April 2026
 
-These Terms & Conditions ("**Terms**") govern access to and use of the AInevoie website, provider onboarding flow, account areas, newsletter, contact form, and any related marketplace features that are made available from time to time (together, the "**Platform**"). AInevoie is a marketplace for connecting customers with independent service providers, including cleaning and related services.
+These Terms & Conditions ("**Terms**") govern access to and use of the Ainevoie website, provider onboarding flow, account areas, newsletter, contact form, and any related marketplace features that are made available from time to time (together, the "**Platform**"). Ainevoie is a marketplace for connecting customers with independent service providers, including cleaning and related services.
 
 By using the Platform or creating an account, you confirm that you have read and accepted these Terms and the Privacy Policy. If you use the Platform on behalf of a company or other organisation, you confirm that you are authorised to bind that organisation.
 
 ## 1. Operator and contact
 
-The Platform is operated by the legal entity responsible for AInevoie, established in Romania and identified in the public contact details of the Platform. Until full company details are published in the dedicated legal notice, you can contact us at **contact@ai-nevoie.ro**.
+The Platform is operated by the legal entity responsible for Ainevoie, established in Romania and identified in the public contact details of the Platform. Until full company details are published in the dedicated legal notice, you can contact us at **contact@ai-nevoie.ro**.
 
 ## 2. Eligibility
 
@@ -14,7 +14,7 @@ You must be at least 18 years old to create an account, submit provider onboardi
 
 ## 3. Nature of the Platform
 
-AInevoie facilitates discovery, communication, onboarding, scheduling, and, where enabled, payment or subscription flows. Unless expressly stated otherwise, AInevoie does not itself provide the cleaning or related services displayed on the Platform and is not a party to the service contract between a customer and an independent provider.
+Ainevoie facilitates discovery, communication, onboarding, scheduling, and, where enabled, payment or subscription flows. Unless expressly stated otherwise, Ainevoie does not itself provide the cleaning or related services displayed on the Platform and is not a party to the service contract between a customer and an independent provider.
 
 Providers are independent professionals or businesses. They are responsible for the legality, quality, safety, price, tax treatment, insurance, authorisations, and performance of their services.
 
@@ -46,7 +46,7 @@ Features may be released gradually. Some functionality described on the website 
 
 ## 8. Payments, subscriptions, and third-party payment providers
 
-Where payments or subscriptions are enabled, they may be processed by Stripe or another payment provider. AInevoie does not store full card details. Payment provider terms, privacy notices, and authentication requirements may apply.
+Where payments or subscriptions are enabled, they may be processed by Stripe or another payment provider. Ainevoie does not store full card details. Payment provider terms, privacy notices, and authentication requirements may apply.
 
 Prices, taxes, subscription terms, commissions, renewal rules, cancellation rules, and refund conditions will be shown in the relevant purchase or subscription flow where applicable. Providers remain responsible for their own taxes and legal accounting obligations unless mandatory law provides otherwise.
 
@@ -54,7 +54,7 @@ Prices, taxes, subscription terms, commissions, renewal rules, cancellation rule
 
 You may be able to submit profile content, messages, reviews, ratings, images, documents, or other content. You must not submit illegal, misleading, abusive, defamatory, discriminatory, spam, malware, or rights-infringing content.
 
-You retain your rights in your content, but grant AInevoie a non-exclusive, worldwide, royalty-free licence to host, store, reproduce, display, adapt, and use that content as needed to operate, secure, improve, and promote the Platform, subject to the Privacy Policy and applicable law.
+You retain your rights in your content, but grant Ainevoie a non-exclusive, worldwide, royalty-free licence to host, store, reproduce, display, adapt, and use that content as needed to operate, secure, improve, and promote the Platform, subject to the Privacy Policy and applicable law.
 
 We may moderate, hide, remove, or restrict content that appears to breach these Terms, the law, platform safety rules, or third-party rights.
 
@@ -71,7 +71,7 @@ You must not misuse the Platform. This includes:
 
 ## 11. Intellectual property
 
-The AInevoie name, logo, interface, text, graphics, software, and other Platform materials are owned by AInevoie or its licensors and are protected by intellectual property laws. You receive only a limited, revocable, non-transferable right to use the Platform for its intended purpose.
+The Ainevoie name, logo, interface, text, graphics, software, and other Platform materials are owned by Ainevoie or its licensors and are protected by intellectual property laws. You receive only a limited, revocable, non-transferable right to use the Platform for its intended purpose.
 
 ## 12. Third-party services
 
@@ -85,9 +85,9 @@ Nothing in these Terms limits statutory consumer rights or liability that cannot
 
 ## 14. Limitation of liability
 
-To the maximum extent permitted by law, AInevoie is not liable for indirect, incidental, special, consequential, punitive, or loss-of-profit damages arising from use of the Platform. Where liability cannot be excluded, it is limited to the extent permitted by applicable law.
+To the maximum extent permitted by law, Ainevoie is not liable for indirect, incidental, special, consequential, punitive, or loss-of-profit damages arising from use of the Platform. Where liability cannot be excluded, it is limited to the extent permitted by applicable law.
 
-AInevoie is not responsible for the conduct, omissions, service quality, tax compliance, insurance, authorisations, or statements of independent customers or providers, except where mandatory law states otherwise.
+Ainevoie is not responsible for the conduct, omissions, service quality, tax compliance, insurance, authorisations, or statements of independent customers or providers, except where mandatory law states otherwise.
 
 ## 15. Account suspension and termination
 

@@ -1,0 +1,1 @@
+export const PROVIDER_ONBOARDING_MAX_STEP = 6;

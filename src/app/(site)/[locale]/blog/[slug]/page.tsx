@@ -42,7 +42,7 @@ export async function generateMetadata(props: Props) {
   if (post) {
     const slugPart = post?.slug?.current || slug;
     const path = `/blog/${slugPart}`;
-    const title = `${post.title || t("blogPostDefaultTitle")} | ${authorName || "AInevoie"} — AInevoie`;
+    const title = `${post.title || t("blogPostDefaultTitle")} | Ainevoie`;
     const description = `${String(post.metadata || "").slice(0, 136)}...`;
     const base = buildLocalePageMetadata(locale, path, { title, description });
     const imageUrlRaw = post.mainImage ? imageBuilder(post.mainImage).url() : "";
@@ -293,7 +293,7 @@ const SingleBlog = async (props: Props) => {
                   data-wow-delay=".2s"
                 >
                   <div className="mx-auto w-full max-w-[550px]">
-                    AInevoie îți oferă un flux simplu: cauți, compari, trimiți
+                    Ainevoie îți oferă un flux simplu: cauți, compari, trimiți
                     solicitarea și programezi serviciul. Pentru firme, totul este
                     organizat: cereri, programări și statusuri într-un singur loc.
                   </div>

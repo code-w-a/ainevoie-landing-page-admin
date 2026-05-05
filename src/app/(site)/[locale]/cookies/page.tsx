@@ -61,7 +61,7 @@ export default async function CookiesPage({ params }: PageProps) {
               </p>
               <p>
                 Această politică explică ce sunt cookie-urile, cum le folosim pe
-                AInevoie și cum le poți controla.
+                Ainevoie și cum le poți controla.
               </p>
             </section>
 

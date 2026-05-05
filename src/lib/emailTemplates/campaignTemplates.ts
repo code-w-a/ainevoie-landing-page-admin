@@ -197,7 +197,7 @@ const eventFields: CampaignTemplateField[] = [
     key: "title",
     label: "Titlu eveniment",
     type: "text",
-    placeholder: "Întâlnire comunitate AInevoie",
+    placeholder: "Întâlnire comunitate Ainevoie",
     required: true,
   },
   {
@@ -573,7 +573,7 @@ function wrapTemplateHtml(input: {
                 <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
                   <tr>
                     <td valign="middle">
-                      <img src="${escapeHtml(input.logoUrl)}" alt="AInevoie" width="180" style="display:block;border:0;width:180px;max-width:100%;height:auto;" />
+                      <img src="${escapeHtml(input.logoUrl)}" alt="Ainevoie" width="180" style="display:block;border:0;width:180px;max-width:100%;height:auto;" />
                       <p style="margin:8px 0 0 0;font-size:12px;line-height:1.3;color:#64748b;">
                         Newsletter
                       </p>
@@ -590,7 +590,7 @@ function wrapTemplateHtml(input: {
             <tr>
               <td style="padding:0 24px 18px 24px;">
                 <p style="margin:0;font-size:12px;line-height:1.5;color:#94a3b8;">
-                  AInevoie • Soluții digitale pentru prestatori
+                  Ainevoie • Soluții digitale pentru prestatori
                 </p>
               </td>
             </tr>
@@ -1047,7 +1047,7 @@ export function renderCampaignTemplate(input: {
     throw new Error(validation.errors[0]);
   }
 
-  const subject = trimString(input.subject) || "Campanie AInevoie";
+  const subject = trimString(input.subject) || "Campanie Ainevoie";
   const logoUrl = buildLogoUrl(normalizedBaseUrl);
   const data = validation.normalizedData;
 

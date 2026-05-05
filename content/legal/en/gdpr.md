@@ -1,6 +1,6 @@
 **Last updated:** 30 January 2026
 
-This page summarises how you can exercise your rights under the **General Data Protection Regulation (GDPR)** and Romanian law in connection with AInevoie.
+This page summarises how you can exercise your rights under the **General Data Protection Regulation (GDPR)** and Romanian law in connection with Ainevoie.
 
 It complements, but does not replace, our full Privacy Policy elsewhere on this site — please read both for a complete picture.
 

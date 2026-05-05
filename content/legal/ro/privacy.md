@@ -1,10 +1,10 @@
 **Ultima actualizare:** 29 aprilie 2026
 
-Această Politică de confidențialitate explică modul în care AInevoie („**noi**”) prelucrează date cu caracter personal atunci când folosești website-ul, fluxul de onboarding pentru prestatori, zonele de cont, newsletterul, formularul de contact, comunicările operate de administratori și funcționalitățile marketplace conexe („**Platforma**”). Politica urmărește să ofere informații transparente conform articolelor 12-14 din GDPR.
+Această Politică de confidențialitate explică modul în care Ainevoie („**noi**”) prelucrează date cu caracter personal atunci când folosești website-ul, fluxul de onboarding pentru prestatori, zonele de cont, newsletterul, formularul de contact, comunicările operate de administratori și funcționalitățile marketplace conexe („**Platforma**”). Politica urmărește să ofere informații transparente conform articolelor 12-14 din GDPR.
 
 ## 1. Operator și contact
 
-Operatorul este entitatea juridică ce operează AInevoie în România, astfel cum este identificată în datele publice legale/de contact ale Platformei. Până la publicarea notei legale complete, solicitările privind confidențialitatea pot fi trimise la **contact@ai-nevoie.ro**.
+Operatorul este entitatea juridică ce operează Ainevoie în România, astfel cum este identificată în datele publice legale/de contact ale Platformei. Până la publicarea notei legale complete, solicitările privind confidențialitatea pot fi trimise la **contact@ai-nevoie.ro**.
 
 Nu am desemnat un Responsabil cu Protecția Datelor (DPO), cu excepția cazului în care se precizează expres într-o notă legală separată. Poți folosi aceeași adresă pentru întrebări privind confidențialitatea și solicitări GDPR.
 
@@ -19,7 +19,7 @@ Nu am desemnat un Responsabil cu Protecția Datelor (DPO), cu excepția cazului 
 - **Date de servicii și marketplace:** rezervări, disponibilitate, zone de acoperire, conținut de profil, cereri, mesaje, recenzii, evaluări și evidențe operaționale asociate, acolo unde aceste funcții sunt active.
 - **Date de newsletter:** adresă de email, status, evidențe de consimțământ, sursă, tag-uri, joburi de livrare campanii, token de dezabonare, loguri de livrare și preferințe asociate.
 - **Date de contact și suport:** nume, companie, email, telefon, conținutul mesajului, metadate de răspuns și orice comunicare ulterioară.
-- **Date de plată și abonament:** price ID selectat, metadate de checkout/sesiune, status de plată sau abonament și identificatori ai furnizorului de plată. Datele complete ale cardului sunt prelucrate de Stripe sau furnizorul de plată relevant, nu sunt stocate de AInevoie.
+- **Date de plată și abonament:** price ID selectat, metadate de checkout/sesiune, status de plată sau abonament și identificatori ai furnizorului de plată. Datele complete ale cardului sunt prelucrate de Stripe sau furnizorul de plată relevant, nu sunt stocate de Ainevoie.
 - **Date tehnice, de securitate și analiză:** adresă IP, informații despre dispozitiv și browser, loguri de cereri, cookie-uri sau identificatori local storage, preferință de limbă, localizare aproximativă derivată din cereri, diagnostice, rapoarte de erori/crash și loguri de securitate.
 - **Date administrative și audit:** ID-uri administratori, verificări de acces, acțiuni din panourile de administrare, status notificări citite, activitate campanii și acțiuni de review prestatori.
 

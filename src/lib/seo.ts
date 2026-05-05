@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 import { routing } from "@/i18n/routing";
 
-const SITE_NAME = "AInevoie";
+const SITE_NAME = "Ainevoie";
 
 /**
  * Canonical site origin for metadata, sitemap, and robots.

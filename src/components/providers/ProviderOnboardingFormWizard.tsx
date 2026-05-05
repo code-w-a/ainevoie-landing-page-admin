@@ -2,6 +2,7 @@
 
 import { Checkbox } from "@/components/ui/checkbox";
 import { InputGroup } from "@/components/ui/input-group";
+import { PROVIDER_ONBOARDING_MAX_STEP } from "@/constants/providerOnboarding";
 import { createSquareAvatarFile } from "@/lib/cropImage";
 import { getFirebaseAuth, getFirebaseFunctions, getFirebaseStorage } from "@/lib/firebaseClient";
 import { PROVIDER_SERVICE_ENTRIES } from "@/lib/providers";
@@ -24,6 +25,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Cropper, { type Area } from "react-easy-crop";
 import { Controller, useForm } from "react-hook-form";
 import toast from "react-hot-toast";
+import PhoneInput from "react-phone-number-input";
+import { isValidPhoneNumber } from "libphonenumber-js";
+import "react-phone-number-input/style.css";
 
 import { cn } from "@/lib/utils";
 
@@ -67,7 +71,7 @@ type AvatarSource = {
 };
 type EmailStatus = "idle" | "checking" | "available" | "exists" | "error";
 
-const MAX_STEP = 6;
+const MAX_STEP = PROVIDER_ONBOARDING_MAX_STEP;
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
 function emptyFileSlot(): FileSlot {
@@ -284,7 +288,7 @@ export default function ProviderOnboardingFormWizard({
   const contactComplete =
     Boolean(fullNameValue?.trim()) &&
     hasValidEmailForNewsletter &&
-    Boolean(phoneValue?.trim()) &&
+    Boolean(phoneValue && isValidPhoneNumber(phoneValue)) &&
     Boolean(passwordValue) &&
     passwordValue.length >= 8 &&
     passwordValue === confirmPasswordValue;
@@ -545,6 +549,9 @@ export default function ProviderOnboardingFormWizard({
       });
       if (showToast) {
         toast.success(t("accountCreated"));
+        if (res.data?.welcomeEmailSent !== true) {
+          toast(t("welcomeEmailNotSent"), { duration: 6000 });
+        }
       }
       return true;
     } catch (error: unknown) {
@@ -1158,13 +1165,47 @@ export default function ProviderOnboardingFormWizard({
               )}
             </fieldset>
             <div className="md:col-span-2">
-              <InputGroup
-                label={t("phoneLabel")}
-                placeholder={t("phonePh")}
-                disabled={Boolean(providerUid)}
-                {...register("phone", { required: t("phoneRequired") })}
-                errorMessages={errors.phone?.message}
+              <label htmlFor="provider-phone-input" className="mb-2 inline-block text-sm font-medium">
+                {t("phoneLabel")}
+              </label>
+              <p className="mb-2.5 text-xs text-muted-foreground">{t("phoneHint")}</p>
+              <Controller
+                control={control}
+                name="phone"
+                rules={{
+                  required: t("phoneRequired"),
+                  validate: (value) =>
+                    (typeof value === "string" && isValidPhoneNumber(value)) ||
+                    t("phoneInvalid"),
+                }}
+                render={({ field }) => (
+                  <PhoneInput
+                    international
+                    defaultCountry="RO"
+                    countryCallingCodeEditable
+                    placeholder={t("phonePh")}
+                    disabled={Boolean(providerUid)}
+                    value={field.value || undefined}
+                    onChange={(v) => field.onChange(v ?? "")}
+                    smartCaret={false}
+                    className={cn(
+                      "flex w-full items-center gap-2 rounded-md border border-stroke bg-white px-3 py-1 dark:border-stroke-dark dark:bg-black",
+                      errors.phone ? "border-red-500 dark:border-red-500" : null,
+                    )}
+                    numberInputProps={{
+                      id: "provider-phone-input",
+                      name: field.name,
+                      onBlur: field.onBlur,
+                      ref: field.ref,
+                      className:
+                        "min-w-[12rem] flex-1 rounded-md border-0 bg-transparent px-2 py-2 text-base outline-none placeholder:text-muted-foreground disabled:opacity-60 dark:text-white",
+                    }}
+                  />
+                )}
               />
+              {errors.phone?.message && (
+                <p className="mt-2 text-xs text-red-500">{errors.phone.message}</p>
+              )}
             </div>
           </div>
           <p className="text-xs text-muted-foreground">{t("step1Footnote")}</p>
@@ -1465,17 +1506,35 @@ export default function ProviderOnboardingFormWizard({
                   label={
                     <>
                       {t("termsAgree")}{" "}
-                      <Link href="/terms" className="text-primary hover:underline">
+                      <Link
+                        href="/terms"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline"
+                      >
                         {t("termsLink")}
                       </Link>{" "}
                       {t("termsAnd")}{" "}
-                      <Link href="/privacy" className="text-primary hover:underline">
+                      <Link
+                        href="/privacy"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline"
+                      >
                         {t("privacyLink")}
                       </Link>
                       {t("termsEnd")}
                     </>
                   }
                 />
+                {field.value ? (
+                  <p
+                    role="status"
+                    className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100"
+                  >
+                    {t("termsAcknowledgmentNotice")}
+                  </p>
+                ) : null}
                 {fieldState.error && (
                   <p className="mt-2 text-xs text-red-500">{fieldState.error.message}</p>
                 )}

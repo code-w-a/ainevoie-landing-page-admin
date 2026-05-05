@@ -1,7 +1,7 @@
-# AInevoie Firebase Document Model Schema
+# Ainevoie Firebase Document Model Schema
 
 ## Scop
-Acest document este sursa de adevăr pentru modelul de date Firebase al proiectului AInevoie.
+Acest document este sursa de adevăr pentru modelul de date Firebase al proiectului Ainevoie.
 
 Este destinat pentru:
 - aplicația mobilă
@@ -9,7 +9,7 @@ Este destinat pentru:
 - proiectul Next.js Admin Panel
 
 Orice schimbare de model trebuie reflectată și în:
-- [AInevoie-Firebase-MVP-Implementation-Plan.md](/Users/code-with-a/Dev/AINEVOIE-CODECANYON/COMPLET%20APP/AI%20NEVOIE%20APP/docs/AInevoie-Firebase-MVP-Implementation-Plan.md)
+- [Ainevoie-Firebase-MVP-Implementation-Plan.md](/Users/code-with-a/Dev/AINEVOIE-CODECANYON/COMPLET%20APP/AI%20NEVOIE%20APP/docs/AInevoie-Firebase-MVP-Implementation-Plan.md)
 
 Pentru delimitarea curentă între modelul comun Expo/Next.js și datele specifice Next.js, vezi:
 - [firebase-shared-vs-app-specific.md](./firebase-shared-vs-app-specific.md)

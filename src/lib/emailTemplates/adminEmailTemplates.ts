@@ -30,7 +30,7 @@ export type RenderedTemplate = {
 export const EMAIL_TEMPLATE_DEFAULTS: EmailTemplateConfig = {
   providerWelcome: {
     ro: {
-      subject: "Bine ai venit pe AInevoie",
+      subject: "Bine ai venit pe Ainevoie",
       greeting: "Salut, {{fullName}}!",
       intro:
         "Contul tău de prestator a fost creat cu succes și este salvat în baza noastră comună.",
@@ -40,50 +40,50 @@ export const EMAIL_TEMPLATE_DEFAULTS: EmailTemplateConfig = {
         "La lansare, te autentifici direct cu acest cont.",
       ],
       note:
-        "Momentan suntem în prelaunch: aplicația mobilă AInevoie este în curs de finalizare, iar datele tale te vor aștepta la lansare.",
-      signature: "Cu drag,\nEchipa AInevoie",
+        "Momentan suntem în prelaunch: aplicația mobilă Ainevoie este în curs de finalizare, iar datele tale te vor aștepta la lansare.",
+      signature: "Cu drag,\nEchipa Ainevoie",
     },
     en: {
-      subject: "Welcome to AInevoie",
+      subject: "Welcome to Ainevoie",
       greeting: "Hi {{fullName}},",
       intro:
-        "Thank you for signing up as a provider. Your account is created and your details are on file with AInevoie.",
+        "Thank you for signing up as a provider. Your account is created and your details are on file with Ainevoie.",
       steps: [
         "Our team reviews the information you submitted.",
         "If we need anything else, we will contact you.",
         "When the app goes live, sign in with this same account.",
       ],
       note:
-        "We are currently in prelaunch: the AInevoie mobile app is in the final stages of development and your account will be waiting for you at launch.",
-      signature: "Kind regards,\nThe AInevoie team",
+        "We are currently in prelaunch: the Ainevoie mobile app is in the final stages of development and your account will be waiting for you at launch.",
+      signature: "Kind regards,\nThe Ainevoie team",
     },
   },
   providerApproved: {
     ro: {
-      subject: "Contul tău AInevoie a fost aprobat",
+      subject: "Contul tău Ainevoie a fost aprobat",
       greeting: "Felicitări, {{fullName}}!",
       intro:
-        "Contul tău de prestator a fost verificat și aprobat de echipa AInevoie. Din acest moment ești parte activă din rețeaua noastră de prestatori.",
+        "Contul tău de prestator a fost verificat și aprobat de echipa Ainevoie. Din acest moment ești parte activă din rețeaua noastră de prestatori.",
       steps: [
         "Păstrează acest email ca dovadă a aprobării.",
         "Te vom anunța prin email când aplicația mobilă este disponibilă.",
         "La lansare te vei autentifica cu adresa {{email}} pentru a prelua primele cereri.",
       ],
       note: "",
-      signature: "Cu drag,\nEchipa AInevoie",
+      signature: "Cu drag,\nEchipa Ainevoie",
     },
     en: {
-      subject: "Your AInevoie account has been approved",
+      subject: "Your Ainevoie account has been approved",
       greeting: "Congratulations, {{fullName}}!",
       intro:
-        "Your provider account has been reviewed and approved by the AInevoie team. You are now an active member of our provider network.",
+        "Your provider account has been reviewed and approved by the Ainevoie team. You are now an active member of our provider network.",
       steps: [
         "Keep this email as proof of your approval.",
         "We will notify you by email as soon as the mobile app is available.",
         "At launch, sign in with {{email}} to start receiving requests.",
       ],
       note: "",
-      signature: "Kind regards,\nThe AInevoie team",
+      signature: "Kind regards,\nThe Ainevoie team",
     },
   },
 };

@@ -1,6 +1,6 @@
-# AInevoie Design System Guide
+# Ainevoie Design System Guide
 
-This guide defines the visual system that should drive future screen redesigns in AInevoie.
+This guide defines the visual system that should drive future screen redesigns in Ainevoie.
 
 It is not a component library specification.
 It does not require rebuilding screens or replacing working JSX.
@@ -15,7 +15,7 @@ Its purpose is to help future refactors restyle existing screens in a consistent
 
 The main principle of this system is:
 
-**AInevoie should feel light, minimal, calm, premium, and easy to scan.**
+**Ainevoie should feel light, minimal, calm, premium, and easy to scan.**
 
 The UI should never feel crowded, noisy, over-layered, or overly containerized.
 
@@ -23,7 +23,7 @@ The UI should never feel crowded, noisy, over-layered, or overly containerized.
 
 ## 1. What We Already Extracted From Auth And Onboarding
 
-The auth and onboarding redesign established the new baseline visual language for AInevoie:
+The auth and onboarding redesign established the new baseline visual language for Ainevoie:
 
 - light-only interface direction
 - one central accent color
@@ -98,7 +98,7 @@ Default mindset:
 
 ### 2.4 Minimalism first
 
-AInevoie should feel minimal, not busy.
+Ainevoie should feel minimal, not busy.
 
 Use:
 - fewer visual containers
@@ -429,7 +429,7 @@ For each batch:
 
 When modifying an existing screen, the guiding question should be:
 
-`How can this screen look like AInevoie's auth/onboarding design system while keeping its current layout and logic, and making it cleaner, lighter, and less crowded?`
+`How can this screen look like Ainevoie's auth/onboarding design system while keeping its current layout and logic, and making it cleaner, lighter, and less crowded?`
 
 Not:
 

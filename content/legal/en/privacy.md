@@ -1,10 +1,10 @@
 **Last updated:** 29 April 2026
 
-This Privacy Policy explains how AInevoie ("**we**", "**us**") processes personal data when you use our website, provider onboarding flow, account areas, newsletter, contact form, admin-operated communications, and related marketplace features (the "**Platform**"). It is intended to provide transparent information under Articles 12-14 of the GDPR.
+This Privacy Policy explains how Ainevoie ("**we**", "**us**") processes personal data when you use our website, provider onboarding flow, account areas, newsletter, contact form, admin-operated communications, and related marketplace features (the "**Platform**"). It is intended to provide transparent information under Articles 12-14 of the GDPR.
 
 ## 1. Controller and contact
 
-The controller is the legal entity operating AInevoie in Romania, as identified in the Platform's public legal/contact details. Until the full legal notice is published, privacy requests can be sent to **contact@ai-nevoie.ro**.
+The controller is the legal entity operating Ainevoie in Romania, as identified in the Platform's public legal/contact details. Until the full legal notice is published, privacy requests can be sent to **contact@ai-nevoie.ro**.
 
 We have not appointed a Data Protection Officer unless expressly stated in a separate legal notice. You can use the same contact address for privacy questions and GDPR requests.
 
@@ -19,7 +19,7 @@ Depending on how you use the Platform, we may process the following categories:
 - **Service and marketplace data:** bookings, availability, service areas, profile content, requests, messages, reviews, ratings, and related operational records where these features are enabled.
 - **Newsletter data:** email address, status, consent records, source, tags, campaign delivery jobs, unsubscribe token, delivery logs, and related preferences.
 - **Contact and support data:** name, company, email, phone, message content, reply metadata, and any follow-up communication.
-- **Payment and subscription data:** selected price ID, checkout/session metadata, payment or subscription status, and payment-provider identifiers. Full card details are processed by Stripe or the relevant payment provider, not stored by AInevoie.
+- **Payment and subscription data:** selected price ID, checkout/session metadata, payment or subscription status, and payment-provider identifiers. Full card details are processed by Stripe or the relevant payment provider, not stored by Ainevoie.
 - **Technical, security, and analytics data:** IP address, device and browser information, request logs, cookies or local storage identifiers, language preference, approximate location derived from requests, diagnostics, crash/error reports, and security logs.
 - **Admin and audit data:** administrator user IDs, access checks, actions taken in admin panels, notification-read state, campaign activity, and provider review actions.
 

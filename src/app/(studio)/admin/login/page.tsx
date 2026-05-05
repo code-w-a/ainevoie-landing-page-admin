@@ -62,7 +62,7 @@ export default function AdminLoginPage() {
               width={190}
               height={40}
               src="/images/logo/logo.svg"
-              alt="AInevoie"
+              alt="Ainevoie"
               priority
               className="block dark:hidden"
               style={{ width: "auto", height: "auto" }}
@@ -71,7 +71,7 @@ export default function AdminLoginPage() {
               width={190}
               height={40}
               src="/images/logo/logo-white.svg"
-              alt="AInevoie"
+              alt="Ainevoie"
               priority
               className="hidden dark:block"
               style={{ width: "auto", height: "auto" }}

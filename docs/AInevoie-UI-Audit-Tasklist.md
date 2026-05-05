@@ -1,7 +1,7 @@
-# AInevoie UI Audit Task List
+# Ainevoie UI Audit Task List
 
 ## Scop
-Acest document transformă auditul UI/front-end într-un backlog concret de implementare pentru AInevoie.
+Acest document transformă auditul UI/front-end într-un backlog concret de implementare pentru Ainevoie.
 
 Scopul este strict:
 - front-end / UI / mock flows;
@@ -10,12 +10,12 @@ Scopul este strict:
 - pregătirea aplicației pentru integrare backend ulterioară.
 
 ## Regulă De Design Obligatorie
-Toate taskurile de mai jos trebuie implementate în același sistem de design descris în [AInevoie-Design-System-Guide.md](/Users/code-with-a/Dev/AINEVOIE-CODECANYON/COMPLET%20APP/AI%20NEVOIE%20APP/docs/AInevoie-Design-System-Guide.md).
+Toate taskurile de mai jos trebuie implementate în același sistem de design descris în [Ainevoie-Design-System-Guide.md](/Users/code-with-a/Dev/AINEVOIE-CODECANYON/COMPLET%20APP/AI%20NEVOIE%20APP/docs/AInevoie-Design-System-Guide.md).
 
 Asta înseamnă:
 - light-only shell;
 - business / premium / semi-minimal visual language;
-- accent unificat AInevoie, fără palete noi arbitrare;
+- accent unificat Ainevoie, fără palete noi arbitrare;
 - suprafețe curate, aerisite, fără look de template generic;
 - ierarhie clară prin spacing, tipografie și density calmă;
 - user și provider trebuie să pară parte din același produs, nu două template-uri diferite;
@@ -90,7 +90,7 @@ Asta înseamnă:
 - eliminarea ecranelor vechi care nu respectă design system-ul;
 - unificare naming și copy;
 - eliminarea conținutului generic / placeholder / english leftovers din zone critice;
-- alinierea tuturor ecranelor importante la identitatea AInevoie.
+- alinierea tuturor ecranelor importante la identitatea Ainevoie.
 
 ### 8. Admin Web Shell
 - structură admin web separată;

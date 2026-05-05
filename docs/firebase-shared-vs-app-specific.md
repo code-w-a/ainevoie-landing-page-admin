@@ -1,8 +1,8 @@
-# AInevoie Firebase Shared vs App-Specific Model
+# Ainevoie Firebase Shared vs App-Specific Model
 
 ## Purpose
 
-The Expo mobile app is the source of truth for Firebase structures shared by AInevoie clients. The Next.js project may keep site/dashboard-only Firebase data, but it must not redefine shared collections, shared Storage paths, or shared callable names with incompatible behavior.
+The Expo mobile app is the source of truth for Firebase structures shared by Ainevoie clients. The Next.js project may keep site/dashboard-only Firebase data, but it must not redefine shared collections, shared Storage paths, or shared callable names with incompatible behavior.
 
 ## Firestore Collections
 

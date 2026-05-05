@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
+import { isValidPhoneNumber } from "libphonenumber-js";
 import { type AppLocale, getRequestLocale } from "@/lib/apiLocale";
 import { getApiErrorMessage } from "@/lib/apiMessages";
 import { getAdminAuth, getAdminDb } from "@/lib/firebaseAdmin";
@@ -65,7 +66,8 @@ type WelcomeEmailResult = {
 async function sendWelcomeEmail(
   email: string,
   fullName: string,
-  locale: AppLocale
+  locale: AppLocale,
+  emailVerificationLink?: string | null,
 ): Promise<WelcomeEmailResult> {
   try {
     const config = await getEmailTemplateConfig();
@@ -75,11 +77,29 @@ async function sendWelcomeEmail(
       config,
       vars: { fullName, email },
     });
+    let html = rendered.html;
+    let text = rendered.text;
+
+    if (emailVerificationLink && emailVerificationLink.startsWith("http")) {
+      const href = emailVerificationLink.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+      if (locale === "en") {
+        html +=
+          `<p style="margin-top:18px;line-height:1.5;"><strong>Confirm your email address</strong></p>` +
+          `<p>Please verify that this inbox belongs to you: <a href="${href}" style="color:#d35400;font-weight:600;">Verify email address</a></p>`;
+        text += `\n\nConfirm your email address: ${emailVerificationLink}\n`;
+      } else {
+        html +=
+          `<p style="margin-top:18px;line-height:1.5;"><strong>Confirmă adresa de email</strong></p>` +
+          `<p>Te rugăm să confirmi că acest inbox îți aparține: <a href="${href}" style="color:#d35400;font-weight:600;">Verifică adresa de email</a></p>`;
+        text += `\n\nConfirmă adresa de email: ${emailVerificationLink}\n`;
+      }
+    }
+
     await sendEmail({
       to: email,
       subject: rendered.subject,
-      html: rendered.html,
-      text: rendered.text,
+      html,
+      text,
     });
     return { sent: true };
   } catch (error) {
@@ -175,6 +195,10 @@ export async function POST(request: Request) {
       return jsonError(locale, "INVALID_EMAIL", 400);
     }
 
+    if (!isValidPhoneNumber(phone)) {
+      return jsonError(locale, "INVALID_PHONE", 400);
+    }
+
     if (password.length < MIN_PASSWORD_LENGTH) {
       return jsonError(locale, "PASSWORD_TOO_SHORT", 400);
     }
@@ -267,7 +291,23 @@ export async function POST(request: Request) {
       throw error;
     }
 
-    const welcomeEmailResult = await sendWelcomeEmail(email, fullName, locale);
+    let emailVerificationLink: string | null = null;
+    try {
+      emailVerificationLink = await auth.generateEmailVerificationLink(email);
+    } catch (err) {
+      logProviderOnboardingApiError(err, {
+        uid: userRecord.uid,
+        stage: "email_verification_link",
+        emailDomain: getEmailDomain(email),
+      });
+    }
+
+    const welcomeEmailResult = await sendWelcomeEmail(
+      email,
+      fullName,
+      locale,
+      emailVerificationLink,
+    );
     logProviderOnboardingApi("welcome email attempted", {
       uid: userRecord.uid,
       sent: welcomeEmailResult.sent,

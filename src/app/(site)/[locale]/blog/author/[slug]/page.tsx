@@ -39,7 +39,7 @@ export async function generateMetadata(props: Props) {
 
   if (author) {
     const path = `/blog/author/${slug}`;
-    const title = `${author.name || "Author Page"} | ${authorName || "AInevoie"} — AInevoie`;
+    const title = `${author.name || "Author Page"} | Ainevoie`;
     const description = String(author.bio || "").slice(0, 160) || title;
     const base = buildLocalePageMetadata(locale, path, {
       title,
@@ -76,7 +76,7 @@ export async function generateMetadata(props: Props) {
   }
 
   return buildLocalePageMetadata(locale, `/blog/author/${slug}`, {
-    title: "Autor negăsit | AInevoie",
+    title: "Autor negăsit | Ainevoie",
     description: "Autorul căutat nu există sau nu mai este disponibil.",
     robotsIndex: false,
   });
