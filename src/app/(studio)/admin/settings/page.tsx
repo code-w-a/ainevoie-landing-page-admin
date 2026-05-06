@@ -13,7 +13,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Tabs, TabList, TabTrigger, TabContent } from "@/components/ui/tabs";
 import { useAdminData } from "@/components/admin/useAdminData";
-import { adminFetch } from "@/components/admin/adminApi";
+import { adminFetch, readAdminResponseError } from "@/components/admin/adminApi";
 import { AdminFormGridSkeleton } from "@/components/admin/AdminSkeletonLayouts";
 import { EmailTemplateEditor } from "@/components/admin/EmailTemplateEditor";
 import {
@@ -21,11 +21,17 @@ import {
   TemplateContent,
   getDefaultEmailTemplateConfig,
 } from "@/lib/emailTemplates/adminEmailTemplates";
+import {
+  AppUpdateLocale,
+  AppUpdateSettings,
+  getDefaultAppUpdateSettings,
+} from "@/lib/appUpdateSettings";
 import type { AppLocale } from "@/lib/apiLocale";
 
 const TOP_TABS = {
   newsletter: "newsletter",
   templates: "templates",
+  appUpdate: "appUpdate",
 } as const;
 
 type TopTab = (typeof TOP_TABS)[keyof typeof TOP_TABS];
@@ -48,6 +54,16 @@ function tabTriggerClass(active: boolean): string {
 type EmailTemplatesResponse = {
   item: EmailTemplateConfig;
   defaults: EmailTemplateConfig;
+};
+
+type AppUpdateSettingsResponse = {
+  item: AppUpdateSettings;
+  defaults: AppUpdateSettings;
+};
+
+const localeLabels: Record<AppUpdateLocale, string> = {
+  ro: "Română",
+  en: "English",
 };
 
 export default function SettingsPage() {
@@ -119,6 +135,18 @@ export default function SettingsPage() {
   const [templateTab, setTemplateTab] = useState<TemplateTab>(
     TEMPLATE_TABS.welcome
   );
+  const {
+    data: appUpdateData,
+    loading: appUpdateLoading,
+    error: appUpdateError,
+    reload: reloadAppUpdate,
+  } = useAdminData<AppUpdateSettingsResponse>("/api/admin/app-update-settings");
+  const [appUpdateState, setAppUpdateState] = useState<AppUpdateSettings>(
+    getDefaultAppUpdateSettings()
+  );
+  const [appUpdateSaving, setAppUpdateSaving] = useState(false);
+  const [appUpdateSaveError, setAppUpdateSaveError] = useState<string | null>(null);
+  const [appUpdateSaveOk, setAppUpdateSaveOk] = useState(false);
 
   useEffect(() => {
     if (templatesData?.item) {
@@ -132,6 +160,49 @@ export default function SettingsPage() {
   ) {
     setConfig((prev) => ({ ...prev, [kind]: next }));
     setTemplatesSaveOk(false);
+  }
+
+  useEffect(() => {
+    if (appUpdateData?.item) {
+      setAppUpdateState(appUpdateData.item);
+    }
+  }, [appUpdateData]);
+
+  function updateAppUpdateField<K extends keyof AppUpdateSettings>(
+    field: K,
+    value: AppUpdateSettings[K]
+  ) {
+    setAppUpdateState((prev) => ({ ...prev, [field]: value }));
+    setAppUpdateSaveOk(false);
+  }
+
+  function updateAppUpdateLocaleField(
+    field: "title" | "body" | "primaryActionLabel",
+    locale: AppUpdateLocale,
+    value: string
+  ) {
+    setAppUpdateState((prev) => ({
+      ...prev,
+      [field]: {
+        ...prev[field],
+        [locale]: value,
+      },
+    }));
+    setAppUpdateSaveOk(false);
+  }
+
+  function updateAppUpdateUrl(
+    field: keyof AppUpdateSettings["urls"],
+    value: string
+  ) {
+    setAppUpdateState((prev) => ({
+      ...prev,
+      urls: {
+        ...prev.urls,
+        [field]: value,
+      },
+    }));
+    setAppUpdateSaveOk(false);
   }
 
   async function saveTemplates() {
@@ -156,12 +227,48 @@ export default function SettingsPage() {
     }
   }
 
+  async function saveAppUpdateSettings() {
+    setAppUpdateSaving(true);
+    setAppUpdateSaveError(null);
+    try {
+      const res = await adminFetch("/api/admin/app-update-settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(appUpdateState),
+      });
+
+      if (!res.ok) {
+        throw new Error(
+          await readAdminResponseError(
+            res,
+            "Nu am putut salva setările de actualizare."
+          )
+        );
+      }
+
+      const json = await res.json();
+      if (json?.item) {
+        setAppUpdateState(json.item);
+      }
+      await reloadAppUpdate();
+      setAppUpdateSaveOk(true);
+    } catch (error) {
+      setAppUpdateSaveError(
+        error instanceof Error
+          ? error.message
+          : "Nu am putut salva setările de actualizare."
+      );
+    } finally {
+      setAppUpdateSaving(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold">Setări</h1>
         <p className="text-sm text-muted-foreground">
-          Configurații pentru newsletter și template-urile de email.
+          Configurații pentru newsletter, emailuri și experiența aplicației mobile.
         </p>
       </div>
 
@@ -178,6 +285,12 @@ export default function SettingsPage() {
             className={tabTriggerClass(topTab === TOP_TABS.templates)}
           >
             Template-uri email
+          </TabTrigger>
+          <TabTrigger
+            value={TOP_TABS.appUpdate}
+            className={tabTriggerClass(topTab === TOP_TABS.appUpdate)}
+          >
+            Actualizare aplicație
           </TabTrigger>
         </TabList>
 
@@ -379,6 +492,182 @@ export default function SettingsPage() {
               disabled={templatesSaving || templatesLoading}
             >
               {templatesSaving ? "Se salvează..." : "Salvează template-urile"}
+            </Button>
+          </div>
+        </TabContent>
+
+        <TabContent value={TOP_TABS.appUpdate} className="mt-6 space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Modal actualizare aplicație</CardTitle>
+              <CardDescription>
+                Controlează mesajul global afișat în aplicația Expo. Varianta
+                forțată blochează închiderea modalului.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {appUpdateError && (
+                <p className="text-sm text-rose-500">{appUpdateError}</p>
+              )}
+              {appUpdateLoading ? (
+                <AdminFormGridSkeleton fields={8} />
+              ) : (
+                <>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <label className="flex items-start gap-3 rounded-lg border border-border p-4">
+                      <input
+                        type="checkbox"
+                        className="mt-1 size-4"
+                        checked={appUpdateState.enabled}
+                        onChange={(event) =>
+                          updateAppUpdateField("enabled", event.target.checked)
+                        }
+                      />
+                      <span>
+                        <span className="block text-sm font-medium">
+                          Activează modalul
+                        </span>
+                        <span className="block text-sm text-muted-foreground">
+                          Când este activ, aplicația mobilă verifică endpointul
+                          public și afișează mesajul peste orice ecran.
+                        </span>
+                      </span>
+                    </label>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Mod afișare</label>
+                      <select
+                        className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
+                        value={appUpdateState.mode}
+                        onChange={(event) =>
+                          updateAppUpdateField(
+                            "mode",
+                            event.target.value === "force" ? "force" : "notice"
+                          )
+                        }
+                      >
+                        <option value="notice">Înștiințare</option>
+                        <option value="force">Forțare actualizare</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">
+                        Versiune afișată
+                      </label>
+                      <Input
+                        placeholder="Ex: 1.0.5"
+                        value={appUpdateState.displayVersion}
+                        onChange={(event) =>
+                          updateAppUpdateField("displayVersion", event.target.value)
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">URL iOS</label>
+                      <Input
+                        placeholder="https://apps.apple.com/..."
+                        value={appUpdateState.urls.ios}
+                        onChange={(event) =>
+                          updateAppUpdateUrl("ios", event.target.value)
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">URL Android</label>
+                      <Input
+                        placeholder="https://play.google.com/..."
+                        value={appUpdateState.urls.android}
+                        onChange={(event) =>
+                          updateAppUpdateUrl("android", event.target.value)
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">URL fallback</label>
+                      <Input
+                        placeholder="https://ainevoie.ro"
+                        value={appUpdateState.urls.fallback}
+                        onChange={(event) =>
+                          updateAppUpdateUrl("fallback", event.target.value)
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid gap-6 lg:grid-cols-2">
+                    {(["ro", "en"] as AppUpdateLocale[]).map((locale) => (
+                      <div key={locale} className="space-y-4 rounded-lg border border-border p-4">
+                        <h3 className="text-sm font-semibold">
+                          Texte {localeLabels[locale]}
+                        </h3>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Titlu</label>
+                          <Input
+                            value={appUpdateState.title[locale]}
+                            onChange={(event) =>
+                              updateAppUpdateLocaleField(
+                                "title",
+                                locale,
+                                event.target.value
+                              )
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Mesaj</label>
+                          <textarea
+                            className="min-h-28 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            value={appUpdateState.body[locale]}
+                            onChange={(event) =>
+                              updateAppUpdateLocaleField(
+                                "body",
+                                locale,
+                                event.target.value
+                              )
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">
+                            Label buton
+                          </label>
+                          <Input
+                            value={appUpdateState.primaryActionLabel[locale]}
+                            onChange={(event) =>
+                              updateAppUpdateLocaleField(
+                                "primaryActionLabel",
+                                locale,
+                                event.target.value
+                              )
+                            }
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          <div className="flex items-center justify-end gap-3">
+            {appUpdateSaveError && (
+              <p className="text-sm text-rose-500">{appUpdateSaveError}</p>
+            )}
+            {appUpdateSaveOk && !appUpdateSaveError && (
+              <p className="text-sm text-emerald-600">
+                Setările de actualizare au fost salvate.
+              </p>
+            )}
+            <Button
+              onClick={saveAppUpdateSettings}
+              disabled={appUpdateSaving || appUpdateLoading}
+            >
+              {appUpdateSaving ? "Se salvează..." : "Salvează actualizarea"}
             </Button>
           </div>
         </TabContent>

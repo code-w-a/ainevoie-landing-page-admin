@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/adminAuth", () => ({
-  requireAdmin: vi.fn().mockResolvedValue({ uid: "admin-uid" }),
+  requireAdmin: vi.fn().mockResolvedValue({
+    uid: "admin-uid",
+    idToken: "admin-token",
+  }),
   requireAdminOrSupport: vi.fn().mockResolvedValue({
     uid: "admin-uid",
     idToken: "admin-token",
@@ -163,5 +166,54 @@ describe("admin provider callable proxy routes", () => {
         }),
       })
     );
+  });
+
+  it("proxies provider deletion to adminDeleteProvider", async () => {
+    vi.mocked(fetch).mockReturnValueOnce(
+      jsonResponse({ result: { providerId: "provider-1", deleted: true } }) as ReturnType<typeof fetch>
+    );
+
+    const { DELETE } = await import("../[id]/route");
+    const response = await DELETE(
+      new Request("https://example.com/api/admin/providers/provider-1", {
+        method: "DELETE",
+      }),
+      { params: Promise.resolve({ id: "provider-1" }) }
+    );
+    const json = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(json).toEqual({ providerId: "provider-1", deleted: true });
+    expect(fetch).toHaveBeenCalledWith(
+      "https://europe-west1-test-project.cloudfunctions.net/adminDeleteProvider",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          data: {
+            providerId: "provider-1",
+            adminUid: "admin-uid",
+            adminApiKey: "admin-secret",
+          },
+        }),
+      })
+    );
+  });
+
+  it("propagates provider deletion callable errors", async () => {
+    vi.mocked(fetch).mockReturnValueOnce(
+      jsonResponse({ error: { message: "Only admin users can delete providers." } }, 403) as ReturnType<typeof fetch>
+    );
+
+    const { DELETE } = await import("../[id]/route");
+    const response = await DELETE(
+      new Request("https://example.com/api/admin/providers/provider-1", {
+        method: "DELETE",
+      }),
+      { params: Promise.resolve({ id: "provider-1" }) }
+    );
+    const json = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(json.error).toBe("Only admin users can delete providers.");
   });
 });

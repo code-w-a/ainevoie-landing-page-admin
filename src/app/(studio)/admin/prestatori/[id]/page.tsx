@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import {
   AlertTriangle,
   BriefcaseBusiness,
@@ -21,6 +21,7 @@ import {
   RotateCcw,
   ShieldCheck,
   Star,
+  Trash2,
   UserRound,
   XCircle,
 } from "lucide-react";
@@ -770,6 +771,78 @@ function ReviewDecisionDialog({
   );
 }
 
+function DeleteProviderDialog({
+  providerId,
+  providerName,
+  open,
+  loading,
+  error,
+  onOpenChange,
+  onConfirm,
+}: {
+  providerId: string;
+  providerName: string;
+  open: boolean;
+  loading: boolean;
+  error: string | null;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: () => Promise<boolean>;
+}) {
+  const [confirmation, setConfirmation] = useState("");
+  const canConfirm = confirmation.trim() === providerId;
+
+  useEffect(() => {
+    if (open) setConfirmation("");
+  }, [open, providerId]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg" onPointerDownOutside={(event) => loading && event.preventDefault()}>
+        <DialogHeader>
+          <DialogTitle>Șterge definitiv prestatorul</DialogTitle>
+          <DialogDescription>
+            Această acțiune șterge contul Firebase Auth, profilul prestatorului, snapshot-ul public,
+            serviciile, disponibilitatea și fișierele încărcate. Istoricul de audit și programările rămân păstrate.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm">
+          <p className="font-medium">{providerName}</p>
+          <p className="mt-1 text-muted-foreground">Cod intern: {providerId}</p>
+        </div>
+        <div>
+          <label className="mb-2 inline-block text-sm font-medium">
+            Tastează codul intern pentru confirmare
+          </label>
+          <input
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            value={confirmation}
+            disabled={loading}
+            onChange={(event) => setConfirmation(event.target.value)}
+            placeholder={providerId}
+          />
+        </div>
+        {error && <p className="text-sm text-rose-500">{error}</p>}
+        <DialogFooter>
+          <Button type="button" variant="outline" disabled={loading} onClick={() => onOpenChange(false)}>
+            Anulează
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            disabled={loading || !canConfirm}
+            onClick={async () => {
+              const done = await onConfirm();
+              if (done) onOpenChange(false);
+            }}
+          >
+            {loading ? "Se șterge..." : "Șterge definitiv"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function FieldValue({
   label,
   value,
@@ -844,14 +917,18 @@ function AvatarPreview({
 
 export default function ProviderDetailPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const id = Array.isArray(params?.id) ? params.id[0] : params?.id;
 
   const [data, setData] = useState<ProviderCase | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [dialogAction, setDialogAction] = useState<ReviewAction | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [documentPreviewOpen, setDocumentPreviewOpen] = useState(false);
   const [documentPreviewTitle, setDocumentPreviewTitle] = useState("");
   const [documentPreviewUrl, setDocumentPreviewUrl] = useState<string | null>(null);
@@ -997,6 +1074,28 @@ export default function ProviderDetailPage() {
     }
   }
 
+  async function deleteProvider() {
+    if (!id) return false;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const res = await adminFetch(`/api/admin/providers/${id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        throw new Error(await readAdminResponseError(res, "Nu am putut șterge prestatorul."));
+      }
+      router.replace("/admin/prestatori");
+      router.refresh();
+      return true;
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Nu am putut șterge prestatorul.");
+      return false;
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   async function openDocumentPreview(documentType: ProviderDocumentType, title: string) {
     if (!id) return;
     if (documentPreviewUrl) {
@@ -1130,6 +1229,15 @@ export default function ProviderDetailPage() {
     provider.status === "pending_review" || provider.status === "approved";
   const shortBioWarning =
     shouldValidatePublicProfileCopy && isShortOrTestDescription(profile.shortBio);
+  const approvalBlockedReasons = [
+    !profileOk ? "profil profesional incomplet" : "",
+    !profile.avatarPath ? "poza de profil lipsește" : "",
+    !identityMeta.ok ? "act de identitate lipsă" : "",
+    !professionalMeta.ok ? "document profesional/firmă lipsă" : "",
+    !availabilityOk ? "disponibilitate neconfigurată" : "",
+    activeServices.length === 0 ? "serviciu principal/serviciu activ lipsă" : "",
+  ].filter(Boolean);
+  const isApproveBlocked = approvalBlockedReasons.length > 0;
 
   return (
     <div className="space-y-6">
@@ -1202,7 +1310,7 @@ export default function ProviderDetailPage() {
                     <Button
                       key={action}
                       variant={meta.destructive ? "destructive" : "default"}
-                      disabled={saving}
+                      disabled={saving || (action === "approve" && isApproveBlocked)}
                       onClick={() => setDialogAction(action)}
                     >
                       <Icon className="h-4 w-4" />
@@ -1210,10 +1318,27 @@ export default function ProviderDetailPage() {
                     </Button>
                   );
                 })}
+                <Button
+                  type="button"
+                  variant="destructive"
+                  disabled={saving || deleting}
+                  onClick={() => {
+                    setDeleteError(null);
+                    setDeleteDialogOpen(true);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Șterge prestator
+                </Button>
               </div>
               {availableActions.length === 0 && (
                 <p className="text-right text-xs text-muted-foreground">
                   Nu există acțiuni administrative pentru statusul curent.
+                </p>
+              )}
+              {isApproveBlocked && availableActions.includes("approve") && (
+                <p className="max-w-sm text-right text-xs text-amber-700">
+                  Aprobarea este blocată până se completează: {approvalBlockedReasons.join(", ")}.
                 </p>
               )}
             </div>
@@ -1373,7 +1498,7 @@ export default function ProviderDetailPage() {
                     <Button
                       key={action}
                       variant={meta.destructive ? "destructive" : "default"}
-                      disabled={saving}
+                      disabled={saving || (action === "approve" && isApproveBlocked)}
                       onClick={() => setDialogAction(action)}
                     >
                       <Icon className="h-4 w-4" />
@@ -1381,7 +1506,24 @@ export default function ProviderDetailPage() {
                     </Button>
                   );
                 })}
+                <Button
+                  type="button"
+                  variant="destructive"
+                  disabled={saving || deleting}
+                  onClick={() => {
+                    setDeleteError(null);
+                    setDeleteDialogOpen(true);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Șterge prestator
+                </Button>
               </div>
+            )}
+            {isApproveBlocked && availableActions.includes("approve") && (
+              <p className="text-sm text-amber-700">
+                Aprobarea este blocată până se completează: {approvalBlockedReasons.join(", ")}.
+              </p>
             )}
           </CardContent>
         </Card>
@@ -1623,6 +1765,23 @@ export default function ProviderDetailPage() {
           if (!dialogAction) return false;
           return submitReview(dialogAction, reason);
         }}
+      />
+
+      <DeleteProviderDialog
+        providerId={providerId}
+        providerName={displayName}
+        open={deleteDialogOpen}
+        loading={deleting}
+        error={deleteError}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteDialogOpen(false);
+            setDeleteError(null);
+            return;
+          }
+          setDeleteDialogOpen(true);
+        }}
+        onConfirm={deleteProvider}
       />
 
       <Dialog open={documentPreviewOpen} onOpenChange={closeDocumentPreview}>

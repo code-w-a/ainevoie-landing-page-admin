@@ -183,6 +183,7 @@ export default function ProviderOnboardingFormWizard({
   const apiErrors = useTranslations("ApiErrors");
   const locale = useLocale();
   const router = useRouter();
+  const defaultPhoneCountry = useMemo(() => (locale === "en" ? "GB" : "RO"), [locale]);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [citySearch, setCitySearch] = useState("");
@@ -1181,7 +1182,10 @@ export default function ProviderOnboardingFormWizard({
                 render={({ field }) => (
                   <PhoneInput
                     international
-                    defaultCountry="RO"
+                    // Re-mount on locale change so the flag + calling code update immediately.
+                    key={defaultPhoneCountry}
+                    defaultCountry={defaultPhoneCountry}
+                    focusInputOnCountrySelection={false}
                     countryCallingCodeEditable
                     placeholder={t("phonePh")}
                     disabled={Boolean(providerUid)}
@@ -1196,7 +1200,6 @@ export default function ProviderOnboardingFormWizard({
                       id: "provider-phone-input",
                       name: field.name,
                       onBlur: field.onBlur,
-                      ref: field.ref,
                       className:
                         "min-w-[12rem] flex-1 rounded-md border-0 bg-transparent px-2 py-2 text-base outline-none placeholder:text-muted-foreground disabled:opacity-60 dark:text-white",
                     }}
