@@ -35,7 +35,7 @@ const validPayload = {
   fullName: "Provider Test",
   legalStatus: "need_guidance",
   password: "Passw0rd!",
-  phone: "0700000000",
+  phone: "+40700000000",
   serviceType: "Curatenie birouri",
 };
 
@@ -240,6 +240,7 @@ describe("POST /api/providers/onboarding", () => {
     await expect(response.json()).resolves.toMatchObject({
       status: "created",
       uid: "provider-uid",
+      welcomeEmailSent: false,
     });
     expect(createUser).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -281,7 +282,7 @@ describe("POST /api/providers/onboarding", () => {
           messages: true,
           promoSystem: true,
         },
-        phoneNumber: "0700000000",
+        phoneNumber: "+40700000000",
         adminReview: {
           action: null,
           reason: null,
@@ -323,6 +324,8 @@ describe("POST /api/providers/onboarding", () => {
         status: "pre_registered",
         suspension: null,
         onboardingStatus: "pre_registered",
+        welcomeEmailSent: false,
+        welcomeEmailError: null,
         privacyAcceptedAt: expect.anything(),
         privacyVersion: "v1",
         termsAcceptedAt: expect.anything(),
@@ -341,5 +344,6 @@ describe("POST /api/providers/onboarding", () => {
         type: "status_changed",
       }),
     );
+    expect(mocks.sendEmail).not.toHaveBeenCalled();
   });
 });

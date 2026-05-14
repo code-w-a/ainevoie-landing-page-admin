@@ -576,6 +576,41 @@ export default function ProviderOnboardingFormWizard({
     }
   }
 
+  const triggerWelcomeEmailSend = useCallback(async () => {
+    const currentUser = getFirebaseAuth().currentUser;
+    if (!currentUser) {
+      logOnboardingClient("welcome email trigger skipped: missing authenticated provider user");
+      return false;
+    }
+
+    try {
+      const idToken = await currentUser.getIdToken();
+      const response = await axios.post<{ sent?: boolean; alreadySent?: boolean }>(
+        "/api/providers/onboarding/welcome-email",
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${idToken}`,
+            "x-next-intl-locale": locale,
+          },
+        },
+      );
+
+      const sent = response.data?.sent === true;
+      logOnboardingClient("welcome email trigger completed", {
+        uid: currentUser.uid,
+        sent,
+        alreadySent: response.data?.alreadySent === true,
+      });
+      return sent;
+    } catch (error) {
+      logOnboardingClientError("welcome email trigger failed", error, {
+        uid: currentUser.uid,
+      });
+      return false;
+    }
+  }, [locale]);
+
   async function uploadSlot(
     label: string,
     slot: FileSlot,
@@ -878,6 +913,10 @@ export default function ProviderOnboardingFormWizard({
       };
 
       logOnboardingClient("pre-registration uploads finalized", submitPayloadSummary);
+      const welcomeEmailSent = await triggerWelcomeEmailSend();
+      if (!welcomeEmailSent) {
+        toast(t("welcomeEmailNotSent"), { duration: 6000 });
+      }
       logOnboardingClient("final submit completed");
       toast.success(t("toastSuccess"));
       router.push("/providers/onboarding/success");

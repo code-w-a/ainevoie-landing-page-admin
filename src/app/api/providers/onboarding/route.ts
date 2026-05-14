@@ -4,7 +4,6 @@ import { isValidPhoneNumber } from "libphonenumber-js";
 import { type AppLocale, getRequestLocale } from "@/lib/apiLocale";
 import { getApiErrorMessage } from "@/lib/apiMessages";
 import { getAdminAuth, getAdminDb } from "@/lib/firebaseAdmin";
-import { sendEmail } from "@/lib/email";
 import { captureServerException } from "@/lib/sentryServer";
 import {
   PROVIDER_LAUNCH_CONTACT_CONSENT_VERSION,
@@ -20,8 +19,6 @@ import {
   normalizeRomaniaLocationCode,
   normalizeRomaniaLocationName,
 } from "@/lib/romaniaLocations";
-import { renderTemplate } from "@/lib/emailTemplates/adminEmailTemplates";
-import { getEmailTemplateConfig } from "@/lib/emailTemplates/adminEmailTemplatesServer";
 import type {
   ProviderLegalStatus,
   ProviderNewsletterStatusAtSignup,
@@ -56,57 +53,6 @@ function normalize(value?: string) {
 
 function normalizeEmail(value?: string) {
   return normalize(value).toLowerCase();
-}
-
-type WelcomeEmailResult = {
-  sent: boolean;
-  errorMessage?: string;
-};
-
-async function sendWelcomeEmail(
-  email: string,
-  fullName: string,
-  locale: AppLocale,
-  emailVerificationLink?: string | null,
-): Promise<WelcomeEmailResult> {
-  try {
-    const config = await getEmailTemplateConfig();
-    const rendered = renderTemplate({
-      kind: "providerWelcome",
-      locale,
-      config,
-      vars: { fullName, email },
-    });
-    let html = rendered.html;
-    let text = rendered.text;
-
-    if (emailVerificationLink && emailVerificationLink.startsWith("http")) {
-      const href = emailVerificationLink.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
-      if (locale === "en") {
-        html +=
-          `<p style="margin-top:18px;line-height:1.5;"><strong>Confirm your email address</strong></p>` +
-          `<p>Please verify that this inbox belongs to you: <a href="${href}" style="color:#d35400;font-weight:600;">Verify email address</a></p>`;
-        text += `\n\nConfirm your email address: ${emailVerificationLink}\n`;
-      } else {
-        html +=
-          `<p style="margin-top:18px;line-height:1.5;"><strong>Confirmă adresa de email</strong></p>` +
-          `<p>Te rugăm să confirmi că acest inbox îți aparține: <a href="${href}" style="color:#d35400;font-weight:600;">Verifică adresa de email</a></p>`;
-        text += `\n\nConfirmă adresa de email: ${emailVerificationLink}\n`;
-      }
-    }
-
-    await sendEmail({
-      to: email,
-      subject: rendered.subject,
-      html,
-      text,
-    });
-    return { sent: true };
-  } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : "welcome_email_failed";
-    return { sent: false, errorMessage };
-  }
 }
 
 function jsonError(locale: AppLocale, code: string, status: number) {
@@ -291,29 +237,6 @@ export async function POST(request: Request) {
       throw error;
     }
 
-    let emailVerificationLink: string | null = null;
-    try {
-      emailVerificationLink = await auth.generateEmailVerificationLink(email);
-    } catch (err) {
-      logProviderOnboardingApiError(err, {
-        uid: userRecord.uid,
-        stage: "email_verification_link",
-        emailDomain: getEmailDomain(email),
-      });
-    }
-
-    const welcomeEmailResult = await sendWelcomeEmail(
-      email,
-      fullName,
-      locale,
-      emailVerificationLink,
-    );
-    logProviderOnboardingApi("welcome email attempted", {
-      uid: userRecord.uid,
-      sent: welcomeEmailResult.sent,
-      errorMessage: welcomeEmailResult.errorMessage || null,
-    });
-
     let newsletterStatusAtSignup: ProviderNewsletterStatusAtSignup = "skipped";
     let newsletterError: string | null = null;
 
@@ -494,8 +417,8 @@ export async function POST(request: Request) {
       : null,
       onboardingStatus: "pre_registered",
       source: "landing_onboarding",
-      welcomeEmailSent: welcomeEmailResult.sent,
-      welcomeEmailError: welcomeEmailResult.errorMessage || null,
+      welcomeEmailSent: false,
+      welcomeEmailError: null,
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     });
@@ -533,7 +456,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       status: "created",
       uid: userRecord.uid,
-      welcomeEmailSent: welcomeEmailResult.sent,
+      welcomeEmailSent: false,
       newsletterStatusAtSignup,
     });
   } catch (error) {
