@@ -171,11 +171,26 @@ describe("POST /api/providers/onboarding/welcome-email", () => {
       alreadySent: false,
     });
     expect(mocks.sendEmail).toHaveBeenCalledTimes(1);
+    expect(mocks.sendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: "provider@example.com",
+        subject: "Subject",
+      }),
+      expect.objectContaining({
+        channel: "provider_onboarding_welcome",
+        templateKind: "providerWelcome",
+        requestId: expect.any(String),
+      }),
+    );
     expect(db.set).toHaveBeenCalledWith(
       expect.objectContaining({
         welcomeEmailSent: true,
         welcomeEmailError: null,
         welcomeEmailSentAt: expect.anything(),
+        welcomeEmailLastAttemptAt: expect.anything(),
+        welcomeEmailLastOutcome: "success",
+        welcomeEmailLastErrorCode: null,
+        welcomeEmailLastErrorMessage: null,
       }),
       { merge: true },
     );
@@ -210,6 +225,10 @@ describe("POST /api/providers/onboarding/welcome-email", () => {
       expect.objectContaining({
         welcomeEmailSent: false,
         welcomeEmailError: "smtp down",
+        welcomeEmailLastAttemptAt: expect.anything(),
+        welcomeEmailLastOutcome: "failed",
+        welcomeEmailLastErrorCode: "UNKNOWN",
+        welcomeEmailLastErrorMessage: "smtp down",
       }),
       { merge: true },
     );

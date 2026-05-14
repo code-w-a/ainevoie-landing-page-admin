@@ -209,17 +209,18 @@ describe("admin provider callable proxy routes", () => {
       "https://europe-west1-test-project.cloudfunctions.net/adminReviewProvider",
       expect.objectContaining({
         method: "POST",
-        body: JSON.stringify({
-          data: {
-            providerId: "provider-1",
-            action: "suspend",
-            reason: "Document expirat",
-            adminUid: "admin-uid",
-            adminApiKey: "admin-secret",
-          },
-        }),
+        body: expect.any(String),
       })
     );
+    const reviewBody = JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body || "{}"));
+    expect(reviewBody.data).toMatchObject({
+      providerId: "provider-1",
+      action: "suspend",
+      reason: "Document expirat",
+      adminUid: "admin-uid",
+      adminApiKey: "admin-secret",
+    });
+    expect(reviewBody.data.reviewCorrelationId).toEqual(expect.any(String));
   });
 
   it("sends providerApproved email after a successful approve action", async () => {
@@ -255,7 +256,13 @@ describe("admin provider callable proxy routes", () => {
       expect.objectContaining({
         to: "provider@example.com",
         subject: "Cont aprobat",
-      })
+      }),
+      expect.objectContaining({
+        channel: "provider_approved",
+        templateKind: "providerApproved",
+        requestId: expect.any(String),
+        correlationId: expect.any(String),
+      }),
     );
   });
 

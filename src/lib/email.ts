@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import { createHash, randomUUID } from "node:crypto";
 
 type EmailPayload = {
   to: string;
@@ -6,6 +7,18 @@ type EmailPayload = {
   html: string;
   text?: string;
   replyTo?: string;
+};
+
+type EmailSendContext = {
+  channel?: string;
+  templateKind?: string;
+  requestId?: string;
+  correlationId?: string;
+  route?: string;
+  providerId?: string;
+  action?: string;
+  statusFrom?: string;
+  statusTo?: string;
 };
 
 type SmtpConfig = {
@@ -19,6 +32,7 @@ type SmtpConfig = {
 
 let cachedTransporter: nodemailer.Transporter | null = null;
 let cachedTransportKey = "";
+const LOG_PREFIX = "[email]";
 
 function getRequiredEnv(name: string): string {
   const value = process.env[name]?.trim();
@@ -99,12 +113,154 @@ function getTransporter(config: SmtpConfig): nodemailer.Transporter {
   return cachedTransporter;
 }
 
-export const sendEmail = async (data: EmailPayload) => {
+function maskEmail(value: string): string {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (!normalized) {
+    return "";
+  }
+
+  const [localPartRaw, domainPartRaw] = normalized.split("@");
+  const localPart = localPartRaw || "";
+  const domainPart = domainPartRaw || "";
+
+  if (!domainPart) {
+    if (localPart.length <= 2) {
+      return `${localPart[0] || "*"}***`;
+    }
+    return `${localPart.slice(0, 2)}***`;
+  }
+
+  const visibleLocal = localPart.slice(0, 2) || localPart.slice(0, 1) || "*";
+  return `${visibleLocal}***@${domainPart}`;
+}
+
+function hashEmail(value: string): string {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (!normalized) {
+    return "";
+  }
+
+  return createHash("sha256").update(normalized).digest("hex");
+}
+
+function getAcceptedCount(info: nodemailer.SentMessageInfo): number {
+  if (!Array.isArray(info.accepted)) {
+    return 0;
+  }
+
+  return info.accepted.length;
+}
+
+function getRejectedCount(info: nodemailer.SentMessageInfo): number {
+  if (!Array.isArray(info.rejected)) {
+    return 0;
+  }
+
+  return info.rejected.length;
+}
+
+function readErrorCode(error: unknown): string {
+  const code = (error as { code?: unknown })?.code;
+  if (typeof code === "string" && code.trim()) {
+    return code.trim();
+  }
+
+  return "UNKNOWN";
+}
+
+function readErrorResponseCode(error: unknown): number | null {
+  const responseCode = (error as { responseCode?: unknown })?.responseCode;
+  if (typeof responseCode === "number" && Number.isFinite(responseCode)) {
+    return responseCode;
+  }
+
+  return null;
+}
+
+function readErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.trim().slice(0, 500);
+}
+
+export const sendEmail = async (data: EmailPayload, context: EmailSendContext = {}) => {
   const smtpConfig = getSmtpConfig();
   const transporter = getTransporter(smtpConfig);
+  const startedAt = Date.now();
+  const requestId = context.requestId || randomUUID();
+  const recipientMasked = maskEmail(data.to);
+  const recipientHash = hashEmail(data.to);
+  const channel = context.channel || "generic";
+  const templateKind = context.templateKind || null;
 
-  return await transporter.sendMail({
-    from: smtpConfig.from,
-    ...data,
+  console.info(`${LOG_PREFIX} email_send_start`, {
+    event: "email_send_start",
+    channel,
+    templateKind,
+    requestId,
+    correlationId: context.correlationId || null,
+    route: context.route || null,
+    providerId: context.providerId || null,
+    action: context.action || null,
+    statusFrom: context.statusFrom || null,
+    statusTo: context.statusTo || null,
+    recipientMasked,
+    recipientHash,
+    smtpHost: smtpConfig.host,
+    smtpPort: smtpConfig.port,
+    secure: smtpConfig.secure,
   });
+
+  try {
+    const info = await transporter.sendMail({
+      from: smtpConfig.from,
+      ...data,
+    });
+
+    console.info(`${LOG_PREFIX} email_send_success`, {
+      event: "email_send_success",
+      channel,
+      templateKind,
+      requestId,
+      correlationId: context.correlationId || null,
+      route: context.route || null,
+      providerId: context.providerId || null,
+      action: context.action || null,
+      statusFrom: context.statusFrom || null,
+      statusTo: context.statusTo || null,
+      recipientMasked,
+      recipientHash,
+      smtpHost: smtpConfig.host,
+      smtpPort: smtpConfig.port,
+      secure: smtpConfig.secure,
+      durationMs: Date.now() - startedAt,
+      messageId: info.messageId || null,
+      acceptedCount: getAcceptedCount(info),
+      rejectedCount: getRejectedCount(info),
+    });
+
+    return info;
+  } catch (error) {
+    console.error(`${LOG_PREFIX} email_send_failure`, {
+      event: "email_send_failure",
+      channel,
+      templateKind,
+      requestId,
+      correlationId: context.correlationId || null,
+      route: context.route || null,
+      providerId: context.providerId || null,
+      action: context.action || null,
+      statusFrom: context.statusFrom || null,
+      statusTo: context.statusTo || null,
+      recipientMasked,
+      recipientHash,
+      smtpHost: smtpConfig.host,
+      smtpPort: smtpConfig.port,
+      secure: smtpConfig.secure,
+      durationMs: Date.now() - startedAt,
+      errorCode: readErrorCode(error),
+      responseCode: readErrorResponseCode(error),
+      errorMessage: readErrorMessage(error),
+    });
+    throw error;
+  }
 };

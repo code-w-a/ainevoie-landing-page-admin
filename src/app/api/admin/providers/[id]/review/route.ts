@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { randomUUID } from "node:crypto";
 import { adminAuthErrorResponse, requireAdmin } from "@/lib/adminAuth";
 import { AdminCallableError, callAdminCallable } from "@/lib/adminCallables";
 import { sendEmail } from "@/lib/email";
@@ -6,6 +7,7 @@ import { renderTemplate } from "@/lib/emailTemplates/adminEmailTemplates";
 import { getEmailTemplateConfig } from "@/lib/emailTemplates/adminEmailTemplatesServer";
 import { getAdminDb } from "@/lib/firebaseAdmin";
 import { captureServerException } from "@/lib/sentryServer";
+const ROUTE_TAG = "[admin-provider-review]";
 
 const REVIEW_ACTIONS = ["approve", "reject", "suspend", "reinstate"] as const;
 type ReviewAction = (typeof REVIEW_ACTIONS)[number];
@@ -22,13 +24,25 @@ function resolveProviderLocale(value: unknown): "ro" | "en" {
   return value === "en" ? "en" : "ro";
 }
 
-async function trySendProviderApprovedEmail(providerId: string) {
+async function trySendProviderApprovedEmail({
+  providerId,
+  reviewCorrelationId,
+  action,
+  statusTo,
+}: {
+  providerId: string;
+  reviewCorrelationId: string;
+  action: ReviewAction;
+  statusTo: string;
+}) {
   try {
     const providerSnap = await getAdminDb().collection("providers").doc(providerId).get();
     const providerData = providerSnap.exists ? providerSnap.data() || {} : null;
+    const statusFrom = sanitizeText(providerData?.status);
 
     if (!providerData) {
-      console.warn("[admin-provider-review] provider approved email skipped: provider missing", {
+      console.warn(`${ROUTE_TAG} provider_approved_email_skipped_provider_missing`, {
+        reviewCorrelationId,
         providerId,
       });
       return;
@@ -37,7 +51,8 @@ async function trySendProviderApprovedEmail(providerId: string) {
     const providerEmail = sanitizeText(providerData.email).toLowerCase();
 
     if (!providerEmail || !providerEmail.includes("@")) {
-      console.warn("[admin-provider-review] provider approved email skipped: invalid email", {
+      console.warn(`${ROUTE_TAG} provider_approved_email_skipped_invalid_email`, {
+        reviewCorrelationId,
         providerId,
       });
       return;
@@ -59,20 +74,40 @@ async function trySendProviderApprovedEmail(providerId: string) {
       },
     });
 
+    console.info(`${ROUTE_TAG} provider_approved_email_send_attempt`, {
+      reviewCorrelationId,
+      providerId,
+      action,
+      statusFrom,
+      statusTo,
+      locale,
+    });
+
     await sendEmail({
       to: providerEmail,
       subject: rendered.subject,
       html: rendered.html,
       text: rendered.text,
+    }, {
+      channel: "provider_approved",
+      templateKind: "providerApproved",
+      requestId: reviewCorrelationId,
+      correlationId: reviewCorrelationId,
+      route: "api/admin/providers/[id]/review",
+      providerId,
+      action,
+      statusFrom,
+      statusTo,
     });
 
-    console.info("[admin-provider-review] provider approved email sent", {
+    console.info(`${ROUTE_TAG} provider_approved_email_sent`, {
+      reviewCorrelationId,
       providerId,
       locale,
-      to: providerEmail,
     });
   } catch (error) {
-    console.error("[admin-provider-review] provider approved email failed", {
+    console.error(`${ROUTE_TAG} provider_approved_email_failed`, {
+      reviewCorrelationId,
       providerId,
       error: error instanceof Error ? error.message : String(error),
     });
@@ -85,12 +120,14 @@ export async function POST(
 ) {
   try {
     const admin = await requireAdmin(request);
+    const reviewCorrelationId = randomUUID();
     const { id } = await context.params;
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
     const action = body.action;
     const reason = typeof body.reason === "string" ? body.reason.trim() : "";
 
-    console.info("[admin-provider-review] review request", {
+    console.info(`${ROUTE_TAG} review_request`, {
+      reviewCorrelationId,
       adminUid: admin.uid,
       providerId: id,
       action,
@@ -98,7 +135,8 @@ export async function POST(
     });
 
     if (!isReviewAction(action)) {
-      console.warn("[admin-provider-review] invalid action", {
+      console.warn(`${ROUTE_TAG} review_invalid_action`, {
+        reviewCorrelationId,
         providerId: id,
         action,
       });
@@ -106,7 +144,8 @@ export async function POST(
     }
 
     if ((action === "reject" || action === "suspend") && !reason) {
-      console.warn("[admin-provider-review] missing reason", {
+      console.warn(`${ROUTE_TAG} review_missing_reason`, {
+        reviewCorrelationId,
         providerId: id,
         action,
       });
@@ -123,14 +162,27 @@ export async function POST(
         action,
         reason: reason || undefined,
         adminUid: admin.uid,
+        reviewCorrelationId,
       },
       "Nu am putut procesa decizia pentru prestator.",
       admin.idToken
     );
 
     const resultStatus = sanitizeText((result as Record<string, unknown>)?.status);
+    console.info(`${ROUTE_TAG} review_result`, {
+      reviewCorrelationId,
+      providerId: id,
+      action,
+      statusTo: resultStatus || null,
+    });
+
     if (action === "approve" && resultStatus === "approved") {
-      await trySendProviderApprovedEmail(id);
+      await trySendProviderApprovedEmail({
+        providerId: id,
+        reviewCorrelationId,
+        action,
+        statusTo: resultStatus,
+      });
     }
 
     return NextResponse.json(result);
@@ -141,14 +193,14 @@ export async function POST(
     }
 
     if (error instanceof AdminCallableError) {
-      console.error("[admin-provider-review] callable error", {
+      console.error(`${ROUTE_TAG} review_callable_error`, {
         status: error.status,
         message: error.message,
       });
       return NextResponse.json({ error: error.message }, { status: error.status });
     }
 
-    console.error("[admin-provider-review] route error", error);
+    console.error(`${ROUTE_TAG} review_route_error`, error);
     captureServerException(error, { route: "api/admin/providers/[id]/review/route.ts" });
     return NextResponse.json(
       {

@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
+import { randomUUID } from "node:crypto";
 import { getRequestLocale, type AppLocale } from "@/lib/apiLocale";
 import { sendEmail } from "@/lib/email";
 import { renderTemplate } from "@/lib/emailTemplates/adminEmailTemplates";
 import { getEmailTemplateConfig } from "@/lib/emailTemplates/adminEmailTemplatesServer";
 import { getAdminAuth, getAdminDb } from "@/lib/firebaseAdmin";
 import { captureServerException } from "@/lib/sentryServer";
+const ROUTE_TAG = "[provider-onboarding-welcome-email]";
 
 function readBearerToken(request: Request) {
   const authHeader = request.headers.get("authorization") || "";
@@ -22,6 +24,19 @@ function resolveProviderLocale(value: unknown): AppLocale {
 
 function isValidEmail(value: string) {
   return value.includes("@");
+}
+
+function readErrorCode(error: unknown): string {
+  const code = (error as { code?: unknown })?.code;
+  if (typeof code === "string" && code.trim()) {
+    return code.trim();
+  }
+
+  return "UNKNOWN";
+}
+
+function readErrorMessage(error: unknown): string {
+  return (error instanceof Error ? error.message : String(error)).trim().slice(0, 500);
 }
 
 function getLocalizedErrorMessage(locale: AppLocale, key: "unauthorized" | "providerMissing" | "providerEmailMissing" | "serverError") {
@@ -69,10 +84,20 @@ function appendVerificationLinkContent(
 }
 
 export async function POST(request: Request) {
+  const requestId = randomUUID();
   const requestLocale = getRequestLocale(request);
   const token = readBearerToken(request);
 
+  console.info(`${ROUTE_TAG} request_start`, {
+    requestId,
+    locale: requestLocale,
+    hasBearerToken: Boolean(token),
+  });
+
   if (!token) {
+    console.warn(`${ROUTE_TAG} auth_missing_token`, {
+      requestId,
+    });
     return NextResponse.json(
       { error: getLocalizedErrorMessage(requestLocale, "unauthorized"), code: "UNAUTHORIZED" },
       { status: 401 },
@@ -82,7 +107,16 @@ export async function POST(request: Request) {
   let decodedToken: { uid: string };
   try {
     decodedToken = await getAdminAuth().verifyIdToken(token) as { uid: string };
-  } catch {
+    console.info(`${ROUTE_TAG} auth_verified`, {
+      requestId,
+      uid: decodedToken.uid,
+    });
+  } catch (error) {
+    console.warn(`${ROUTE_TAG} auth_invalid_token`, {
+      requestId,
+      errorCode: readErrorCode(error),
+      errorMessage: readErrorMessage(error),
+    });
     return NextResponse.json(
       { error: getLocalizedErrorMessage(requestLocale, "unauthorized"), code: "UNAUTHORIZED" },
       { status: 401 },
@@ -93,6 +127,10 @@ export async function POST(request: Request) {
   const providerSnap = await providerRef.get();
 
   if (!providerSnap.exists) {
+    console.warn(`${ROUTE_TAG} provider_missing`, {
+      requestId,
+      uid: decodedToken.uid,
+    });
     return NextResponse.json(
       { error: getLocalizedErrorMessage(requestLocale, "providerMissing"), code: "PROVIDER_NOT_FOUND" },
       { status: 404 },
@@ -101,7 +139,18 @@ export async function POST(request: Request) {
 
   const providerData = providerSnap.data() || {};
   const providerEmail = sanitizeText(providerData.email).toLowerCase();
+  console.info(`${ROUTE_TAG} provider_loaded`, {
+    requestId,
+    uid: decodedToken.uid,
+    hasEmail: Boolean(providerEmail),
+    welcomeEmailSent: providerData.welcomeEmailSent === true,
+  });
+
   if (!providerEmail || !isValidEmail(providerEmail)) {
+    console.warn(`${ROUTE_TAG} provider_email_invalid`, {
+      requestId,
+      uid: decodedToken.uid,
+    });
     return NextResponse.json(
       { error: getLocalizedErrorMessage(requestLocale, "providerEmailMissing"), code: "PROVIDER_EMAIL_INVALID" },
       { status: 400 },
@@ -109,6 +158,10 @@ export async function POST(request: Request) {
   }
 
   if (providerData.welcomeEmailSent === true) {
+    console.info(`${ROUTE_TAG} already_sent`, {
+      requestId,
+      uid: decodedToken.uid,
+    });
     return NextResponse.json({ sent: true, alreadySent: true }, { status: 200 });
   }
 
@@ -121,10 +174,17 @@ export async function POST(request: Request) {
   let emailVerificationLink: string | null = null;
   try {
     emailVerificationLink = await getAdminAuth().generateEmailVerificationLink(providerEmail);
-  } catch (error) {
-    console.warn("[provider-onboarding-welcome-email] verification link generation failed", {
+    console.info(`${ROUTE_TAG} verification_link_generated`, {
+      requestId,
       uid: decodedToken.uid,
-      message: error instanceof Error ? error.message : String(error),
+      hasLink: Boolean(emailVerificationLink),
+    });
+  } catch (error) {
+    console.warn(`${ROUTE_TAG} verification_link_failed`, {
+      requestId,
+      uid: decodedToken.uid,
+      errorCode: readErrorCode(error),
+      errorMessage: readErrorMessage(error),
     });
   }
 
@@ -143,36 +203,92 @@ export async function POST(request: Request) {
       emailVerificationLink,
     );
 
+    console.info(`${ROUTE_TAG} send_attempt`, {
+      requestId,
+      uid: decodedToken.uid,
+      locale: providerLocale,
+      templateKind: "providerWelcome",
+    });
+
     await sendEmail({
       to: providerEmail,
       subject: rendered.subject,
       html: body.html,
       text: body.text,
+    }, {
+      channel: "provider_onboarding_welcome",
+      templateKind: "providerWelcome",
+      requestId,
+      route: "api/providers/onboarding/welcome-email",
+      providerId: decodedToken.uid,
+    });
+
+    console.info(`${ROUTE_TAG} firestore_status_update_attempt`, {
+      requestId,
+      uid: decodedToken.uid,
+      outcome: "success",
     });
 
     await providerRef.set({
       welcomeEmailSent: true,
       welcomeEmailError: null,
       welcomeEmailSentAt: FieldValue.serverTimestamp(),
+      welcomeEmailLastAttemptAt: FieldValue.serverTimestamp(),
+      welcomeEmailLastOutcome: "success",
+      welcomeEmailLastErrorCode: null,
+      welcomeEmailLastErrorMessage: null,
       updatedAt: FieldValue.serverTimestamp(),
       updatedBy: decodedToken.uid,
     }, { merge: true });
 
+    console.info(`${ROUTE_TAG} request_success`, {
+      requestId,
+      uid: decodedToken.uid,
+    });
     return NextResponse.json({ sent: true, alreadySent: false }, { status: 200 });
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "welcome_email_failed";
+    const errorCode = readErrorCode(error);
+    const errorMessage = readErrorMessage(error) || "welcome_email_failed";
 
-    await providerRef.set({
-      welcomeEmailSent: false,
-      welcomeEmailError: errorMessage,
-      updatedAt: FieldValue.serverTimestamp(),
-      updatedBy: decodedToken.uid,
-    }, { merge: true });
+    console.error(`${ROUTE_TAG} request_failed`, {
+      requestId,
+      uid: decodedToken.uid,
+      errorCode,
+      errorMessage,
+    });
+
+    try {
+      console.info(`${ROUTE_TAG} firestore_status_update_attempt`, {
+        requestId,
+        uid: decodedToken.uid,
+        outcome: "failed",
+      });
+
+      await providerRef.set({
+        welcomeEmailSent: false,
+        welcomeEmailError: errorMessage,
+        welcomeEmailLastAttemptAt: FieldValue.serverTimestamp(),
+        welcomeEmailLastOutcome: "failed",
+        welcomeEmailLastErrorCode: errorCode,
+        welcomeEmailLastErrorMessage: errorMessage,
+        updatedAt: FieldValue.serverTimestamp(),
+        updatedBy: decodedToken.uid,
+      }, { merge: true });
+    } catch (statusPersistError) {
+      console.error(`${ROUTE_TAG} firestore_status_update_failed`, {
+        requestId,
+        uid: decodedToken.uid,
+        errorCode: readErrorCode(statusPersistError),
+        errorMessage: readErrorMessage(statusPersistError),
+      });
+    }
 
     captureServerException(error, {
       route: "api/providers/onboarding/welcome-email/route.ts",
       extra: {
+        requestId,
         uid: decodedToken.uid,
+        errorCode,
       },
     });
 
