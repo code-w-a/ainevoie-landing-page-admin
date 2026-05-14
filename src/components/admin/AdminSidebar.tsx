@@ -8,17 +8,27 @@ import {
   BarChart2,
   CalendarClock,
   ChevronDown,
+  CreditCard,
+  LifeBuoy,
   Mail,
+  MessageSquare,
   BriefcaseBusiness,
   LayoutDashboard,
   Settings,
+  Star,
   Users,
 } from "lucide-react";
 
 const operationsItems = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { href: "/admin/prestatori", label: "Prestatori", icon: BriefcaseBusiness },
+  { href: "/admin/utilizatori", label: "Utilizatori", icon: Users },
   { href: "/admin/programari", label: "Programări", icon: CalendarClock },
+  { href: "/admin/plati", label: "Plăți", icon: CreditCard },
+  { href: "/admin/recenzii", label: "Recenzii", icon: Star },
+  { href: "/admin/conversatii", label: "Conversații", icon: MessageSquare },
+  { href: "/admin/suport", label: "Suport", icon: LifeBuoy },
+  { href: "/admin/settings", label: "Setări", icon: Settings },
 ];
 
 const newsletterItems = [
@@ -26,7 +36,6 @@ const newsletterItems = [
   { href: "/admin/campaigns", label: "Campanii", icon: Mail },
   { href: "/admin/subscribers", label: "Abonați", icon: Users },
   { href: "/admin/logs", label: "Loguri", icon: Activity },
-  { href: "/admin/settings", label: "Setări", icon: Settings },
 ];
 
 export default function AdminSidebar() {

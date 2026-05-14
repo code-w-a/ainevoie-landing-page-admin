@@ -33,12 +33,31 @@ type BookingListItem = {
   serviceId?: string;
   scheduledStartAt?: string | null;
   scheduledEndAt?: string | null;
+  requestDetails?: {
+    estimatedHours?: number;
+    professionalsCount?: number;
+    description?: string;
+  };
+  requestResponse?: {
+    status?: string;
+    deadlineAt?: string | null;
+    answeredAt?: string | null;
+    expiredAt?: string | null;
+  };
+  pricingSnapshot?: {
+    ratePerHourPerProfessional?: number;
+    estimatedHours?: number;
+    professionalsCount?: number;
+  };
   paymentSummary?: {
     status?: string;
     method?: string;
     processor?: string;
     amount?: number;
     currency?: string;
+    estimatedHours?: number;
+    professionalsCount?: number;
+    ratePerHourPerProfessional?: number;
     transactionId?: string | null;
     stripePaymentIntentId?: string | null;
   };
@@ -70,6 +89,7 @@ const bookingStatuses = [
   "reschedule_proposed",
   "completed",
   "rejected",
+  "expired_unanswered",
   "cancelled_by_user",
   "cancelled_by_provider",
 ];
@@ -78,7 +98,7 @@ const paymentStatuses = ["unpaid", "in_progress", "paid", "failed"];
 
 function badgeVariant(status?: string | null) {
   if (status === "paid" || status === "completed" || status === "confirmed") return "success";
-  if (status === "failed" || status === "rejected" || status?.startsWith("cancelled")) return "danger";
+  if (status === "failed" || status === "rejected" || status === "expired_unanswered" || status?.startsWith("cancelled")) return "danger";
   if (status === "requested" || status === "reschedule_proposed" || status === "in_progress") return "warning";
   return "outline";
 }
@@ -99,6 +119,54 @@ function formatAmount(item: BookingListItem) {
     style: "currency",
     currency,
   }).format(amount);
+}
+
+function formatPricingContext(item: BookingListItem) {
+  const paymentAmount = Number(item.paymentSummary?.amount);
+  const rate = Number(
+    item.pricingSnapshot?.ratePerHourPerProfessional
+    ?? item.paymentSummary?.ratePerHourPerProfessional
+    ?? 0
+  );
+  const hours = Math.max(
+    1,
+    Number(
+      item.requestDetails?.estimatedHours
+      ?? item.pricingSnapshot?.estimatedHours
+      ?? item.paymentSummary?.estimatedHours
+      ?? 1
+    ) || 1
+  );
+  const professionals = Math.max(
+    1,
+    Number(
+      item.requestDetails?.professionalsCount
+      ?? item.pricingSnapshot?.professionalsCount
+      ?? item.paymentSummary?.professionalsCount
+      ?? 1
+    ) || 1
+  );
+
+  if (!Number.isFinite(rate) || rate <= 0 || !Number.isFinite(paymentAmount) || paymentAmount <= 0) {
+    return `${hours}h × ${professionals} pers`;
+  }
+
+  return `${hours}h × ${rate} × ${professionals} pers`;
+}
+
+function formatRequestResponseMeta(item: BookingListItem) {
+  const status = item.requestResponse?.status;
+  const deadlineAt = item.requestResponse?.deadlineAt;
+  if (status === "pending" && deadlineAt) {
+    return `Răspuns până la ${formatAdminDateTime(deadlineAt)}`;
+  }
+  if (status === "answered" && item.requestResponse?.answeredAt) {
+    return `Răspuns înregistrat ${formatAdminDateTime(item.requestResponse.answeredAt)}`;
+  }
+  if (status === "expired" && item.requestResponse?.expiredAt) {
+    return `Expirată ${formatAdminDateTime(item.requestResponse.expiredAt)}`;
+  }
+  return null;
 }
 
 export default function AdminBookingsPage() {
@@ -209,41 +277,53 @@ export default function AdminBookingsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {items.map((item) => (
-                  <TableRow key={item.bookingId}>
-                    <TableCell>
-                      <div className="flex items-start gap-2">
-                        <CalendarClock className="mt-0.5 h-4 w-4 text-muted-foreground" />
-                        <div>
-                          <p className="font-medium">{formatAdminDateTime(item.scheduledStartAt)}</p>
-                          <p className="text-xs text-muted-foreground">{item.bookingId}</p>
+                {items.map((item) => {
+                  const requestResponseMeta = formatRequestResponseMeta(item);
+
+                  return (
+                    <TableRow key={item.bookingId}>
+                      <TableCell>
+                        <div className="flex items-start gap-2">
+                          <CalendarClock className="mt-0.5 h-4 w-4 text-muted-foreground" />
+                          <div>
+                            <p className="font-medium">{formatAdminDateTime(item.scheduledStartAt)}</p>
+                            <p className="text-xs text-muted-foreground">{item.bookingId}</p>
+                          </div>
                         </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>{item.userSnapshot?.displayName || item.userId || "-"}</TableCell>
-                    <TableCell>{item.providerSnapshot?.displayName || item.providerId || "-"}</TableCell>
-                    <TableCell>{item.serviceSnapshot?.name || item.serviceId || "-"}</TableCell>
-                    <TableCell>
-                      <Badge variant={badgeVariant(item.status)}>{label(item.status)}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                        <Badge variant={badgeVariant(item.paymentSummary?.status)}>
-                          {label(item.paymentSummary?.status)}
-                        </Badge>
-                        <p className="text-xs text-muted-foreground">{formatAmount(item)}</p>
-                        <p className="text-xs text-muted-foreground">{label(item.paymentSummary?.processor)}</p>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button asChild size="sm" variant="outline">
-                        <Link href={`/admin/programari/${encodeURIComponent(item.bookingId)}`}>
-                          Vezi
-                        </Link>
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      </TableCell>
+                      <TableCell>{item.userSnapshot?.displayName || item.userId || "-"}</TableCell>
+                      <TableCell>{item.providerSnapshot?.displayName || item.providerId || "-"}</TableCell>
+                      <TableCell>{item.serviceSnapshot?.name || item.serviceId || "-"}</TableCell>
+                      <TableCell>
+                        <div className="mb-1 text-xs text-muted-foreground">
+                          {formatPricingContext(item)}
+                        </div>
+                        {requestResponseMeta ? (
+                          <div className="mb-1 text-xs text-muted-foreground">
+                            {requestResponseMeta}
+                          </div>
+                        ) : null}
+                        <Badge variant={badgeVariant(item.status)}>{label(item.status)}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          <Badge variant={badgeVariant(item.paymentSummary?.status)}>
+                            {label(item.paymentSummary?.status)}
+                          </Badge>
+                          <p className="text-xs text-muted-foreground">{formatAmount(item)}</p>
+                          <p className="text-xs text-muted-foreground">{label(item.paymentSummary?.processor)}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button asChild size="sm" variant="outline">
+                          <Link href={`/admin/programari/${encodeURIComponent(item.bookingId)}`}>
+                            Vezi
+                          </Link>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
                 {!items.length && (
                   <TableRow>
                     <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">

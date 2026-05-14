@@ -34,7 +34,7 @@ type AdminBookingCase = {
 
 function badgeVariant(status?: string | null) {
   if (status === "paid" || status === "completed" || status === "confirmed" || status === "success") return "success";
-  if (status === "failed" || status === "rejected" || status?.startsWith("cancelled") || status === "failure") return "danger";
+  if (status === "failed" || status === "rejected" || status === "expired_unanswered" || status?.startsWith("cancelled") || status === "failure") return "danger";
   if (status === "requested" || status === "reschedule_proposed" || status === "in_progress") return "warning";
   return "outline";
 }
@@ -57,6 +57,27 @@ function formatAmount(payment?: Record<string, any> | null) {
   }).format(amount);
 }
 
+function formatPricingContext(booking?: Record<string, any>) {
+  const pricing = booking?.pricingSnapshot || {};
+  const requestDetails = booking?.requestDetails || {};
+  const rate = Number(pricing.ratePerHourPerProfessional ?? booking?.serviceSnapshot?.baseRateAmount ?? 0);
+  const hours = Math.max(1, Number(requestDetails.estimatedHours ?? pricing.estimatedHours ?? 1) || 1);
+  const professionals = Math.max(1, Number(requestDetails.professionalsCount ?? pricing.professionalsCount ?? 1) || 1);
+
+  if (!Number.isFinite(rate) || rate <= 0) {
+    return `${hours}h × ${professionals} pers`;
+  }
+
+  return `${hours}h × ${rate} × ${professionals} pers`;
+}
+
+function formatRequestResponseStatus(status?: string | null) {
+  if (status === "pending") return "pending";
+  if (status === "answered") return "answered";
+  if (status === "expired") return "expired";
+  return "-";
+}
+
 function InfoRow({ label: rowLabel, value }: { label: string; value: unknown }) {
   return (
     <div className="rounded-md border border-border px-3 py-2">
@@ -75,6 +96,7 @@ export default function AdminBookingDetailPage() {
   const booking = data?.booking || {};
   const payment = data?.payment || booking.paymentSummary || null;
   const auditEvents = data?.recentAuditEvents || [];
+  const requestResponse = booking.requestResponse || null;
 
   return (
     <div className="space-y-6">
@@ -112,6 +134,13 @@ export default function AdminBookingDetailPage() {
                 <InfoRow label="Început" value={formatAdminDateTime(booking.scheduledStartAt)} />
                 <InfoRow label="Sfârșit" value={formatAdminDateTime(booking.scheduledEndAt)} />
                 <InfoRow label="Timezone" value={booking.timezone} />
+                <InfoRow label="SLA profil" value={requestResponse?.profile || "-"} />
+                <InfoRow label="SLA status" value={formatRequestResponseStatus(requestResponse?.status)} />
+                <InfoRow label="Deadline răspuns" value={formatAdminDateTime(requestResponse?.deadlineAt)} />
+                <InfoRow label="Răspuns la" value={formatAdminDateTime(requestResponse?.answeredAt)} />
+                <InfoRow label="Expirat la" value={formatAdminDateTime(requestResponse?.expiredAt)} />
+                <InfoRow label="Profesioniști" value={booking.requestDetails?.professionalsCount} />
+                <InfoRow label="Formulă preț" value={formatPricingContext(booking)} />
                 <InfoRow label="Descriere" value={booking.requestDetails?.description} />
               </CardContent>
             </Card>

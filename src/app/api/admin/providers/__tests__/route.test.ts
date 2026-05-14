@@ -1,5 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const mocks = vi.hoisted(() => ({
+  providerGet: vi.fn(),
+  sendEmail: vi.fn(),
+  getEmailTemplateConfig: vi.fn(),
+  renderTemplate: vi.fn(),
+}));
+
 vi.mock("@/lib/adminAuth", () => ({
   requireAdmin: vi.fn().mockResolvedValue({
     uid: "admin-uid",
@@ -20,6 +27,35 @@ vi.mock("@/lib/sentryServer", () => ({
   captureServerException: vi.fn(),
 }));
 
+vi.mock("@/lib/firebaseAdmin", () => ({
+  getAdminDb: () => ({
+    collection: () => ({
+      doc: () => ({
+        get: mocks.providerGet,
+      }),
+    }),
+  }),
+  requireEnv: (name: string) => {
+    const value = process.env[name];
+    if (!value) {
+      throw new Error(`Missing env: ${name}`);
+    }
+    return value;
+  },
+}));
+
+vi.mock("@/lib/email", () => ({
+  sendEmail: mocks.sendEmail,
+}));
+
+vi.mock("@/lib/emailTemplates/adminEmailTemplatesServer", () => ({
+  getEmailTemplateConfig: mocks.getEmailTemplateConfig,
+}));
+
+vi.mock("@/lib/emailTemplates/adminEmailTemplates", () => ({
+  renderTemplate: mocks.renderTemplate,
+}));
+
 function jsonResponse(body: unknown, status = 200) {
   return Promise.resolve(
     new Response(JSON.stringify(body), {
@@ -32,10 +68,28 @@ function jsonResponse(body: unknown, status = 200) {
 describe("admin provider callable proxy routes", () => {
   beforeEach(() => {
     vi.resetModules();
+    vi.clearAllMocks();
     vi.stubEnv("FIREBASE_PROJECT_ID", "test-project");
     vi.stubEnv("FIREBASE_REGION", "europe-west1");
     vi.stubEnv("ADMIN_API_KEY", "admin-secret");
     vi.stubGlobal("fetch", vi.fn());
+    mocks.providerGet.mockResolvedValue({
+      exists: true,
+      data: () => ({
+        email: "provider@example.com",
+        locale: "ro",
+        professionalProfile: {
+          displayName: "Provider One",
+        },
+      }),
+    });
+    mocks.getEmailTemplateConfig.mockResolvedValue({});
+    mocks.renderTemplate.mockReturnValue({
+      subject: "Cont aprobat",
+      html: "<p>approved</p>",
+      text: "approved",
+    });
+    mocks.sendEmail.mockResolvedValue(undefined);
   });
 
   it("proxies provider list filters to listAdminProviders", async () => {
@@ -166,6 +220,110 @@ describe("admin provider callable proxy routes", () => {
         }),
       })
     );
+  });
+
+  it("sends providerApproved email after a successful approve action", async () => {
+    vi.mocked(fetch).mockReturnValueOnce(
+      jsonResponse({ result: { providerId: "provider-1", status: "approved" } }) as ReturnType<typeof fetch>
+    );
+
+    const { POST } = await import("../[id]/review/route");
+    const response = await POST(
+      new Request("https://example.com/api/admin/providers/provider-1/review", {
+        method: "POST",
+        body: JSON.stringify({ action: "approve" }),
+      }),
+      { params: Promise.resolve({ id: "provider-1" }) }
+    );
+    const json = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(json).toEqual({ providerId: "provider-1", status: "approved" });
+    expect(mocks.providerGet).toHaveBeenCalledTimes(1);
+    expect(mocks.getEmailTemplateConfig).toHaveBeenCalledTimes(1);
+    expect(mocks.renderTemplate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: "providerApproved",
+        locale: "ro",
+        vars: expect.objectContaining({
+          fullName: "Provider One",
+          email: "provider@example.com",
+        }),
+      })
+    );
+    expect(mocks.sendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: "provider@example.com",
+        subject: "Cont aprobat",
+      })
+    );
+  });
+
+  it("keeps approve success response even when providerApproved email sending fails", async () => {
+    vi.mocked(fetch).mockReturnValueOnce(
+      jsonResponse({ result: { providerId: "provider-1", status: "approved" } }) as ReturnType<typeof fetch>
+    );
+    mocks.sendEmail.mockRejectedValueOnce(new Error("smtp down"));
+
+    const { POST } = await import("../[id]/review/route");
+    const response = await POST(
+      new Request("https://example.com/api/admin/providers/provider-1/review", {
+        method: "POST",
+        body: JSON.stringify({ action: "approve" }),
+      }),
+      { params: Promise.resolve({ id: "provider-1" }) }
+    );
+    const json = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(json).toEqual({ providerId: "provider-1", status: "approved" });
+    expect(mocks.sendEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not send providerApproved email for non-approve review actions", async () => {
+    vi.mocked(fetch).mockReturnValueOnce(
+      jsonResponse({ result: { providerId: "provider-1", status: "rejected" } }) as ReturnType<typeof fetch>
+    );
+
+    const { POST } = await import("../[id]/review/route");
+    const response = await POST(
+      new Request("https://example.com/api/admin/providers/provider-1/review", {
+        method: "POST",
+        body: JSON.stringify({ action: "reject", reason: "Informații incomplete" }),
+      }),
+      { params: Promise.resolve({ id: "provider-1" }) }
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.providerGet).not.toHaveBeenCalled();
+    expect(mocks.sendEmail).not.toHaveBeenCalled();
+  });
+
+  it("skips providerApproved email when provider email is missing", async () => {
+    vi.mocked(fetch).mockReturnValueOnce(
+      jsonResponse({ result: { providerId: "provider-1", status: "approved" } }) as ReturnType<typeof fetch>
+    );
+    mocks.providerGet.mockResolvedValueOnce({
+      exists: true,
+      data: () => ({
+        locale: "en",
+        professionalProfile: { displayName: "Provider One" },
+      }),
+    });
+
+    const { POST } = await import("../[id]/review/route");
+    const response = await POST(
+      new Request("https://example.com/api/admin/providers/provider-1/review", {
+        method: "POST",
+        body: JSON.stringify({ action: "approve" }),
+      }),
+      { params: Promise.resolve({ id: "provider-1" }) }
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.getEmailTemplateConfig).not.toHaveBeenCalled();
+    expect(mocks.renderTemplate).not.toHaveBeenCalled();
+    expect(mocks.sendEmail).not.toHaveBeenCalled();
   });
 
   it("proxies provider deletion to adminDeleteProvider", async () => {

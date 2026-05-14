@@ -533,6 +533,28 @@ export default function SettingsPage() {
                         </span>
                       </span>
                     </label>
+                    <label className="flex items-start gap-3 rounded-lg border border-border p-4">
+                      <input
+                        type="checkbox"
+                        className="mt-1 size-4"
+                        checked={appUpdateState.paymentDemoModeEnabled}
+                        onChange={(event) =>
+                          updateAppUpdateField(
+                            "paymentDemoModeEnabled",
+                            event.target.checked
+                          )
+                        }
+                      />
+                      <span>
+                        <span className="block text-sm font-medium">
+                          Activează plată demo (fără Stripe)
+                        </span>
+                        <span className="block text-sm text-muted-foreground">
+                          Checkout-ul mobil finalizează plata prin fluxul demo,
+                          fără PaymentSheet Stripe.
+                        </span>
+                      </span>
+                    </label>
 
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Mod afișare</label>

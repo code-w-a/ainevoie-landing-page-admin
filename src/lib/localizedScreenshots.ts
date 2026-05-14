@@ -6,7 +6,7 @@ export const SCREENSHOT_SOURCES = {
     onboarding1: "/images/screenshots/Onboarding_unu.jpg",
     onboarding2: "/images/screenshots/Onboarding_doi.jpg",
     onboarding3: "/images/screenshots/Onboarding_trei.jpg",
-    home: "/images/screenshots/utilizator_ecran_home.jpg",
+    home: "/images/screenshots/utilizator_ecran_home.png",
     providerProfile: "/images/screenshots/utilizator_ecran_prestator.jpg",
     bookingConfirmation:
       "/images/screenshots/utilizator_ecran_confirmare_rezervare.jpg",

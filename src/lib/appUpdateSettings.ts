@@ -6,6 +6,7 @@ export type AppUpdateLocale = "ro" | "en";
 
 export type AppUpdateSettings = {
   enabled: boolean;
+  paymentDemoModeEnabled: boolean;
   mode: AppUpdateMode;
   revision: string;
   displayVersion: string;
@@ -24,6 +25,7 @@ const DEFAULT_REVISION = "mobile-update-default";
 export function getDefaultAppUpdateSettings(): AppUpdateSettings {
   return {
     enabled: false,
+    paymentDemoModeEnabled: false,
     mode: "notice",
     revision: DEFAULT_REVISION,
     displayVersion: "",
@@ -79,6 +81,7 @@ function sanitizeUrl(value: unknown) {
 function buildRevision(settings: AppUpdateSettings) {
   return [
     settings.enabled ? "enabled" : "disabled",
+    settings.paymentDemoModeEnabled ? "payment-demo-enabled" : "payment-demo-disabled",
     settings.mode,
     settings.displayVersion,
     settings.title.ro,
@@ -102,6 +105,7 @@ export function sanitizeAppUpdateSettings(raw: unknown): AppUpdateSettings {
 
   const settings: AppUpdateSettings = {
     enabled: source.enabled === true,
+    paymentDemoModeEnabled: source.paymentDemoModeEnabled === true,
     mode: source.mode === "force" ? "force" : "notice",
     revision: readString(source.revision, 120) || defaults.revision,
     displayVersion: readString(source.displayVersion, 80),
@@ -140,6 +144,7 @@ export function validateAppUpdateSettings(settings: AppUpdateSettings) {
 export function getPublicAppUpdateSettings(settings: AppUpdateSettings) {
   return {
     enabled: settings.enabled,
+    paymentDemoModeEnabled: settings.paymentDemoModeEnabled,
     mode: settings.mode,
     revision: settings.revision,
     displayVersion: settings.displayVersion,

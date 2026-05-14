@@ -202,6 +202,57 @@ service cloud.firestore {
       return conversationId + '_' + request.auth.uid;
     }
 
+    function supportTicketCreateKeys() {
+      return [
+        'ticketId',
+        'topic',
+        'subject',
+        'initialMessage',
+        'status',
+        'priority',
+        'requesterUid',
+        'requesterRole',
+        'requesterSnapshot',
+        'requesterSnapshot.displayName',
+        'requesterSnapshot.email',
+        'requesterSnapshot.phoneNumber',
+        'assignedAdminUid',
+        'assignedAdminSnapshot',
+        'adminNote',
+        'relatedEntity',
+        'relatedEntity.bookingId',
+        'relatedEntity.providerId',
+        'relatedEntity.userId',
+        'resolvedAt',
+        'closedAt',
+        'updatedBy',
+        'updatedBy.uid',
+        'updatedBy.role',
+        'createdAt',
+        'updatedAt',
+        'schemaVersion'
+      ];
+    }
+
+    function isSupportTicketTopic(value) {
+      return value == 'support' || value == 'bug';
+    }
+
+    function isSupportTicketPriority(value) {
+      return value == 'low'
+        || value == 'normal'
+        || value == 'high'
+        || value == 'urgent';
+    }
+
+    function supportRequesterRoleMatchesProfile(role, uid) {
+      return role == 'user'
+        ? exists(/databases/$(database)/documents/users/$(uid))
+        : role == 'provider'
+          ? exists(/databases/$(database)/documents/providers/$(uid))
+          : false;
+    }
+
     match /users/{uid} {
       allow read: if isSelf(uid);
       allow create, delete: if false;
@@ -274,6 +325,10 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    match /providerBookingLocks/{document=**} {
+      allow read, write: if false;
+    }
+
     match /conversations/{conversationId} {
       allow read: if signedIn()
         && exists(/databases/$(database)/documents/conversationMemberships/$(conversationMembershipDocId(conversationId)));
@@ -289,6 +344,32 @@ service cloud.firestore {
     match /conversationMemberships/{membershipId} {
       allow read: if signedIn() && resource.data.uid == request.auth.uid;
       allow write: if false;
+    }
+
+    match /supportTickets/{ticketId} {
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(supportTicketCreateKeys())
+        && request.resource.data.ticketId == ticketId
+        && isSupportTicketTopic(request.resource.data.topic)
+        && request.resource.data.subject is string
+        && request.resource.data.subject.size() > 0
+        && request.resource.data.initialMessage is string
+        && request.resource.data.initialMessage.size() > 0
+        && request.resource.data.status == 'open'
+        && isSupportTicketPriority(request.resource.data.priority)
+        && request.resource.data.requesterUid == request.auth.uid
+        && (request.resource.data.requesterRole == 'user' || request.resource.data.requesterRole == 'provider')
+        && supportRequesterRoleMatchesProfile(request.resource.data.requesterRole, request.auth.uid)
+        && request.resource.data.assignedAdminUid == null
+        && request.resource.data.assignedAdminSnapshot == null
+        && request.resource.data.adminNote == null
+        && request.resource.data.resolvedAt == null
+        && request.resource.data.closedAt == null
+        && request.resource.data.updatedBy.uid == request.auth.uid
+        && request.resource.data.updatedBy.role == request.resource.data.requesterRole
+        && request.resource.data.schemaVersion == 1;
+      allow read: if signedIn() && resource.data.requesterUid == request.auth.uid;
+      allow update, delete: if false;
     }
 
     match /payments/{document=**} {

@@ -1237,7 +1237,7 @@ export default function ProviderDetailPage() {
     !availabilityOk ? "disponibilitate neconfigurată" : "",
     activeServices.length === 0 ? "serviciu principal/serviciu activ lipsă" : "",
   ].filter(Boolean);
-  const isApproveBlocked = approvalBlockedReasons.length > 0;
+  const hasApprovalWarnings = approvalBlockedReasons.length > 0;
 
   return (
     <div className="space-y-6">
@@ -1310,7 +1310,7 @@ export default function ProviderDetailPage() {
                     <Button
                       key={action}
                       variant={meta.destructive ? "destructive" : "default"}
-                      disabled={saving || (action === "approve" && isApproveBlocked)}
+                      disabled={saving}
                       onClick={() => setDialogAction(action)}
                     >
                       <Icon className="h-4 w-4" />
@@ -1336,9 +1336,9 @@ export default function ProviderDetailPage() {
                   Nu există acțiuni administrative pentru statusul curent.
                 </p>
               )}
-              {isApproveBlocked && availableActions.includes("approve") && (
+              {hasApprovalWarnings && availableActions.includes("approve") && (
                 <p className="max-w-sm text-right text-xs text-amber-700">
-                  Aprobarea este blocată până se completează: {approvalBlockedReasons.join(", ")}.
+                  Profil incomplet (avertisment): {approvalBlockedReasons.join(", ")}.
                 </p>
               )}
             </div>
@@ -1498,7 +1498,7 @@ export default function ProviderDetailPage() {
                     <Button
                       key={action}
                       variant={meta.destructive ? "destructive" : "default"}
-                      disabled={saving || (action === "approve" && isApproveBlocked)}
+                      disabled={saving}
                       onClick={() => setDialogAction(action)}
                     >
                       <Icon className="h-4 w-4" />
@@ -1520,9 +1520,9 @@ export default function ProviderDetailPage() {
                 </Button>
               </div>
             )}
-            {isApproveBlocked && availableActions.includes("approve") && (
+            {hasApprovalWarnings && availableActions.includes("approve") && (
               <p className="text-sm text-amber-700">
-                Aprobarea este blocată până se completează: {approvalBlockedReasons.join(", ")}.
+                Profil incomplet (avertisment): {approvalBlockedReasons.join(", ")}.
               </p>
             )}
           </CardContent>
