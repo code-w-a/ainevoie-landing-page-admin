@@ -5,11 +5,36 @@ import { captureServerException } from "@/lib/sentryServer";
 
 const ROUTE_TAG = "[admin-smtp-verify]";
 
+function hasValidAdminApiKey(request: Request) {
+  const configuredApiKey = process.env.ADMIN_API_KEY?.trim();
+  if (!configuredApiKey) {
+    return false;
+  }
+
+  const headerApiKey = request.headers.get("x-admin-api-key")?.trim();
+  if (!headerApiKey) {
+    return false;
+  }
+
+  return headerApiKey === configuredApiKey;
+}
+
 export async function POST(request: Request) {
   try {
-    const admin = await requireAdmin(request);
+    const hasApiKeyAccess = hasValidAdminApiKey(request);
+    let adminUid: string | null = null;
+    let authSource: "admin_api_key" | "firebase_admin_token" = "admin_api_key";
+
+    if (!hasApiKeyAccess) {
+      const admin = await requireAdmin(request);
+      adminUid = admin.uid;
+      authSource = "firebase_admin_token";
+    }
+
     console.info(`${ROUTE_TAG} verify_request`, {
-      adminUid: admin.uid,
+      adminUid,
+      authSource,
+      hasApiKeyAccess,
     });
 
     const result = await verifySmtpConnection();
