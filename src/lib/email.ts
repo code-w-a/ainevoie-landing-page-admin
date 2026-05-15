@@ -42,6 +42,23 @@ function getRequiredEnv(name: string): string {
   return value;
 }
 
+function maskSmtpUser(value: string): string {
+  const normalized = String(value || "").trim();
+  if (!normalized) {
+    return "";
+  }
+
+  if (normalized.includes("@")) {
+    return maskEmail(normalized);
+  }
+
+  if (normalized.length <= 2) {
+    return `${normalized[0] || "*"}***`;
+  }
+
+  return `${normalized.slice(0, 2)}***`;
+}
+
 function parsePort(value: string): number {
   const port = Number(value);
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
@@ -77,6 +94,18 @@ function getSmtpConfig(): SmtpConfig {
   const from = getRequiredEnv("EMAIL_FROM");
 
   return { host, port, secure, user, pass, from };
+}
+
+function getSmtpDebugInfo(config: SmtpConfig) {
+  return {
+    smtpHost: config.host,
+    smtpPort: config.port,
+    secure: config.secure,
+    smtpUserMasked: maskSmtpUser(config.user),
+    smtpPasswordPresent: Boolean(config.pass),
+    smtpPasswordLength: config.pass ? config.pass.length : 0,
+    fromMasked: maskEmail(config.from),
+  };
 }
 
 function parseOptionalTimeout(name: string, fallbackMs: number): number {
@@ -192,6 +221,12 @@ export const sendEmail = async (data: EmailPayload, context: EmailSendContext = 
   const channel = context.channel || "generic";
   const templateKind = context.templateKind || null;
 
+  console.info(`${LOG_PREFIX} smtp_auth_debug`, {
+    event: "smtp_auth_debug",
+    requestId,
+    ...getSmtpDebugInfo(smtpConfig),
+  });
+
   console.info(`${LOG_PREFIX} email_send_start`, {
     event: "email_send_start",
     channel,
@@ -262,5 +297,57 @@ export const sendEmail = async (data: EmailPayload, context: EmailSendContext = 
       errorMessage: readErrorMessage(error),
     });
     throw error;
+  }
+};
+
+export const verifySmtpConnection = async () => {
+  const smtpConfig = getSmtpConfig();
+  const transporter = getTransporter(smtpConfig);
+  const startedAt = Date.now();
+  const requestId = randomUUID();
+  const debug = getSmtpDebugInfo(smtpConfig);
+
+  console.info(`${LOG_PREFIX} smtp_verify_start`, {
+    event: "smtp_verify_start",
+    requestId,
+    ...debug,
+  });
+
+  try {
+    await transporter.verify();
+    const durationMs = Date.now() - startedAt;
+    console.info(`${LOG_PREFIX} smtp_verify_success`, {
+      event: "smtp_verify_success",
+      requestId,
+      durationMs,
+      ...debug,
+    });
+    return {
+      ok: true as const,
+      durationMs,
+      ...debug,
+    };
+  } catch (error) {
+    const durationMs = Date.now() - startedAt;
+    const errorCode = readErrorCode(error);
+    const responseCode = readErrorResponseCode(error);
+    const errorMessage = readErrorMessage(error);
+    console.error(`${LOG_PREFIX} smtp_verify_failure`, {
+      event: "smtp_verify_failure",
+      requestId,
+      durationMs,
+      errorCode,
+      responseCode,
+      errorMessage,
+      ...debug,
+    });
+    return {
+      ok: false as const,
+      durationMs,
+      errorCode,
+      responseCode,
+      errorMessage,
+      ...debug,
+    };
   }
 };
