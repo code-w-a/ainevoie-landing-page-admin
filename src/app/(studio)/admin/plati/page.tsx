@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { CreditCard, Download, Search } from "lucide-react";
 import { useAdminData } from "@/components/admin/useAdminData";
+import { AdminEntityLookup } from "@/components/admin/AdminEntityLookup";
 import { AdminTableSkeleton } from "@/components/admin/AdminSkeletonLayouts";
+import { humanBookingLabel, humanProviderLabel, humanUserLabel } from "@/lib/adminHumanize";
 import { formatAdminDateTime } from "@/lib/formatAdminDateTime";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -43,7 +45,11 @@ type PaymentAdminListItem = {
   stripeLatestChargeId: string | null;
   webhookState: PaymentWebhookState;
   booking: {
+    bookingId?: string | null;
     status: string | null;
+    serviceName?: string | null;
+    userName?: string | null;
+    providerName?: string | null;
   };
   user: {
     displayName: string | null;
@@ -155,7 +161,7 @@ export default function AdminPaymentsPage() {
         <CardHeader>
           <CardTitle>Filtre</CardTitle>
           <CardDescription>
-            Cauta dupa ID-uri, utilizator, prestator sau referinte procesator.
+            Caută după persoane, programare, serviciu sau referințe procesator.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-4">
@@ -197,22 +203,24 @@ export default function AdminPaymentsPage() {
               setProcessorId(event.target.value);
             }}
           />
-          <Input
-            placeholder="Provider ID"
+          <AdminEntityLookup
             value={providerId}
+            entityType="provider"
             disabled={loading}
-            onChange={(event) => {
+            placeholder="Provider"
+            onValueChange={(nextValue) => {
               setPage(1);
-              setProviderId(event.target.value);
+              setProviderId(nextValue);
             }}
           />
-          <Input
-            placeholder="User ID"
+          <AdminEntityLookup
             value={userId}
+            entityType="user"
             disabled={loading}
-            onChange={(event) => {
+            placeholder="User"
+            onValueChange={(nextValue) => {
               setPage(1);
-              setUserId(event.target.value);
+              setUserId(nextValue);
             }}
           />
           <Input
@@ -280,7 +288,13 @@ export default function AdminPaymentsPage() {
                 {items.map((item) => (
                   <TableRow key={item.paymentId}>
                     <TableCell>
-                      <div className="font-medium">{item.paymentId}</div>
+                      <div className="font-medium">
+                        {humanBookingLabel({
+                          serviceName: item.booking?.serviceName,
+                          userLabel: item.user?.displayName || item.user?.email,
+                          providerLabel: item.provider?.displayName || item.provider?.email,
+                        }, "Plată")}
+                      </div>
                       <div className="text-xs text-muted-foreground">{item.method || "-"}</div>
                     </TableCell>
                     <TableCell>
@@ -310,7 +324,11 @@ export default function AdminPaymentsPage() {
                         <Button asChild size="sm" variant="outline">
                           <Link href={`/admin/programari/${encodeURIComponent(item.bookingId)}`}>
                             <CreditCard className="mr-2 h-4 w-4" />
-                            {item.bookingId}
+                            {humanBookingLabel({
+                              serviceName: item.booking?.serviceName,
+                              userLabel: item.booking?.userName,
+                              providerLabel: item.booking?.providerName,
+                            })}
                           </Link>
                         </Button>
                       ) : (
@@ -323,7 +341,10 @@ export default function AdminPaymentsPage() {
                           href={`/admin/utilizatori/${encodeURIComponent(item.userId)}`}
                           className="underline underline-offset-2"
                         >
-                          {item.user.displayName || item.user.email || item.userId}
+                          {humanUserLabel({
+                            displayName: item.user.displayName,
+                            email: item.user.email,
+                          })}
                         </Link>
                       ) : (
                         "-"
@@ -335,7 +356,10 @@ export default function AdminPaymentsPage() {
                           href={`/admin/prestatori/${encodeURIComponent(item.providerId)}`}
                           className="underline underline-offset-2"
                         >
-                          {item.provider.displayName || item.provider.email || item.providerId}
+                          {humanProviderLabel({
+                            displayName: item.provider.displayName,
+                            email: item.provider.email,
+                          })}
                         </Link>
                       ) : (
                         "-"

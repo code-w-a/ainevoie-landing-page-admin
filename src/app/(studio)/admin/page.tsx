@@ -8,6 +8,8 @@ import {
   CalendarClock,
   CreditCard,
   ExternalLink,
+  LifeBuoy,
+  MessageSquare,
   RotateCw,
   ShieldCheck,
 } from "lucide-react";
@@ -20,6 +22,7 @@ import {
   AdminTableSkeleton,
 } from "@/components/admin/AdminSkeletonLayouts";
 import { useAdminData } from "@/components/admin/useAdminData";
+import { humanProviderLabel, humanUserLabel } from "@/lib/adminHumanize";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,8 +50,11 @@ type DashboardResponse = {
   queues?: {
     pendingProviders?: DashboardQueue;
     requestedBookings?: DashboardQueue;
+    overdueBookingRequests?: DashboardQueue;
     rescheduleBookings?: DashboardQueue;
     failedPaymentBookings?: DashboardQueue;
+    urgentSupportTickets?: DashboardQueue;
+    flaggedConversations?: DashboardQueue;
   };
   recentAuditEvents?: DashboardQueue;
 };
@@ -61,6 +67,7 @@ const bookingStatusMeta: Record<string, { label: string; variant: BadgeVariant }
   rejected: { label: "Respinsă", variant: "danger" },
   cancelled_by_user: { label: "Anulată client", variant: "danger" },
   cancelled_by_provider: { label: "Anulată prestator", variant: "danger" },
+  cancelled_by_admin: { label: "Anulată admin", variant: "danger" },
 };
 
 const paymentStatusMeta: Record<string, { label: string; variant: BadgeVariant }> = {
@@ -123,11 +130,12 @@ function paymentStatusVariant(value: unknown): BadgeVariant {
 
 function providerName(item: Record<string, unknown>) {
   return (
-    readString(item.businessName) ||
-    readString(item.displayName) ||
-    readString(item.email) ||
-    readString(item.providerId) ||
-    "-"
+    humanProviderLabel({
+      displayName: readString(item.displayName),
+      businessName: readString(item.businessName),
+      email: readString(item.email),
+      phoneNumber: readString(item.phoneNumber),
+    })
   );
 }
 
@@ -141,7 +149,22 @@ function bookingId(item: Record<string, unknown>) {
 
 function bookingPerson(item: Record<string, unknown>, key: "userSnapshot" | "providerSnapshot", fallbackKey: string) {
   const snapshot = readRecord(item[key]);
-  return readString(snapshot.displayName) || readString(item[fallbackKey]) || "-";
+  if (key === "providerSnapshot") {
+    const label = humanProviderLabel({
+      displayName: readString(snapshot.displayName),
+      businessName: readString(snapshot.businessName),
+      email: readString(snapshot.email),
+    }, "");
+    if (label) return label;
+    return readString(item[fallbackKey]) ? "Prestator necunoscut" : "-";
+  }
+  const label = humanUserLabel({
+    displayName: readString(snapshot.displayName),
+    email: readString(snapshot.email),
+    phoneNumber: readString(snapshot.phoneNumber),
+  }, "");
+  if (label) return label;
+  return readString(item[fallbackKey]) ? "Utilizator necunoscut" : "-";
 }
 
 function bookingService(item: Record<string, unknown>) {
@@ -336,6 +359,85 @@ function BookingQueue({
   );
 }
 
+function SupportQueue({ items }: { items: Array<Record<string, unknown>> }) {
+  if (!items.length) {
+    return <EmptyQueue message="Nu există tichete urgente active." />;
+  }
+
+  return (
+    <div className="space-y-3">
+      {items.map((item, index) => {
+        const id = readString(item.ticketId) || `ticket-${index}`;
+        const requester = readRecord(item.requesterSnapshot);
+        return (
+          <div key={id} className="rounded-md border border-border p-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium">{readString(item.subject) || id}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {readString(item.requesterRole) === "provider"
+                    ? humanProviderLabel({
+                        displayName: readString(requester.displayName),
+                        email: readString(requester.email),
+                      })
+                    : humanUserLabel({
+                        displayName: readString(requester.displayName),
+                        email: readString(requester.email),
+                      })}
+                </p>
+              </div>
+              <Badge variant="danger">{readString(item.priority) || "urgent"}</Badge>
+            </div>
+            <div className="mt-3 flex items-center justify-between gap-3 text-xs text-muted-foreground">
+              <span>{formatAdminDateTime(readString(item.updatedAt) || readString(item.createdAt), { includeSeconds: true })}</span>
+              <Button asChild size="sm" variant="outline">
+                <Link href={`/admin/suport?q=${encodeURIComponent(id)}`}>Deschide</Link>
+              </Button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ConversationQueue({ items }: { items: Array<Record<string, unknown>> }) {
+  if (!items.length) {
+    return <EmptyQueue message="Nu există conversații flagged sau în review." />;
+  }
+
+  return (
+    <div className="space-y-3">
+      {items.map((item, index) => {
+        const id = readString(item.conversationId) || `conversation-${index}`;
+        const status = readString(item.moderationStatus) || "flagged";
+        return (
+          <div key={id} className="rounded-md border border-border p-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium">{id}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Booking: {readString(item.bookingId) || "-"} · User: {humanUserLabel({
+                    displayName: readString(readRecord(item.user).displayName),
+                    email: readString(readRecord(item.user).email),
+                  })}
+                </p>
+              </div>
+              <Badge variant={status === "flagged" ? "danger" : "warning"}>{labelFromKey(status)}</Badge>
+            </div>
+            <div className="mt-3 flex items-center justify-between gap-3 text-xs text-muted-foreground">
+              <span>{formatAdminDateTime(readString(item.updatedAt) || readString(item.createdAt), { includeSeconds: true })}</span>
+              <Button asChild size="sm" variant="outline">
+                <Link href={`/admin/conversatii?conversationId=${encodeURIComponent(id)}`}>Deschide</Link>
+              </Button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function StatusDistribution({
   title,
   items,
@@ -418,8 +520,11 @@ export default function AdminOperationalDashboardPage() {
   const reviewsByStatus = readCountMap(summary.reviewsByStatus);
   const pendingProviders = readItems(data?.queues?.pendingProviders);
   const requestedBookings = readItems(data?.queues?.requestedBookings);
+  const overdueBookingRequests = readItems(data?.queues?.overdueBookingRequests);
   const rescheduleBookings = readItems(data?.queues?.rescheduleBookings);
   const failedPaymentBookings = readItems(data?.queues?.failedPaymentBookings);
+  const urgentSupportTickets = readItems(data?.queues?.urgentSupportTickets);
+  const flaggedConversations = readItems(data?.queues?.flaggedConversations);
   const auditEvents = readItems(data?.recentAuditEvents);
   const lastUpdated = data?.generatedAt || readString(summary.generatedAt);
 
@@ -519,6 +624,13 @@ export default function AdminOperationalDashboardPage() {
           note="necesită verificare"
           variant={failedPaymentBookings.length > 0 ? "danger" : "success"}
         />
+        <KpiCard
+          icon={LifeBuoy}
+          label="Suport urgent"
+          value={urgentSupportTickets.length}
+          note="tichete active cu prioritate urgent"
+          variant={urgentSupportTickets.length > 0 ? "danger" : "success"}
+        />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.5fr_0.9fr]">
@@ -567,6 +679,24 @@ export default function AdminOperationalDashboardPage() {
               <section className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
                   <div>
+                    <h2 className="text-base font-semibold">Cereri fără răspuns în SLA</h2>
+                    <p className="text-xs text-muted-foreground">
+                      {data?.queues?.overdueBookingRequests?.total ?? overdueBookingRequests.length} total
+                    </p>
+                  </div>
+                  <Button asChild size="sm" variant="outline">
+                    <Link href="/admin/programari?status=requested">Toate cererile</Link>
+                  </Button>
+                </div>
+                <BookingQueue
+                  items={overdueBookingRequests}
+                  emptyMessage="Nu există cereri întârziate peste deadline-ul de răspuns."
+                />
+              </section>
+
+              <section className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
                     <h2 className="text-base font-semibold">Reprogramări propuse</h2>
                     <p className="text-xs text-muted-foreground">
                       {data?.queues?.rescheduleBookings?.total ?? rescheduleBookings.length} total
@@ -599,6 +729,44 @@ export default function AdminOperationalDashboardPage() {
                   emptyMessage="Nu există plăți eșuate de verificat."
                   showPayment
                 />
+              </section>
+
+              <section className="grid gap-6 lg:grid-cols-2">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h2 className="flex items-center gap-2 text-base font-semibold">
+                        <LifeBuoy className="h-4 w-4" />
+                        Suport urgent
+                      </h2>
+                      <p className="text-xs text-muted-foreground">
+                        {data?.queues?.urgentSupportTickets?.total ?? urgentSupportTickets.length} total
+                      </p>
+                    </div>
+                    <Button asChild size="sm" variant="outline">
+                      <Link href="/admin/suport?priority=urgent">Toate</Link>
+                    </Button>
+                  </div>
+                  <SupportQueue items={urgentSupportTickets} />
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h2 className="flex items-center gap-2 text-base font-semibold">
+                        <MessageSquare className="h-4 w-4" />
+                        Conversații moderate
+                      </h2>
+                      <p className="text-xs text-muted-foreground">
+                        {data?.queues?.flaggedConversations?.total ?? flaggedConversations.length} total
+                      </p>
+                    </div>
+                    <Button asChild size="sm" variant="outline">
+                      <Link href="/admin/conversatii?moderationStatus=flagged">Flagged</Link>
+                    </Button>
+                  </div>
+                  <ConversationQueue items={flaggedConversations} />
+                </div>
               </section>
             </CardContent>
           </Card>

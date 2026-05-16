@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { AlertCircle, Flag, MessageCircle, RefreshCcw, Search, Shield, ShieldOff } from "lucide-react";
 import { adminFetch, readAdminResponseError } from "@/components/admin/adminApi";
+import { AdminEntityLookup } from "@/components/admin/AdminEntityLookup";
 import { AdminTableSkeleton } from "@/components/admin/AdminSkeletonLayouts";
+import { humanAdminLabel, humanProviderLabel, humanUserLabel } from "@/lib/adminHumanize";
 import { formatAdminDateTime } from "@/lib/formatAdminDateTime";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -34,6 +36,18 @@ type ConversationListItem = {
   bookingId: string | null;
   userId: string | null;
   providerId: string | null;
+  user?: {
+    userId: string | null;
+    displayName: string | null;
+    email: string | null;
+    phoneNumber: string | null;
+  } | null;
+  provider?: {
+    providerId: string | null;
+    displayName: string | null;
+    email: string | null;
+    phoneNumber: string | null;
+  } | null;
   lastMessage: {
     preview: string | null;
     createdAt: string | null;
@@ -55,6 +69,11 @@ type ConversationParticipant = {
   membershipId: string;
   uid: string;
   role: string;
+  profile?: {
+    displayName: string | null;
+    email: string | null;
+    role: string | null;
+  } | null;
   blockedAt: string | null;
   blockedBy: {
     uid: string | null;
@@ -74,6 +93,11 @@ type ConversationMessage = {
   messageId: string;
   senderUid: string | null;
   senderRole: string | null;
+  senderSnapshot?: {
+    displayName: string | null;
+    email: string | null;
+    role: string | null;
+  } | null;
   type: string;
   body: string;
   status: string;
@@ -107,6 +131,21 @@ function statusVariant(status: string) {
   if (status === "active") return "success";
   if (status === "closed") return "secondary";
   return "outline";
+}
+
+function conversationPersonLabel(item: ConversationListItem, entity: "user" | "provider") {
+  if (entity === "provider") {
+    return humanProviderLabel({
+      displayName: item.provider?.displayName || null,
+      email: item.provider?.email || null,
+      phoneNumber: item.provider?.phoneNumber || null,
+    });
+  }
+  return humanUserLabel({
+    displayName: item.user?.displayName || null,
+    email: item.user?.email || null,
+    phoneNumber: item.user?.phoneNumber || null,
+  });
 }
 
 export default function AdminConversationsPage() {
@@ -405,7 +444,7 @@ export default function AdminConversationsPage() {
         <CardHeader>
           <CardTitle>Filtre</CardTitle>
           <CardDescription>
-            Căutare ID-only în conversații (`conversationId`, `bookingId`, `userId`, `providerId`).
+            Caută după nume, email, booking sau ID conversație.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-4">
@@ -413,7 +452,7 @@ export default function AdminConversationsPage() {
             <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               className="pl-9"
-              placeholder="Căutare ID"
+              placeholder="Căutare conversație"
               value={q}
               disabled={loadingMore}
               onChange={(event) => setQ(event.target.value)}
@@ -446,18 +485,20 @@ export default function AdminConversationsPage() {
             ))}
           </select>
 
-          <Input
-            placeholder="User ID"
+          <AdminEntityLookup
             value={userId}
-            onChange={(event) => setUserId(event.target.value)}
+            entityType="user"
             disabled={loadingMore}
+            placeholder="User"
+            onValueChange={(nextValue) => setUserId(nextValue)}
           />
 
-          <Input
-            placeholder="Provider ID"
+          <AdminEntityLookup
             value={providerId}
-            onChange={(event) => setProviderId(event.target.value)}
+            entityType="provider"
             disabled={loadingMore}
+            placeholder="Provider"
+            onValueChange={(nextValue) => setProviderId(nextValue)}
           />
 
           <Button
@@ -520,7 +561,10 @@ export default function AdminConversationsPage() {
                       className={isSelected ? "bg-primary/5" : ""}
                       onClick={() => setSelectedConversationId(item.conversationId)}
                     >
-                      <TableCell className="font-medium">{item.conversationId}</TableCell>
+                      <TableCell className="font-medium">
+                        {item.bookingId ? "Conversație booking" : "Conversație directă"}
+                        <p className="text-xs text-muted-foreground">{item.conversationId}</p>
+                      </TableCell>
                       <TableCell>{label(item.type)}</TableCell>
                       <TableCell>
                         <Badge variant={statusVariant(item.status)}>{label(item.status)}</Badge>
@@ -535,14 +579,16 @@ export default function AdminConversationsPage() {
                       <TableCell>
                         {item.userId ? (
                           <Link className="text-primary hover:underline" href={`/admin/utilizatori/${encodeURIComponent(item.userId)}`}>
-                            {item.userId}
+                            {conversationPersonLabel(item, "user")}
+                            <span className="ml-1 text-xs text-muted-foreground">({item.userId})</span>
                           </Link>
                         ) : "-"}
                       </TableCell>
                       <TableCell>
                         {item.providerId ? (
                           <Link className="text-primary hover:underline" href={`/admin/prestatori/${encodeURIComponent(item.providerId)}`}>
-                            {item.providerId}
+                            {conversationPersonLabel(item, "provider")}
+                            <span className="ml-1 text-xs text-muted-foreground">({item.providerId})</span>
                           </Link>
                         ) : "-"}
                       </TableCell>
@@ -656,7 +702,21 @@ export default function AdminConversationsPage() {
                             <div className="flex items-center justify-between gap-3">
                               <div>
                                 <p className="text-sm font-medium">
-                                  {participant.uid} <span className="text-muted-foreground">({participant.role})</span>
+                                  {participant.role === "provider"
+                                    ? humanProviderLabel({
+                                        displayName: participant.profile?.displayName || null,
+                                        email: participant.profile?.email || null,
+                                      })
+                                    : participant.role === "admin" || participant.role === "support"
+                                      ? humanAdminLabel({
+                                          displayName: participant.profile?.displayName || null,
+                                          email: participant.profile?.email || null,
+                                        })
+                                      : humanUserLabel({
+                                          displayName: participant.profile?.displayName || null,
+                                          email: participant.profile?.email || null,
+                                        })}
+                                  <span className="ml-1 text-muted-foreground">({participant.uid} · {participant.role})</span>
                                 </p>
                                 <p className="text-xs text-muted-foreground">
                                   unread: {participant.unreadCount} · last: {formatAdminDateTime(participant.lastMessageAt)}
@@ -761,7 +821,23 @@ export default function AdminConversationsPage() {
                             <p className="text-xs text-muted-foreground">{message.messageId}</p>
                           </TableCell>
                           <TableCell>
-                            {message.senderUid || "-"}
+                            {message.senderRole === "provider"
+                              ? humanProviderLabel({
+                                  displayName: message.senderSnapshot?.displayName || null,
+                                  email: message.senderSnapshot?.email || null,
+                                })
+                              : message.senderRole === "admin" || message.senderRole === "support"
+                                ? humanAdminLabel({
+                                    displayName: message.senderSnapshot?.displayName || null,
+                                    email: message.senderSnapshot?.email || null,
+                                  })
+                                : humanUserLabel({
+                                    displayName: message.senderSnapshot?.displayName || null,
+                                    email: message.senderSnapshot?.email || null,
+                                  })}
+                            {message.senderUid ? (
+                              <span className="ml-1 text-xs text-muted-foreground">({message.senderUid})</span>
+                            ) : null}
                             {message.senderRole ? (
                               <span className="ml-1 text-xs text-muted-foreground">({message.senderRole})</span>
                             ) : null}

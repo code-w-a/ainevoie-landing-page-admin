@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { adminAuthErrorResponse, requireAdminOrSupport } from "@/lib/adminAuth";
 import { AdminCallableError, callAdminCallable } from "@/lib/adminCallables";
+import { listAdminConversations } from "@/lib/adminConversations";
+import { listAdminSupportTickets } from "@/lib/adminSupportTickets";
 import { captureServerException } from "@/lib/sentryServer";
 
 type AdminListResponse = {
@@ -27,9 +29,12 @@ export async function GET(request: Request) {
       summary,
       pendingProviders,
       requestedBookings,
+      overdueBookingRequests,
       rescheduleBookings,
       failedPaymentBookings,
       recentAuditEvents,
+      urgentSupportTickets,
+      flaggedConversations,
     ] = await Promise.all([
       callAdminCallable<Record<string, unknown>>(
         "getAdminDashboardSummary",
@@ -51,6 +56,12 @@ export async function GET(request: Request) {
       ),
       callAdminCallable<AdminListResponse>(
         "listAdminBookings",
+        { overdueOnly: true, limit: 5 },
+        "Nu am putut încărca cererile întârziate.",
+        admin.idToken
+      ),
+      callAdminCallable<AdminListResponse>(
+        "listAdminBookings",
         { status: "reschedule_proposed", limit: 5 },
         "Nu am putut încărca reprogramările.",
         admin.idToken
@@ -67,7 +78,19 @@ export async function GET(request: Request) {
         "Nu am putut încărca auditul recent.",
         admin.idToken
       ),
+      listAdminSupportTickets({}, { maxRows: 100 }),
+      Promise.all([
+        listAdminConversations({ moderationStatus: "flagged" }, { limit: 5 }),
+        listAdminConversations({ moderationStatus: "under_review" }, { limit: 5 }),
+      ]),
     ]);
+    const activeUrgentSupportTickets = urgentSupportTickets.items
+      .filter((item) => item.priority === "urgent" && item.status !== "resolved" && item.status !== "closed")
+      .slice(0, 5);
+    const flaggedConversationItems = [
+      ...flaggedConversations[0].items,
+      ...flaggedConversations[1].items,
+    ].slice(0, 5);
 
     const responseBody = {
       generatedAt: new Date().toISOString(),
@@ -81,6 +104,10 @@ export async function GET(request: Request) {
           total: Number(requestedBookings.total) || listItems(requestedBookings).length,
           items: listItems(requestedBookings),
         },
+        overdueBookingRequests: {
+          total: Number(overdueBookingRequests.total) || listItems(overdueBookingRequests).length,
+          items: listItems(overdueBookingRequests),
+        },
         rescheduleBookings: {
           total: Number(rescheduleBookings.total) || listItems(rescheduleBookings).length,
           items: listItems(rescheduleBookings),
@@ -88,6 +115,14 @@ export async function GET(request: Request) {
         failedPaymentBookings: {
           total: Number(failedPaymentBookings.total) || listItems(failedPaymentBookings).length,
           items: listItems(failedPaymentBookings),
+        },
+        urgentSupportTickets: {
+          total: urgentSupportTickets.total,
+          items: activeUrgentSupportTickets,
+        },
+        flaggedConversations: {
+          total: flaggedConversationItems.length,
+          items: flaggedConversationItems,
         },
       },
       recentAuditEvents: {
@@ -100,8 +135,11 @@ export async function GET(request: Request) {
       adminUid: admin.uid,
       pendingProviders: responseBody.queues.pendingProviders.items.length,
       requestedBookings: responseBody.queues.requestedBookings.items.length,
+      overdueBookingRequests: responseBody.queues.overdueBookingRequests.items.length,
       rescheduleBookings: responseBody.queues.rescheduleBookings.items.length,
       failedPaymentBookings: responseBody.queues.failedPaymentBookings.items.length,
+      urgentSupportTickets: responseBody.queues.urgentSupportTickets.items.length,
+      flaggedConversations: responseBody.queues.flaggedConversations.items.length,
       recentAuditEvents: responseBody.recentAuditEvents.items.length,
     });
 

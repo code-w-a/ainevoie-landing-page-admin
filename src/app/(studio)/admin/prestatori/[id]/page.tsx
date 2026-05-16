@@ -509,6 +509,62 @@ function getPublicationMeta(providerDirectory?: Record<string, unknown> | null) 
   };
 }
 
+function getPublicPreviewDrift(
+  provider: ProviderDocument,
+  providerDirectory: Record<string, unknown> | null | undefined,
+  services: Array<Record<string, unknown>> | undefined,
+  availability: Record<string, unknown> | null | undefined
+) {
+  if (!providerDirectory) {
+    return {
+      hasDrift: true,
+      issues: ["Snapshot providerDirectory lipsă."],
+    };
+  }
+
+  const profile = provider.professionalProfile || {};
+  const expectedDisplayName = readString(profile.businessName) || readString(profile.displayName);
+  const expectedSpecialization = readString(profile.specialization || provider.serviceType);
+  const expectedCoverage = readString(profile.coverageAreaText || provider.coverageAreaText);
+  const expectedAvatarPath = readString(profile.avatarPath);
+  const expectedAvailabilityConfigured = hasConfiguredAvailability(provider, availability || null);
+  const expectedActiveServices = getActiveServices(services).length;
+
+  const actualDisplayName = readString(providerDirectory.displayName);
+  const actualSpecialization = readString(providerDirectory.categoryPrimary);
+  const actualCoverage = readString(providerDirectory.coverageAreaText);
+  const actualAvatarPath = readString(providerDirectory.avatarPath);
+  const actualAvailabilityConfigured = providerDirectory.hasConfiguredAvailability === true;
+  const actualServices = Array.isArray(providerDirectory.serviceSummaries)
+    ? providerDirectory.serviceSummaries.length
+    : 0;
+
+  const issues: string[] = [];
+  if (expectedDisplayName && expectedDisplayName !== actualDisplayName) {
+    issues.push("displayName diferit între provider și providerDirectory.");
+  }
+  if (expectedSpecialization && expectedSpecialization !== actualSpecialization) {
+    issues.push("specializare/categoryPrimary diferite.");
+  }
+  if (expectedCoverage && expectedCoverage !== actualCoverage) {
+    issues.push("coverageAreaText diferit.");
+  }
+  if (expectedAvatarPath && expectedAvatarPath !== actualAvatarPath) {
+    issues.push("avatarPath diferit.");
+  }
+  if (expectedAvailabilityConfigured !== actualAvailabilityConfigured) {
+    issues.push("hasConfiguredAvailability nealiniat.");
+  }
+  if (expectedActiveServices !== actualServices) {
+    issues.push("numărul de servicii publicate diferă de serviciile active.");
+  }
+
+  return {
+    hasDrift: issues.length > 0,
+    issues,
+  };
+}
+
 function getChecklistItems({
   provider,
   profileOk,
@@ -710,6 +766,7 @@ function ReviewDecisionDialog({
   open,
   loading,
   error,
+  approvalWarnings,
   onOpenChange,
   onConfirm,
 }: {
@@ -717,15 +774,21 @@ function ReviewDecisionDialog({
   open: boolean;
   loading: boolean;
   error: string | null;
+  approvalWarnings: string[];
   onOpenChange: (open: boolean) => void;
-  onConfirm: (reason: string) => Promise<boolean>;
+  onConfirm: (reason: string, overrideIncompleteProfile: boolean) => Promise<boolean>;
 }) {
   const [reason, setReason] = useState("");
+  const [overrideIncompleteProfile, setOverrideIncompleteProfile] = useState(false);
   const requiresReason = action === "reject" || action === "suspend";
+  const requiresOverride = action === "approve" && approvalWarnings.length > 0;
   const meta = action ? actionMeta[action] : null;
 
   useEffect(() => {
-    if (open) setReason("");
+    if (open) {
+      setReason("");
+      setOverrideIncompleteProfile(false);
+    }
   }, [open, action]);
 
   if (!meta || !action) return null;
@@ -749,6 +812,31 @@ function ReviewDecisionDialog({
             />
           </div>
         )}
+        {requiresOverride && (
+          <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+            <div>
+              <p className="font-medium">Profil incomplet</p>
+              <p className="mt-1">
+                Backend-ul va bloca aprobarea fără confirmare explicită. Lipsesc:
+              </p>
+            </div>
+            <ul className="list-disc space-y-1 pl-5">
+              {approvalWarnings.map((warning) => (
+                <li key={warning}>{warning}</li>
+              ))}
+            </ul>
+            <label className="flex items-start gap-2">
+              <input
+                type="checkbox"
+                className="mt-1 size-4"
+                checked={overrideIncompleteProfile}
+                disabled={loading}
+                onChange={(event) => setOverrideIncompleteProfile(event.target.checked)}
+              />
+              <span>Aprob oricum și înregistrez override-ul în audit.</span>
+            </label>
+          </div>
+        )}
         {error && <p className="text-sm text-rose-500">{error}</p>}
         <DialogFooter>
           <Button type="button" variant="outline" disabled={loading} onClick={() => onOpenChange(false)}>
@@ -757,9 +845,9 @@ function ReviewDecisionDialog({
           <Button
             type="button"
             variant={meta.destructive ? "destructive" : "default"}
-            disabled={loading || (requiresReason && !reason.trim())}
+            disabled={loading || (requiresReason && !reason.trim()) || (requiresOverride && !overrideIncompleteProfile)}
             onClick={async () => {
-              const done = await onConfirm(reason);
+              const done = await onConfirm(reason, requiresOverride ? overrideIncompleteProfile : false);
               if (done) onOpenChange(false);
             }}
           >
@@ -927,6 +1015,8 @@ export default function ProviderDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [resyncError, setResyncError] = useState<string | null>(null);
+  const [resyncingDirectory, setResyncingDirectory] = useState(false);
   const [dialogAction, setDialogAction] = useState<ReviewAction | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [documentPreviewOpen, setDocumentPreviewOpen] = useState(false);
@@ -1046,7 +1136,7 @@ export default function ProviderDetailPage() {
     };
   }, [avatarPreviewUrl]);
 
-  async function submitReview(action: ReviewAction, reason: string) {
+  async function submitReview(action: ReviewAction, reason: string, overrideIncompleteProfile = false) {
     if (!id) return false;
     setSaving(true);
     setActionError(null);
@@ -1054,7 +1144,11 @@ export default function ProviderDetailPage() {
       const res = await adminFetch(`/api/admin/providers/${id}/review`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, reason: reason.trim() || undefined }),
+        body: JSON.stringify({
+          action,
+          reason: reason.trim() || undefined,
+          overrideIncompleteProfile: action === "approve" ? overrideIncompleteProfile : undefined,
+        }),
       });
       if (!res.ok) {
         throw new Error(await readAdminResponseError(res, "Nu am putut procesa decizia."));
@@ -1093,6 +1187,25 @@ export default function ProviderDetailPage() {
       return false;
     } finally {
       setDeleting(false);
+    }
+  }
+
+  async function resyncPublicDirectorySnapshot() {
+    if (!id) return;
+    setResyncingDirectory(true);
+    setResyncError(null);
+    try {
+      const res = await adminFetch(`/api/admin/providers/${id}/resync-directory`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        throw new Error(await readAdminResponseError(res, "Nu am putut resincroniza snapshot-ul public."));
+      }
+      await loadDetails({ showLoading: false });
+    } catch (err) {
+      setResyncError(err instanceof Error ? err.message : "Nu am putut resincroniza snapshot-ul public.");
+    } finally {
+      setResyncingDirectory(false);
     }
   }
 
@@ -1195,6 +1308,15 @@ export default function ProviderDetailPage() {
   const recentBookings = data?.recentBookings || [];
   const ratingSummary = getRatingSummary(data?.providerDirectory);
   const publicationMeta = getPublicationMeta(data?.providerDirectory);
+  const publicServiceSummaries = Array.isArray(data?.providerDirectory?.serviceSummaries)
+    ? data?.providerDirectory?.serviceSummaries as Array<Record<string, unknown>>
+    : [];
+  const publicPreviewDrift = getPublicPreviewDrift(
+    provider,
+    data?.providerDirectory || null,
+    data?.services,
+    data?.availability || null
+  );
   const profileOk = Boolean(profile.displayName && specialization && coverageText);
   const legalConsentState = getProviderLegalConsentState(provider);
   const legalConsentMeta =
@@ -1293,8 +1415,17 @@ export default function ProviderDetailPage() {
                   Înapoi la listă
                 </Link>
               </Button>
-              {/* TODO: add public profile preview route when a web-admin route exists. */}
-              {/* TODO: add provider edit route when admin editing is supported. */}
+              <Button
+                type="button"
+                variant="outline"
+                disabled={resyncingDirectory}
+                onClick={() => {
+                  void resyncPublicDirectorySnapshot();
+                }}
+              >
+                <RotateCcw className="h-4 w-4" />
+                {resyncingDirectory ? "Se resincronizează..." : "Resync snapshot public"}
+              </Button>
               <div className="flex flex-wrap gap-2 lg:justify-end">
                 {availableActions.map((action) => {
                   const meta = actionMeta[action];
@@ -1344,6 +1475,7 @@ export default function ProviderDetailPage() {
             </div>
           </div>
           {actionError && <p className="mt-4 text-sm text-rose-500">{actionError}</p>}
+          {resyncError && <p className="mt-4 text-sm text-rose-500">{resyncError}</p>}
           {avatarPreviewError && <p className="mt-4 text-sm text-amber-700">{avatarPreviewError}</p>}
         </CardContent>
       </Card>
@@ -1443,6 +1575,107 @@ export default function ProviderDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Public Preview</CardTitle>
+          <CardDescription>
+            Snapshot public real (`providerDirectory`) și randare fidelă cu datele afișate în mobile.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border p-3">
+            <div>
+              <p className="text-sm font-medium">Drift status</p>
+              <p className="text-xs text-muted-foreground">
+                {publicPreviewDrift.hasDrift
+                  ? "Snapshot-ul public diferă de modelul provider curent."
+                  : "Snapshot-ul public este aliniat cu modelul provider."}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant={publicPreviewDrift.hasDrift ? "warning" : "success"}>
+                {publicPreviewDrift.hasDrift ? "Drift detectat" : "Aligned"}
+              </Badge>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={resyncingDirectory}
+                onClick={() => {
+                  void resyncPublicDirectorySnapshot();
+                }}
+              >
+                <RotateCcw className="h-4 w-4" />
+                Resync
+              </Button>
+            </div>
+          </div>
+
+          {publicPreviewDrift.hasDrift && (
+            <ul className="space-y-1 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+              {publicPreviewDrift.issues.map((issue) => (
+                <li key={issue}>- {issue}</li>
+              ))}
+            </ul>
+          )}
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="rounded-md border border-border p-3">
+              <p className="mb-2 text-sm font-medium">providerDirectory snapshot (raw)</p>
+              <pre className="max-h-[360px] overflow-auto rounded-md bg-muted/40 p-3 text-xs">
+                {JSON.stringify(data?.providerDirectory || null, null, 2)}
+              </pre>
+            </div>
+
+            <div className="rounded-md border border-border p-3">
+              <p className="mb-2 text-sm font-medium">Cum apare în app</p>
+              <div className="space-y-3 rounded-md border border-border bg-background p-3">
+                <div className="flex items-center gap-3">
+                  <AvatarPreview src={avatarPreviewUrl} loading={avatarPreviewLoading} name={displayName} size="sm" />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold">
+                      {readString(data?.providerDirectory?.displayName) || displayName}
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {readString(data?.providerDirectory?.categoryPrimary) || formatValue(specialization, "-")}
+                    </p>
+                  </div>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <FieldValue label="Rating" value={ratingSummary.label} />
+                  <FieldValue label="Coverage" value={readString(data?.providerDirectory?.coverageAreaText) || "-"} />
+                  <FieldValue
+                    label="Tarif"
+                    value={formatCurrency(
+                      readNumber(data?.providerDirectory?.baseRateAmount),
+                      readString(data?.providerDirectory?.baseRateCurrency) || "RON"
+                    )}
+                  />
+                  <FieldValue
+                    label="Availability"
+                    value={readString(data?.providerDirectory?.availabilitySummary) || "-"}
+                  />
+                </div>
+                <div>
+                  <p className="text-xs uppercase text-muted-foreground">Servicii publice</p>
+                  <ul className="mt-1 space-y-1 text-sm">
+                    {publicServiceSummaries.length ? (
+                      publicServiceSummaries.slice(0, 5).map((service, index) => (
+                        <li key={`${readString(service?.serviceId) || index}`} className="truncate">
+                          {readString(service?.name) || readString(service?.categoryLabel) || "Serviciu"}
+                        </li>
+                      ))
+                    ) : (
+                      <li className="text-muted-foreground">Fără servicii publicate.</li>
+                    )}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
         <Card>
@@ -1755,15 +1988,16 @@ export default function ProviderDetailPage() {
         open={Boolean(dialogAction)}
         loading={saving}
         error={actionError}
+        approvalWarnings={approvalBlockedReasons}
         onOpenChange={(open) => {
           if (!open) {
             setDialogAction(null);
             setActionError(null);
           }
         }}
-        onConfirm={async (reason) => {
+        onConfirm={async (reason, overrideIncompleteProfile) => {
           if (!dialogAction) return false;
-          return submitReview(dialogAction, reason);
+          return submitReview(dialogAction, reason, overrideIncompleteProfile);
         }}
       />
 

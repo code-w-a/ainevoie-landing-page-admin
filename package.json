@@ -12,6 +12,7 @@
     "test:unit:watch": "vitest",
     "test:smoke": "playwright test",
     "test:build": "next build",
+    "test:firestore-indexes": "node ../expo-mobile-app/scripts/firestore-indexes-check.mjs",
     "test:functions": "npm --prefix functions run build",
     "test:ci": "npm run typecheck && npm run lint && npm run test:unit && npm run test:functions && npm run test:build && npm run test:smoke",
     "stripe:listen": "stripe listen --forward-to http://localhost:3000/api/stripe/webhook"

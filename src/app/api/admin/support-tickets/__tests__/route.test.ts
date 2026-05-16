@@ -247,7 +247,7 @@ describe("admin support tickets routes", () => {
     const { GET } = await import("../route");
     const response = await GET(
       new Request(
-        "https://example.com/api/admin/support-tickets?page=1&pageSize=20&status=open&priority=normal&topic=support&assignedAdminUid=admin_1&requesterUid=user_1&relatedEntity=bk_1&dateFrom=2026-05-08&dateTo=2026-05-08&q=account"
+        "https://example.com/api/admin/support-tickets?page=1&pageSize=20&status=open&priority=normal&topic=support&assignedAdminUid=admin_1&requesterUid=user_1&relatedEntityType=booking&relatedEntityId=bk_1&dateFrom=2026-05-08&dateTo=2026-05-08&q=account"
       )
     );
     const json = await response.json();

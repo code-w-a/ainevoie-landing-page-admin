@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const serviceMocks = vi.hoisted(() => ({
+  listAdminSupportTickets: vi.fn(),
+  listAdminConversations: vi.fn(),
+}));
+
 vi.mock("@/lib/adminAuth", () => ({
   requireAdminOrSupport: vi.fn().mockResolvedValue({
     uid: "admin-uid",
@@ -14,6 +19,14 @@ vi.mock("@/lib/adminAuth", () => ({
 
 vi.mock("@/lib/sentryServer", () => ({
   captureServerException: vi.fn(),
+}));
+
+vi.mock("@/lib/adminSupportTickets", () => ({
+  listAdminSupportTickets: serviceMocks.listAdminSupportTickets,
+}));
+
+vi.mock("@/lib/adminConversations", () => ({
+  listAdminConversations: serviceMocks.listAdminConversations,
 }));
 
 function jsonResponse(body: unknown, status = 200) {
@@ -37,9 +50,28 @@ function bodyFromCall(init?: RequestInit) {
 describe("admin dashboard route", () => {
   beforeEach(() => {
     vi.resetModules();
+    vi.clearAllMocks();
     vi.stubEnv("FIREBASE_PROJECT_ID", "test-project");
     vi.stubEnv("FIREBASE_REGION", "europe-west1");
     vi.stubEnv("ADMIN_API_KEY", "admin-secret");
+    serviceMocks.listAdminSupportTickets.mockResolvedValue({
+      total: 2,
+      items: [
+        { ticketId: "ticket-urgent", priority: "urgent", status: "open" },
+        { ticketId: "ticket-resolved", priority: "urgent", status: "resolved" },
+      ],
+      truncated: false,
+      maxRows: 25,
+    });
+    serviceMocks.listAdminConversations
+      .mockResolvedValueOnce({
+        items: [{ conversationId: "conv-flagged", moderationStatus: "flagged" }],
+        page: { nextCursor: null, hasMore: false },
+      })
+      .mockResolvedValueOnce({
+        items: [{ conversationId: "conv-review", moderationStatus: "under_review" }],
+        page: { nextCursor: null, hasMore: false },
+      });
     vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
       const callableName = callableNameFromUrl(input);
       if (callableName === "getAdminDashboardSummary") {
@@ -73,8 +105,16 @@ describe("admin dashboard route", () => {
     expect(json.summary.totals.providers).toBe(2);
     expect(json.queues.pendingProviders.items).toEqual([{ providerId: "provider-1" }]);
     expect(json.queues.requestedBookings.items).toEqual([{ bookingId: "booking-1" }]);
+    expect(json.queues.overdueBookingRequests.items).toEqual([{ bookingId: "booking-1" }]);
     expect(json.queues.rescheduleBookings.items).toEqual([{ bookingId: "booking-1" }]);
     expect(json.queues.failedPaymentBookings.items).toEqual([{ bookingId: "booking-1" }]);
+    expect(json.queues.urgentSupportTickets.items).toEqual([
+      { ticketId: "ticket-urgent", priority: "urgent", status: "open" },
+    ]);
+    expect(json.queues.flaggedConversations.items).toEqual([
+      { conversationId: "conv-flagged", moderationStatus: "flagged" },
+      { conversationId: "conv-review", moderationStatus: "under_review" },
+    ]);
     expect(json.recentAuditEvents.items).toEqual([{ eventId: "event-1" }]);
     expect(json.generatedAt).toEqual(expect.any(String));
   });
@@ -118,6 +158,16 @@ describe("admin dashboard route", () => {
           name: "listAdminBookings",
           body: {
             data: {
+              overdueOnly: true,
+              limit: 5,
+              adminApiKey: "admin-secret",
+            },
+          },
+        },
+        {
+          name: "listAdminBookings",
+          body: {
+            data: {
               status: "reschedule_proposed",
               limit: 5,
               adminApiKey: "admin-secret",
@@ -139,6 +189,18 @@ describe("admin dashboard route", () => {
           body: { data: { limit: 6, adminApiKey: "admin-secret" } },
         },
       ])
+    );
+    expect(serviceMocks.listAdminSupportTickets).toHaveBeenCalledWith(
+      {},
+      { maxRows: 100 }
+    );
+    expect(serviceMocks.listAdminConversations).toHaveBeenCalledWith(
+      { moderationStatus: "flagged" },
+      { limit: 5 }
+    );
+    expect(serviceMocks.listAdminConversations).toHaveBeenCalledWith(
+      { moderationStatus: "under_review" },
+      { limit: 5 }
     );
   });
 

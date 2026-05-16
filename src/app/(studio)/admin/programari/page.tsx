@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CalendarClock, Search } from "lucide-react";
 import { useAdminData } from "@/components/admin/useAdminData";
 import { AdminTableSkeleton } from "@/components/admin/AdminSkeletonLayouts";
+import { humanProviderLabel, humanUserLabel } from "@/lib/adminHumanize";
 import { formatAdminDateTime } from "@/lib/formatAdminDateTime";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -92,6 +93,7 @@ const bookingStatuses = [
   "expired_unanswered",
   "cancelled_by_user",
   "cancelled_by_provider",
+  "cancelled_by_admin",
 ];
 
 const paymentStatuses = ["unpaid", "in_progress", "paid", "failed"];
@@ -291,8 +293,16 @@ export default function AdminBookingsPage() {
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell>{item.userSnapshot?.displayName || item.userId || "-"}</TableCell>
-                      <TableCell>{item.providerSnapshot?.displayName || item.providerId || "-"}</TableCell>
+                      <TableCell>
+                        {humanUserLabel({
+                          displayName: item.userSnapshot?.displayName,
+                        })}
+                      </TableCell>
+                      <TableCell>
+                        {humanProviderLabel({
+                          displayName: item.providerSnapshot?.displayName,
+                        })}
+                      </TableCell>
                       <TableCell>{item.serviceSnapshot?.name || item.serviceId || "-"}</TableCell>
                       <TableCell>
                         <div className="mb-1 text-xs text-muted-foreground">

@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { ArrowLeft, CalendarClock, FileText } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { useAdminData } from "@/components/admin/useAdminData";
+import { adminFetch, readAdminResponseError } from "@/components/admin/adminApi";
 import { AdminFormGridSkeleton } from "@/components/admin/AdminSkeletonLayouts";
+import { humanProviderLabel, humanUserLabel } from "@/lib/adminHumanize";
 import { formatAdminDateTime } from "@/lib/formatAdminDateTime";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -131,6 +133,38 @@ export default function AdminUserDetailPage() {
   const accountMeta = getAccountStatusMeta(user?.accountStatus);
   const recentBookings = data?.recentBookings || [];
   const recentAuditEvents = data?.recentAuditEvents || [];
+  const [pending, setPending] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [reason, setReason] = useState("");
+  const [note, setNote] = useState("");
+  const [resolutionStatus, setResolutionStatus] = useState<"open" | "in_progress" | "resolved">("open");
+
+  async function changeUserState(action: "disable" | "enable") {
+    setPending(true);
+    setActionError(null);
+    try {
+      const response = await adminFetch(`/api/admin/users/${encodeURIComponent(userId)}/state`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action,
+          reason: action === "disable" ? reason.trim() : undefined,
+          note: note.trim() || undefined,
+          resolutionStatus,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(await readAdminResponseError(response, "Nu am putut actualiza starea utilizatorului."));
+      }
+
+      window.location.reload();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Nu am putut actualiza starea utilizatorului.");
+    } finally {
+      setPending(false);
+    }
+  }
 
   if (loading) {
     return <AdminFormGridSkeleton fields={8} />;
@@ -165,7 +199,13 @@ export default function AdminUserDetailPage() {
               Înapoi
             </Link>
           </Button>
-          <h1 className="mt-4 text-2xl font-semibold">{formatValue(user.displayName, "Utilizator")}</h1>
+          <h1 className="mt-4 text-2xl font-semibold">
+            {humanUserLabel({
+              displayName: user.displayName,
+              email: user.email,
+              phoneNumber: user.phoneNumber,
+            })}
+          </h1>
           <p className="text-sm text-muted-foreground">ID: {user.userId || user.uid || userId}</p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -189,6 +229,62 @@ export default function AdminUserDetailPage() {
           <FieldValue label="Locație" value={formatValue(user.primaryLocation?.formattedAddress)} />
           <FieldValue label="Creat la" value={formatAdminDateTime(user.createdAt)} />
           <FieldValue label="Ultimul login" value={formatAdminDateTime(user.lastLoginAt)} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Acțiuni administrative</CardTitle>
+          <CardDescription>Disable/enable cont cu context de caz intern.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid gap-3 md:grid-cols-3">
+            <input
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+              placeholder="Motiv (obligatoriu la disable)"
+              value={reason}
+              disabled={pending}
+              onChange={(event) => setReason(event.target.value)}
+            />
+            <input
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+              placeholder="Notă internă"
+              value={note}
+              disabled={pending}
+              onChange={(event) => setNote(event.target.value)}
+            />
+            <select
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+              value={resolutionStatus}
+              disabled={pending}
+              onChange={(event) => setResolutionStatus(event.target.value as "open" | "in_progress" | "resolved")}
+            >
+              <option value="open">open</option>
+              <option value="in_progress">in_progress</option>
+              <option value="resolved">resolved</option>
+            </select>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="destructive"
+              disabled={pending || !reason.trim()}
+              onClick={() => {
+                void changeUserState("disable");
+              }}
+            >
+              Disable user
+            </Button>
+            <Button
+              variant="outline"
+              disabled={pending}
+              onClick={() => {
+                void changeUserState("enable");
+              }}
+            >
+              Enable user
+            </Button>
+          </div>
+          {actionError && <p className="text-sm text-rose-500">{actionError}</p>}
         </CardContent>
       </Card>
 
@@ -245,7 +341,12 @@ export default function AdminUserDetailPage() {
                     </div>
                     <div className="text-xs text-muted-foreground">{booking.bookingId}</div>
                   </TableCell>
-                  <TableCell>{booking.providerSnapshot?.displayName || booking.providerSnapshot?.businessName || booking.providerId || "-"}</TableCell>
+                  <TableCell>
+                    {humanProviderLabel({
+                      displayName: booking.providerSnapshot?.displayName,
+                      businessName: booking.providerSnapshot?.businessName,
+                    })}
+                  </TableCell>
                   <TableCell>{booking.serviceSnapshot?.title || booking.serviceSnapshot?.name || "-"}</TableCell>
                   <TableCell>{booking.status || "-"}</TableCell>
                   <TableCell className="text-right">

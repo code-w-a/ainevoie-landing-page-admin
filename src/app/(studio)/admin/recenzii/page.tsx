@@ -5,7 +5,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Download, Eye, EyeOff, Search, Save } from "lucide-react";
 import { useAdminData } from "@/components/admin/useAdminData";
 import { adminFetch, readAdminResponseError } from "@/components/admin/adminApi";
+import { AdminEntityLookup } from "@/components/admin/AdminEntityLookup";
 import { AdminTableSkeleton } from "@/components/admin/AdminSkeletonLayouts";
+import { humanProviderLabel, humanUserLabel } from "@/lib/adminHumanize";
 import { formatAdminDateTime } from "@/lib/formatAdminDateTime";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -144,7 +146,7 @@ export default function AdminReviewsPage() {
   );
 
   const { data, loading, error, reload } = useAdminData<ReviewsResponse>(endpoint);
-  const items = data?.items || [];
+  const items = useMemo(() => data?.items || [], [data?.items]);
   const pagination = data?.pagination;
   const truncated = Boolean(data?.meta?.truncated);
 
@@ -229,22 +231,24 @@ export default function AdminReviewsPage() {
               </option>
             ))}
           </select>
-          <Input
-            placeholder="Provider ID"
+          <AdminEntityLookup
             value={providerId}
+            entityType="provider"
             disabled={loading}
-            onChange={(event) => {
+            placeholder="Provider"
+            onValueChange={(nextValue) => {
               setPage(1);
-              setProviderId(event.target.value);
+              setProviderId(nextValue);
             }}
           />
-          <Input
-            placeholder="User ID"
+          <AdminEntityLookup
             value={userId}
+            entityType="user"
             disabled={loading}
-            onChange={(event) => {
+            placeholder="User"
+            onValueChange={(nextValue) => {
               setPage(1);
-              setUserId(event.target.value);
+              setUserId(nextValue);
             }}
           />
           <select
@@ -365,7 +369,10 @@ export default function AdminReviewsPage() {
                           className="underline underline-offset-2"
                           href={`/admin/prestatori/${encodeURIComponent(item.providerId)}`}
                         >
-                          {item.provider?.displayName || item.providerSnapshot?.displayName || item.providerId}
+                          {humanProviderLabel({
+                            displayName: item.provider?.displayName || item.providerSnapshot?.displayName,
+                            email: item.provider?.email,
+                          })}
                         </Link>
                       </TableCell>
                       <TableCell>
@@ -373,7 +380,10 @@ export default function AdminReviewsPage() {
                           className="underline underline-offset-2"
                           href={`/admin/utilizatori/${encodeURIComponent(item.authorUserId)}`}
                         >
-                          {item.user?.displayName || item.authorSnapshot?.displayName || item.authorUserId}
+                          {humanUserLabel({
+                            displayName: item.user?.displayName || item.authorSnapshot?.displayName,
+                            email: item.user?.email,
+                          })}
                         </Link>
                       </TableCell>
                       <TableCell>{item.serviceSnapshot?.serviceName || "-"}</TableCell>

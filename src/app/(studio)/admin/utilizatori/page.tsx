@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { FileText } from "lucide-react";
+import { FileText, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useAdminData } from "@/components/admin/useAdminData";
+import { adminFetch, readAdminResponseError } from "@/components/admin/adminApi";
 import { AdminTableSkeleton } from "@/components/admin/AdminSkeletonLayouts";
+import { humanUserLabel } from "@/lib/adminHumanize";
 import { formatAdminDateTime } from "@/lib/formatAdminDateTime";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,6 +26,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 type LegalConsentState = "accepted" | "partial" | "missing";
 
@@ -83,8 +93,41 @@ export default function AdminUsersPage() {
     return `/api/admin/users?${params.toString()}`;
   }, [debouncedQ]);
 
-  const { data, loading, error } = useAdminData<UsersResponse>(endpoint);
+  const { data, loading, error, reload } = useAdminData<UsersResponse>(endpoint);
   const items = data?.items || [];
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteSuccess, setDeleteSuccess] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const canDeleteConfirm = Boolean(
+    deleteTarget
+      && deleteConfirmation.trim() === deleteTarget.id
+  );
+
+  async function deleteUserFromList() {
+    if (!deleteTarget?.id) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const res = await adminFetch(`/api/admin/users/${encodeURIComponent(deleteTarget.id)}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        throw new Error(await readAdminResponseError(res, "Nu am putut șterge utilizatorul."));
+      }
+      const deletedName = deleteTarget.name;
+      setDeleteTarget(null);
+      setDeleteConfirmation("");
+      setDeleteSuccess(`Utilizatorul "${deletedName}" a fost șters definitiv.`);
+      await reload();
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Nu am putut șterge utilizatorul.");
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -124,6 +167,7 @@ export default function AdminUsersPage() {
         </CardHeader>
         <CardContent>
           {error && <p className="mb-4 text-sm text-rose-500">{error}</p>}
+          {deleteSuccess && <p className="mb-4 text-sm text-emerald-700">{deleteSuccess}</p>}
 
           {loading ?
             <AdminTableSkeleton rows={10} columns={7} />
@@ -155,7 +199,13 @@ export default function AdminUsersPage() {
                   return (
                     <TableRow key={userId || item.email || item.phoneNumber}>
                       <TableCell>
-                        <div className="font-medium">{item.displayName || userId || "-"}</div>
+                        <div className="font-medium">
+                          {humanUserLabel({
+                            displayName: item.displayName,
+                            email: item.email,
+                            phoneNumber: item.phoneNumber,
+                          })}
+                        </div>
                         <div className="text-xs text-muted-foreground">{userId || "-"}</div>
                       </TableCell>
                       <TableCell>
@@ -176,12 +226,31 @@ export default function AdminUsersPage() {
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button size="sm" variant="outline" asChild disabled={!userId}>
-                          <Link href={`/admin/utilizatori/${userId}`}>
-                            <FileText className="mr-2 h-4 w-4" />
-                            Detalii
-                          </Link>
-                        </Button>
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            disabled={!userId || deleting}
+                            onClick={() => {
+                              setDeleteSuccess(null);
+                              setDeleteError(null);
+                              setDeleteConfirmation("");
+                              setDeleteTarget({
+                                id: userId,
+                                name: item.displayName || item.email || userId,
+                              });
+                            }}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Șterge
+                          </Button>
+                          <Button size="sm" variant="outline" asChild disabled={!userId}>
+                            <Link href={`/admin/utilizatori/${userId}`}>
+                              <FileText className="mr-2 h-4 w-4" />
+                              Detalii
+                            </Link>
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
@@ -191,6 +260,63 @@ export default function AdminUsersPage() {
           }
         </CardContent>
       </Card>
+
+      <Dialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => {
+          if (deleting) return;
+          if (!open) {
+            setDeleteTarget(null);
+            setDeleteConfirmation("");
+            setDeleteError(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Șterge definitiv utilizatorul</DialogTitle>
+            <DialogDescription>
+              Această acțiune este ireversibilă. Tastează codul intern pentru confirmare.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm">
+            <p className="font-medium">{deleteTarget?.name || "-"}</p>
+            <p className="mt-1 text-muted-foreground">Cod intern: {deleteTarget?.id || "-"}</p>
+          </div>
+          <input
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            value={deleteConfirmation}
+            disabled={deleting}
+            onChange={(event) => setDeleteConfirmation(event.target.value)}
+            placeholder={deleteTarget?.id || ""}
+          />
+          {deleteError && <p className="text-sm text-rose-500">{deleteError}</p>}
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={deleting}
+              onClick={() => {
+                setDeleteTarget(null);
+                setDeleteConfirmation("");
+                setDeleteError(null);
+              }}
+            >
+              Anulează
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={!canDeleteConfirm || deleting}
+              onClick={() => {
+                void deleteUserFromList();
+              }}
+            >
+              {deleting ? "Se șterge..." : "Șterge definitiv"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

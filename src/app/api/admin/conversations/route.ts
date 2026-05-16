@@ -20,6 +20,7 @@ export async function GET(request: Request) {
       {
         status: searchParams.get("status")?.trim() || undefined,
         type: searchParams.get("type")?.trim() || undefined,
+        moderationStatus: searchParams.get("moderationStatus")?.trim() || undefined,
         userId: searchParams.get("userId")?.trim() || undefined,
         providerId: searchParams.get("providerId")?.trim() || undefined,
         conversationId: searchParams.get("conversationId")?.trim() || undefined,

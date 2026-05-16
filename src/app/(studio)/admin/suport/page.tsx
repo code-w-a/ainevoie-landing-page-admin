@@ -5,7 +5,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Save, Search } from "lucide-react";
 import { useAdminData } from "@/components/admin/useAdminData";
 import { adminFetch, readAdminResponseError } from "@/components/admin/adminApi";
+import { AdminEntityLookup } from "@/components/admin/AdminEntityLookup";
 import { AdminTableSkeleton } from "@/components/admin/AdminSkeletonLayouts";
+import { humanAdminLabel, humanProviderLabel, humanUserLabel } from "@/lib/adminHumanize";
 import { formatAdminDateTime } from "@/lib/formatAdminDateTime";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -57,6 +59,21 @@ type SupportTicketListItem = {
     providerId: string | null;
     userId: string | null;
   } | null;
+  relatedBooking?: {
+    bookingId: string;
+    status: string | null;
+    scheduledStartAt: string | null;
+  } | null;
+  relatedUser?: {
+    userId: string;
+    displayName: string | null;
+    email: string | null;
+  } | null;
+  relatedProvider?: {
+    providerId: string;
+    displayName: string | null;
+    email: string | null;
+  } | null;
   slaAgeMinutes: number;
   updatedAt: string | null;
   createdAt: string | null;
@@ -80,9 +97,8 @@ type TicketDraft = {
   priority: string;
   assignedAdminUid: string;
   adminNote: string;
-  relatedBookingId: string;
-  relatedProviderId: string;
-  relatedUserId: string;
+  relatedEntityType: "booking" | "provider" | "user";
+  relatedEntityId: string;
 };
 
 const statuses: SupportTicketStatus[] = ["open", "in_progress", "waiting_user", "resolved", "closed"];
@@ -141,7 +157,8 @@ export default function AdminSupportTicketsPage() {
   const [topic, setTopic] = useState("all");
   const [assignedAdminUid, setAssignedAdminUid] = useState("");
   const [requesterUid, setRequesterUid] = useState("");
-  const [relatedEntity, setRelatedEntity] = useState("");
+  const [relatedEntityType, setRelatedEntityType] = useState<"booking" | "provider" | "user">("booking");
+  const [relatedEntityId, setRelatedEntityId] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
@@ -164,7 +181,10 @@ export default function AdminSupportTicketsPage() {
     if (topic !== "all") params.set("topic", topic);
     if (assignedAdminUid.trim()) params.set("assignedAdminUid", assignedAdminUid.trim());
     if (requesterUid.trim()) params.set("requesterUid", requesterUid.trim());
-    if (relatedEntity.trim()) params.set("relatedEntity", relatedEntity.trim());
+    if (relatedEntityId.trim()) {
+      params.set("relatedEntityType", relatedEntityType);
+      params.set("relatedEntityId", relatedEntityId.trim());
+    }
     if (dateFrom) params.set("dateFrom", dateFrom);
     if (dateTo) params.set("dateTo", dateTo);
     return params;
@@ -175,7 +195,8 @@ export default function AdminSupportTicketsPage() {
     debouncedQ,
     page,
     priority,
-    relatedEntity,
+    relatedEntityId,
+    relatedEntityType,
     requesterUid,
     status,
     topic,
@@ -187,7 +208,7 @@ export default function AdminSupportTicketsPage() {
   );
 
   const { data, loading, error, reload } = useAdminData<SupportTicketsResponse>(endpoint);
-  const items = data?.items || [];
+  const items = useMemo(() => data?.items || [], [data?.items]);
   const pagination = data?.pagination;
   const truncated = Boolean(data?.meta?.truncated);
 
@@ -203,9 +224,15 @@ export default function AdminSupportTicketsPage() {
           priority: item.priority,
           assignedAdminUid: item.assignedAdminUid || "",
           adminNote: item.adminNote || "",
-          relatedBookingId: item.relatedEntity?.bookingId || "",
-          relatedProviderId: item.relatedEntity?.providerId || "",
-          relatedUserId: item.relatedEntity?.userId || "",
+          relatedEntityType: item.relatedEntity?.bookingId
+            ? "booking"
+            : item.relatedEntity?.providerId
+              ? "provider"
+              : "user",
+          relatedEntityId: item.relatedEntity?.bookingId
+            || item.relatedEntity?.providerId
+            || item.relatedEntity?.userId
+            || "",
         };
       });
       return next;
@@ -231,16 +258,13 @@ export default function AdminSupportTicketsPage() {
             priority: draft.priority,
             assignedAdminUid: draft.assignedAdminUid.trim() || null,
             adminNote: draft.adminNote,
-            relatedEntity:
-              draft.relatedBookingId.trim()
-              || draft.relatedProviderId.trim()
-              || draft.relatedUserId.trim()
-                ? {
-                  bookingId: draft.relatedBookingId.trim() || null,
-                  providerId: draft.relatedProviderId.trim() || null,
-                  userId: draft.relatedUserId.trim() || null,
-                }
-                : null,
+            relatedEntity: draft.relatedEntityId.trim()
+              ? {
+                bookingId: draft.relatedEntityType === "booking" ? draft.relatedEntityId.trim() : null,
+                providerId: draft.relatedEntityType === "provider" ? draft.relatedEntityId.trim() : null,
+                userId: draft.relatedEntityType === "user" ? draft.relatedEntityId.trim() : null,
+              }
+              : null,
           }),
         }
       );
@@ -337,33 +361,51 @@ export default function AdminSupportTicketsPage() {
             ))}
           </select>
 
-          <Input
-            placeholder="Assigned admin UID"
+          <AdminEntityLookup
             value={assignedAdminUid}
+            entityType="admin"
             disabled={loading}
-            onChange={(event) => {
+            placeholder="Assignee admin"
+            onValueChange={(nextValue) => {
               setPage(1);
-              setAssignedAdminUid(event.target.value);
+              setAssignedAdminUid(nextValue);
             }}
           />
 
-          <Input
-            placeholder="Requester UID"
+          <AdminEntityLookup
             value={requesterUid}
+            entityType={["user", "provider"]}
             disabled={loading}
-            onChange={(event) => {
+            placeholder="Requester (user/provider)"
+            onValueChange={(nextValue) => {
               setPage(1);
-              setRequesterUid(event.target.value);
+              setRequesterUid(nextValue);
             }}
           />
 
-          <Input
-            placeholder="Related entity"
-            value={relatedEntity}
+          <select
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm disabled:opacity-60"
+            value={relatedEntityType}
             disabled={loading}
             onChange={(event) => {
               setPage(1);
-              setRelatedEntity(event.target.value);
+              setRelatedEntityType(event.target.value as "booking" | "provider" | "user");
+              setRelatedEntityId("");
+            }}
+          >
+            <option value="booking">Related booking</option>
+            <option value="provider">Related provider</option>
+            <option value="user">Related user</option>
+          </select>
+
+          <AdminEntityLookup
+            value={relatedEntityId}
+            entityType={relatedEntityType}
+            disabled={loading}
+            placeholder="Select related entity"
+            onValueChange={(nextValue) => {
+              setPage(1);
+              setRelatedEntityId(nextValue);
             }}
           />
 
@@ -446,16 +488,25 @@ export default function AdminSupportTicketsPage() {
                           className="underline underline-offset-2"
                           href={requesterHref(item)}
                         >
-                          {item.requester.displayName || item.requester.email || item.requesterUid}
+                          {item.requesterRole === "provider"
+                            ? humanProviderLabel({
+                                displayName: item.requester.displayName,
+                                email: item.requester.email,
+                              })
+                            : humanUserLabel({
+                                displayName: item.requester.displayName,
+                                email: item.requester.email,
+                              })}
                         </Link>
                         <p className="text-xs text-muted-foreground">{item.requester.role}</p>
                       </TableCell>
                       <TableCell className="align-top">
                         {item.assignedAdminUid ? (
                           <p className="text-sm">
-                            {item.assignedAdminSnapshot?.displayName
-                            || item.assignedAdminSnapshot?.email
-                            || item.assignedAdminUid}
+                            {humanAdminLabel({
+                              displayName: item.assignedAdminSnapshot?.displayName,
+                              email: item.assignedAdminSnapshot?.email,
+                            })}
                           </p>
                         ) : (
                           <p className="text-sm text-muted-foreground">Neasignat</p>
@@ -468,7 +519,8 @@ export default function AdminSupportTicketsPage() {
                               href={`/admin/programari/${encodeURIComponent(item.relatedEntity.bookingId)}`}
                               className="block underline underline-offset-2"
                             >
-                              booking: {item.relatedEntity.bookingId}
+                              booking: {item.relatedBooking?.status ? label(item.relatedBooking.status) : "Programare"}
+                              <span className="ml-1 text-muted-foreground">({item.relatedEntity.bookingId})</span>
                             </Link>
                           ) : null}
                           {item.relatedEntity?.providerId ? (
@@ -476,7 +528,11 @@ export default function AdminSupportTicketsPage() {
                               href={`/admin/prestatori/${encodeURIComponent(item.relatedEntity.providerId)}`}
                               className="block underline underline-offset-2"
                             >
-                              provider: {item.relatedEntity.providerId}
+                              provider: {humanProviderLabel({
+                                displayName: item.relatedProvider?.displayName,
+                                email: item.relatedProvider?.email,
+                              })}
+                              <span className="ml-1 text-muted-foreground">({item.relatedEntity.providerId})</span>
                             </Link>
                           ) : null}
                           {item.relatedEntity?.userId ? (
@@ -484,7 +540,11 @@ export default function AdminSupportTicketsPage() {
                               href={`/admin/utilizatori/${encodeURIComponent(item.relatedEntity.userId)}`}
                               className="block underline underline-offset-2"
                             >
-                              user: {item.relatedEntity.userId}
+                              user: {humanUserLabel({
+                                displayName: item.relatedUser?.displayName,
+                                email: item.relatedUser?.email,
+                              })}
+                              <span className="ml-1 text-muted-foreground">({item.relatedEntity.userId})</span>
                             </Link>
                           ) : null}
                           {!item.relatedEntity?.bookingId
@@ -543,16 +603,17 @@ export default function AdminSupportTicketsPage() {
                               </select>
                             </div>
 
-                            <Input
+                            <AdminEntityLookup
                               value={draft.assignedAdminUid}
-                              placeholder="assignedAdminUid"
+                              entityType="admin"
                               disabled={isPending}
-                              onChange={(event) =>
+                              placeholder="Assignee admin"
+                              onValueChange={(nextValue) =>
                                 setDrafts((current) => ({
                                   ...current,
                                   [item.ticketId]: {
                                     ...current[item.ticketId],
-                                    assignedAdminUid: event.target.value,
+                                    assignedAdminUid: nextValue,
                                   },
                                 }))
                               }
@@ -573,45 +634,37 @@ export default function AdminSupportTicketsPage() {
                               }
                             />
 
-                            <div className="grid gap-2 md:grid-cols-3">
-                              <Input
-                                value={draft.relatedBookingId}
-                                placeholder="bookingId"
+                            <div className="grid gap-2 md:grid-cols-[200px_minmax(0,1fr)]">
+                              <select
+                                className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                                value={draft.relatedEntityType}
                                 disabled={isPending}
                                 onChange={(event) =>
                                   setDrafts((current) => ({
                                     ...current,
                                     [item.ticketId]: {
                                       ...current[item.ticketId],
-                                      relatedBookingId: event.target.value,
+                                      relatedEntityType: event.target.value as "booking" | "provider" | "user",
+                                      relatedEntityId: "",
                                     },
                                   }))
                                 }
-                              />
-                              <Input
-                                value={draft.relatedProviderId}
-                                placeholder="providerId"
+                              >
+                                <option value="booking">booking</option>
+                                <option value="provider">provider</option>
+                                <option value="user">user</option>
+                              </select>
+                              <AdminEntityLookup
+                                value={draft.relatedEntityId}
+                                entityType={draft.relatedEntityType}
                                 disabled={isPending}
-                                onChange={(event) =>
+                                placeholder={`Select ${draft.relatedEntityType}`}
+                                onValueChange={(nextValue) =>
                                   setDrafts((current) => ({
                                     ...current,
                                     [item.ticketId]: {
                                       ...current[item.ticketId],
-                                      relatedProviderId: event.target.value,
-                                    },
-                                  }))
-                                }
-                              />
-                              <Input
-                                value={draft.relatedUserId}
-                                placeholder="userId"
-                                disabled={isPending}
-                                onChange={(event) =>
-                                  setDrafts((current) => ({
-                                    ...current,
-                                    [item.ticketId]: {
-                                      ...current[item.ticketId],
-                                      relatedUserId: event.target.value,
+                                      relatedEntityId: nextValue,
                                     },
                                   }))
                                 }

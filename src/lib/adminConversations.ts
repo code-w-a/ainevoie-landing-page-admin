@@ -16,6 +16,7 @@ export type ConversationParticipantBlockPayload = {
 export type AdminConversationListFilters = {
   status?: string;
   type?: string;
+  moderationStatus?: string;
   userId?: string;
   providerId?: string;
   conversationId?: string;
@@ -30,6 +31,18 @@ export type AdminConversationListItem = {
   bookingId: string | null;
   userId: string | null;
   providerId: string | null;
+  user: {
+    userId: string | null;
+    displayName: string | null;
+    email: string | null;
+    phoneNumber: string | null;
+  } | null;
+  provider: {
+    providerId: string | null;
+    displayName: string | null;
+    email: string | null;
+    phoneNumber: string | null;
+  } | null;
   participantIds: string[];
   lastMessage: {
     messageId: string | null;
@@ -63,6 +76,11 @@ export type AdminConversationParticipant = {
     displayName: string | null;
     avatarPath: string | null;
   };
+  profile: {
+    displayName: string | null;
+    email: string | null;
+    role: string | null;
+  } | null;
   updatedAt: string | null;
   createdAt: string | null;
 };
@@ -77,6 +95,11 @@ export type AdminConversationMessageItem = {
   conversationId: string;
   senderUid: string | null;
   senderRole: string | null;
+  senderSnapshot: {
+    displayName: string | null;
+    email: string | null;
+    role: string | null;
+  } | null;
   type: string;
   body: string;
   status: string;
@@ -158,6 +181,33 @@ function normalizeModerationStatus(value: unknown): ConversationModerationStatus
   return "none";
 }
 
+async function loadByIds(collectionName: string, ids: string[]) {
+  if (!ids.length) {
+    return new Map<string, Record<string, unknown>>();
+  }
+  try {
+    const db = getAdminDb();
+    const snapshots = await Promise.all(ids.map((id) => db.collection(collectionName).doc(id).get()));
+    const map = new Map<string, Record<string, unknown>>();
+    snapshots.forEach((snap) => {
+      if (snap.exists) {
+        map.set(snap.id, (snap.data() || {}) as Record<string, unknown>);
+      }
+    });
+    return map;
+  } catch {
+    return new Map<string, Record<string, unknown>>();
+  }
+}
+
+function mapProviderDisplayName(provider: Record<string, unknown> | null) {
+  const profile = (provider?.professionalProfile as Record<string, unknown> | undefined) || {};
+  return readString(profile.displayName)
+    || readString(profile.businessName)
+    || readString(provider?.displayName)
+    || null;
+}
+
 function serializeCursor(payload: CursorPayload) {
   return Buffer.from(JSON.stringify(payload), "utf8").toString("base64");
 }
@@ -185,6 +235,7 @@ function buildConversationItem(
   source: Record<string, unknown>
 ): AdminConversationListItem {
   const moderation = (source.adminModeration as Record<string, unknown> | undefined) || {};
+  const moderationStatus = normalizeModerationStatus(source.moderationStatus || moderation.status);
   const lastMessage = (source.lastMessage as Record<string, unknown> | undefined) || null;
 
   return {
@@ -194,6 +245,8 @@ function buildConversationItem(
     bookingId: readString(source.bookingId) || null,
     userId: readString(source.userId) || null,
     providerId: readString(source.providerId) || null,
+    user: null,
+    provider: null,
     participantIds: Array.isArray(source.participantIds)
       ? source.participantIds.map((item) => readString(item)).filter(Boolean)
       : [],
@@ -206,7 +259,7 @@ function buildConversationItem(
         createdAt: toIso(lastMessage.createdAt),
       }
       : null,
-    moderationStatus: normalizeModerationStatus(moderation.status),
+    moderationStatus,
     moderationNote: readString(moderation.note) || null,
     updatedAt: toIso(source.updatedAt),
     createdAt: toIso(source.createdAt),
@@ -226,6 +279,7 @@ function matchesIdOnlySearch(item: AdminConversationListItem, query: string) {
 function matchesStructuredFilters(item: AdminConversationListItem, filters: AdminConversationListFilters) {
   const status = readString(filters.status);
   const type = readString(filters.type);
+  const moderationStatus = readString(filters.moderationStatus);
   const userId = readString(filters.userId);
   const providerId = readString(filters.providerId);
 
@@ -233,6 +287,9 @@ function matchesStructuredFilters(item: AdminConversationListItem, filters: Admi
     return false;
   }
   if (type && readString(item.type) !== type) {
+    return false;
+  }
+  if (moderationStatus && readString(item.moderationStatus) !== moderationStatus) {
     return false;
   }
   if (userId && readString(item.userId) !== userId) {
@@ -246,7 +303,8 @@ function matchesStructuredFilters(item: AdminConversationListItem, filters: Admi
 
 function buildParticipantItem(
   membershipId: string,
-  source: Record<string, unknown>
+  source: Record<string, unknown>,
+  profilesByUid?: Map<string, { displayName: string | null; email: string | null; role: string | null }>
 ): AdminConversationParticipant {
   const other = (source.otherParticipantSnapshot as Record<string, unknown> | undefined) || {};
   const blockedBy = (source.blockedBy as Record<string, unknown> | undefined) || {};
@@ -272,6 +330,9 @@ function buildParticipantItem(
       displayName: readString(other.displayName) || null,
       avatarPath: readString(other.avatarPath) || null,
     },
+    profile: readString(source.uid) && profilesByUid?.has(readString(source.uid))
+      ? profilesByUid.get(readString(source.uid)) || null
+      : null,
     updatedAt: toIso(source.updatedAt),
     createdAt: toIso(source.createdAt),
   };
@@ -279,13 +340,18 @@ function buildParticipantItem(
 
 function buildMessageItem(
   messageId: string,
-  source: Record<string, unknown>
+  source: Record<string, unknown>,
+  profilesByUid?: Map<string, { displayName: string | null; email: string | null; role: string | null }>
 ): AdminConversationMessageItem {
+  const senderUid = readString(source.senderUid) || null;
   return {
     messageId,
     conversationId: readString(source.conversationId),
-    senderUid: readString(source.senderUid) || null,
+    senderUid,
     senderRole: readString(source.senderRole) || null,
+    senderSnapshot: senderUid && profilesByUid?.has(senderUid)
+      ? profilesByUid.get(senderUid) || null
+      : null,
     type: readString(source.type) || "text",
     body: readString(source.body),
     status: readString(source.status) || "sent",
@@ -294,6 +360,82 @@ function buildMessageItem(
     editedAt: toIso(source.editedAt),
     deletedAt: toIso(source.deletedAt),
   };
+}
+
+async function enrichConversationPeople(items: AdminConversationListItem[]) {
+  if (!items.length) {
+    return items;
+  }
+  const userIds = Array.from(new Set(items.map((item) => readString(item.userId)).filter(Boolean)));
+  const providerIds = Array.from(new Set(items.map((item) => readString(item.providerId)).filter(Boolean)));
+  const [usersById, providersById] = await Promise.all([
+    loadByIds("users", userIds),
+    loadByIds("providers", providerIds),
+  ]);
+
+  return items.map((item) => {
+    const userId = readString(item.userId);
+    const providerId = readString(item.providerId);
+    const user = userId ? usersById.get(userId) || null : null;
+    const provider = providerId ? providersById.get(providerId) || null : null;
+    return {
+      ...item,
+      user: userId ? {
+        userId,
+        displayName: readString(user?.displayName) || null,
+        email: readString(user?.email) || null,
+        phoneNumber: readString(user?.phoneNumber) || null,
+      } : null,
+      provider: providerId ? {
+        providerId,
+        displayName: mapProviderDisplayName(provider),
+        email: readString(provider?.email) || null,
+        phoneNumber: readString(provider?.phoneNumber) || null,
+      } : null,
+    };
+  });
+}
+
+async function buildProfilesByUid(uids: string[]) {
+  const deduped = Array.from(new Set(uids.map((uid) => readString(uid)).filter(Boolean)));
+  if (!deduped.length) {
+    return new Map<string, { displayName: string | null; email: string | null; role: string | null }>();
+  }
+  const [usersById, providersById, adminsById] = await Promise.all([
+    loadByIds("users", deduped),
+    loadByIds("providers", deduped),
+    loadByIds("admini", deduped),
+  ]);
+  const profiles = new Map<string, { displayName: string | null; email: string | null; role: string | null }>();
+  deduped.forEach((uid) => {
+    const admin = adminsById.get(uid) || null;
+    if (admin) {
+      profiles.set(uid, {
+        displayName: readString(admin.displayName) || null,
+        email: readString(admin.email) || null,
+        role: readString(admin.role) || "admin",
+      });
+      return;
+    }
+    const provider = providersById.get(uid) || null;
+    if (provider) {
+      profiles.set(uid, {
+        displayName: mapProviderDisplayName(provider),
+        email: readString(provider.email) || null,
+        role: "provider",
+      });
+      return;
+    }
+    const user = usersById.get(uid) || null;
+    if (user) {
+      profiles.set(uid, {
+        displayName: readString(user.displayName) || null,
+        email: readString(user.email) || null,
+        role: readString(user.role) || "user",
+      });
+    }
+  });
+  return profiles;
 }
 
 async function getConversationById(conversationId: string) {
@@ -354,14 +496,16 @@ export async function listAdminConversations(
       };
     }
 
+    const enriched = await enrichConversationPeople([directItem]);
     return {
-      items: [directItem],
+      items: enriched,
       page: { nextCursor: null, hasMore: false },
     };
   }
 
   const status = readString(filters.status);
   const type = readString(filters.type);
+  const moderationStatus = readString(filters.moderationStatus);
   const userId = readString(filters.userId);
   const providerId = readString(filters.providerId);
   const scanLimit = Math.min(limit * 4, 200);
@@ -380,6 +524,12 @@ export async function listAdminConversations(
   if (providerId) {
     query = query.where("providerId", "==", providerId);
   }
+  const canQueryModerationDirectly = Boolean(
+    moderationStatus && !status && !type && !userId && !providerId
+  );
+  if (canQueryModerationDirectly) {
+    query = query.where("moderationStatus", "==", moderationStatus);
+  }
 
   query = query.orderBy("updatedAt", "desc");
 
@@ -394,9 +544,11 @@ export async function listAdminConversations(
   const mapped = scannedDocs.map((doc) =>
     buildConversationItem(doc.id, (doc.data() || {}) as Record<string, unknown>)
   );
-  const filtered = mapped.filter((item) => matchesIdOnlySearch(item, queryText));
+  const filtered = mapped
+    .filter((item) => !moderationStatus || readString(item.moderationStatus) === moderationStatus)
+    .filter((item) => matchesIdOnlySearch(item, queryText));
 
-  const items = filtered.slice(0, limit);
+  const items = await enrichConversationPeople(filtered.slice(0, limit));
   const lastScannedDoc = scannedDocs[scannedDocs.length - 1];
   const nextCursor = (hasRawMore || filtered.length > limit) && lastScannedDoc
     ? serializeCursor({ millis: toMillis(lastScannedDoc.get("updatedAt")) })
@@ -426,7 +578,7 @@ export async function getAdminConversationDetail(
     throw new AdminConversationError("Conversația nu există.", 404);
   }
 
-  const item = buildConversationItem(
+  const baseItem = buildConversationItem(
     conversationId,
     (conversationSnap.data() || {}) as Record<string, unknown>
   );
@@ -437,9 +589,17 @@ export async function getAdminConversationDetail(
     .limit(20)
     .get();
 
-  const participants = membersSnap.docs
-    .map((doc) => buildParticipantItem(doc.id, (doc.data() || {}) as Record<string, unknown>))
+  const participantSources = membersSnap.docs.map((doc) => ({
+    id: doc.id,
+    data: (doc.data() || {}) as Record<string, unknown>,
+  }));
+  const participantUids = participantSources.map((item) => readString(item.data.uid)).filter(Boolean);
+  const profilesByUid = await buildProfilesByUid(participantUids);
+
+  const participants = participantSources
+    .map((doc) => buildParticipantItem(doc.id, doc.data, profilesByUid))
     .sort((first, second) => first.role.localeCompare(second.role));
+  const [item] = await enrichConversationPeople([baseItem]);
 
   return {
     item,
@@ -478,9 +638,11 @@ export async function listAdminConversationMessages(
   const hasMore = snapshot.docs.length > limit;
   const docs = hasMore ? snapshot.docs.slice(0, limit) : snapshot.docs;
   const lastDoc = docs[docs.length - 1];
+  const senderUids = docs.map((doc) => readString(doc.get("senderUid"))).filter(Boolean);
+  const profilesByUid = await buildProfilesByUid(senderUids);
 
   return {
-    items: docs.map((doc) => buildMessageItem(doc.id, (doc.data() || {}) as Record<string, unknown>)),
+    items: docs.map((doc) => buildMessageItem(doc.id, (doc.data() || {}) as Record<string, unknown>, profilesByUid)),
     page: {
       nextCursor: hasMore && lastDoc
         ? serializeCursor({ millis: toMillis(lastDoc.get("createdAt")) })
@@ -530,6 +692,7 @@ export async function patchAdminConversationModeration(
   const now = Timestamp.now();
   await conversationRef.set(
     {
+      moderationStatus: statusTo,
       adminModeration: {
         status: statusTo,
         note: noteValue || null,

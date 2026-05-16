@@ -125,6 +125,7 @@ export async function POST(
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
     const action = body.action;
     const reason = typeof body.reason === "string" ? body.reason.trim() : "";
+    const overrideIncompleteProfile = body.overrideIncompleteProfile === true;
 
     console.info(`${ROUTE_TAG} review_request`, {
       reviewCorrelationId,
@@ -132,6 +133,7 @@ export async function POST(
       providerId: id,
       action,
       hasReason: Boolean(reason),
+      overrideIncompleteProfile,
     });
 
     if (!isReviewAction(action)) {
@@ -161,6 +163,7 @@ export async function POST(
         providerId: id,
         action,
         reason: reason || undefined,
+        overrideIncompleteProfile,
         adminUid: admin.uid,
         reviewCorrelationId,
       },

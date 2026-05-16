@@ -32,7 +32,8 @@ export type SupportTicketListFilters = {
   topic?: string;
   assignedAdminUid?: string;
   requesterUid?: string;
-  relatedEntity?: string;
+  relatedEntityId?: string;
+  relatedEntityType?: "booking" | "provider" | "user";
   q?: string;
   dateFrom?: Date | null;
   dateTo?: Date | null;
@@ -403,12 +404,23 @@ function matchesSearch(item: SupportTicketListItem, query: string) {
     .some((value) => value.includes(token));
 }
 
-function matchesRelatedEntity(item: SupportTicketListItem, relatedEntity: string) {
-  if (!relatedEntity) {
+function matchesRelatedEntity(
+  item: SupportTicketListItem,
+  relatedEntityId: string,
+  relatedEntityType?: "booking" | "provider" | "user"
+) {
+  if (!relatedEntityId) {
     return true;
   }
-  const token = relatedEntity.toLowerCase();
-  return [item.relatedEntity?.bookingId, item.relatedEntity?.providerId, item.relatedEntity?.userId]
+  const token = relatedEntityId.toLowerCase();
+  const values = relatedEntityType === "booking"
+    ? [item.relatedEntity?.bookingId]
+    : relatedEntityType === "provider"
+      ? [item.relatedEntity?.providerId]
+      : relatedEntityType === "user"
+        ? [item.relatedEntity?.userId]
+        : [item.relatedEntity?.bookingId, item.relatedEntity?.providerId, item.relatedEntity?.userId];
+  return values
     .map((value) => normalizeText(value))
     .some((value) => value === token || value.includes(token));
 }
@@ -491,10 +503,11 @@ export async function listAdminSupportTickets(
   );
 
   const queryText = normalizeText(filters.q);
-  const relatedEntityFilter = normalizeText(filters.relatedEntity);
+  const relatedEntityFilter = normalizeText(filters.relatedEntityId);
+  const relatedEntityType = filters.relatedEntityType;
 
   const filtered = mapped
-    .filter((item) => matchesRelatedEntity(item, relatedEntityFilter))
+    .filter((item) => matchesRelatedEntity(item, relatedEntityFilter, relatedEntityType))
     .filter((item) => matchesSearch(item, queryText))
     .sort((first, second) => toMillis(second.updatedAt || second.createdAt) - toMillis(first.updatedAt || first.createdAt));
 
@@ -581,6 +594,42 @@ async function getSupportTicketById(ticketId: string, now = new Date()) {
   });
 }
 
+async function ensureAdminExists(db: FirebaseFirestore.Firestore, adminUid: string) {
+  const adminSnap = await db.collection("admini").doc(adminUid).get();
+  if (!adminSnap.exists) {
+    throw new AdminSupportTicketError("assignedAdminUid invalid: admin account not found.", 400);
+  }
+  return adminSnap.data() as Record<string, unknown>;
+}
+
+async function ensureRelatedEntityExists(
+  db: FirebaseFirestore.Firestore,
+  relatedEntity: SupportTicketRelatedEntity
+) {
+  if (!relatedEntity) {
+    return;
+  }
+
+  if (relatedEntity.bookingId) {
+    const bookingSnap = await db.collection("bookings").doc(relatedEntity.bookingId).get();
+    if (!bookingSnap.exists) {
+      throw new AdminSupportTicketError(`relatedEntity.bookingId invalid: ${relatedEntity.bookingId}`, 400);
+    }
+  }
+  if (relatedEntity.providerId) {
+    const providerSnap = await db.collection("providers").doc(relatedEntity.providerId).get();
+    if (!providerSnap.exists) {
+      throw new AdminSupportTicketError(`relatedEntity.providerId invalid: ${relatedEntity.providerId}`, 400);
+    }
+  }
+  if (relatedEntity.userId) {
+    const userSnap = await db.collection("users").doc(relatedEntity.userId).get();
+    if (!userSnap.exists) {
+      throw new AdminSupportTicketError(`relatedEntity.userId invalid: ${relatedEntity.userId}`, 400);
+    }
+  }
+}
+
 export async function patchAdminSupportTicket(
   ticketIdInput: string,
   payload: SupportTicketPatchPayload,
@@ -637,10 +686,7 @@ export async function patchAdminSupportTicket(
       assignedAdminUidTo = null;
       assignedAdminSnapshotTo = null;
     } else {
-      const adminSnap = await db.collection("admini").doc(nextAssignee).get();
-      const adminData = adminSnap.exists
-        ? (adminSnap.data() as Record<string, unknown>)
-        : null;
+      const adminData = await ensureAdminExists(db, nextAssignee);
       assignedAdminUidTo = nextAssignee;
       assignedAdminSnapshotTo = mapAdminSnapshot(adminData);
     }
@@ -649,6 +695,7 @@ export async function patchAdminSupportTicket(
   const relatedEntityTo = hasRelatedEntity
     ? sanitizePatchRelatedEntity(payload.relatedEntity)
     : normalizeRelatedEntity(current.relatedEntity);
+  await ensureRelatedEntityExists(db, relatedEntityTo);
 
   const updatePayload: Record<string, unknown> = {
     status: statusTo,

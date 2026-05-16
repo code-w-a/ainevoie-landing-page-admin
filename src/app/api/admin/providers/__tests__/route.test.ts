@@ -266,6 +266,31 @@ describe("admin provider callable proxy routes", () => {
     );
   });
 
+  it("proxies explicit incomplete profile override for approve actions", async () => {
+    vi.mocked(fetch).mockReturnValueOnce(
+      jsonResponse({ result: { providerId: "provider-1", status: "approved" } }) as ReturnType<typeof fetch>
+    );
+
+    const { POST } = await import("../[id]/review/route");
+    const response = await POST(
+      new Request("https://example.com/api/admin/providers/provider-1/review", {
+        method: "POST",
+        body: JSON.stringify({ action: "approve", overrideIncompleteProfile: true }),
+      }),
+      { params: Promise.resolve({ id: "provider-1" }) }
+    );
+
+    expect(response.status).toBe(200);
+    const reviewBody = JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body || "{}"));
+    expect(reviewBody.data).toMatchObject({
+      providerId: "provider-1",
+      action: "approve",
+      overrideIncompleteProfile: true,
+      adminUid: "admin-uid",
+      adminApiKey: "admin-secret",
+    });
+  });
+
   it("keeps approve success response even when providerApproved email sending fails", async () => {
     vi.mocked(fetch).mockReturnValueOnce(
       jsonResponse({ result: { providerId: "provider-1", status: "approved" } }) as ReturnType<typeof fetch>
