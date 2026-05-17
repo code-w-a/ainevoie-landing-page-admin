@@ -1,7 +1,7 @@
 import { Timestamp } from "firebase-admin/firestore";
 import { getAdminDb } from "@/lib/firebaseAdmin";
 
-export type ReviewStatus = "published" | "hidden_by_admin";
+export type ReviewStatus = "published" | "hidden_by_admin" | "deleted_by_admin";
 
 export type ReviewModerationPayload = {
   status?: ReviewStatus;
@@ -341,7 +341,12 @@ export async function moderateAdminReview(
   if (!hasStatus && !hasNote) {
     throw new AdminReviewError("Trimite status sau notă pentru moderare.", 400);
   }
-  if (hasStatus && nextStatus !== "published" && nextStatus !== "hidden_by_admin") {
+  if (
+    hasStatus
+    && nextStatus !== "published"
+    && nextStatus !== "hidden_by_admin"
+    && nextStatus !== "deleted_by_admin"
+  ) {
     throw new AdminReviewError("Status de review invalid.", 400);
   }
 
@@ -356,9 +361,18 @@ export async function moderateAdminReview(
   const now = Timestamp.now();
   const currentStatus = readString(current.status);
   const statusTo = hasStatus ? nextStatus : currentStatus;
+  if (currentStatus === "deleted_by_admin" && nextStatus === "published") {
+    throw new AdminReviewError(
+      "Review-ul șters de admin nu poate fi republicat prin moderarea standard.",
+      400
+    );
+  }
   const currentModeration =
     (current.adminModeration as Record<string, unknown> | undefined) || {};
   const noteValue = hasNote ? String(payload.note || "").trim() : readString(currentModeration.note);
+  const auditAction = hasStatus && nextStatus === "deleted_by_admin"
+    ? "review.delete"
+    : "review.moderate";
 
   await reviewRef.set(
     {
@@ -377,7 +391,7 @@ export async function moderateAdminReview(
   const auditRef = db.collection("auditEvents").doc();
   await auditRef.set({
     eventId: auditRef.id,
-    action: "review.moderate",
+    action: auditAction,
     actorUid: actor.uid,
     actorRole: "admin",
     resourceType: "review",
@@ -416,4 +430,45 @@ export async function moderateAdminReview(
       ? (providerSnap.data() as Record<string, unknown>)
       : null
   );
+}
+
+export async function deleteAdminReview(
+  reviewIdInput: string,
+  actor: { uid: string }
+): Promise<{ reviewId: string }> {
+  const reviewId = readString(reviewIdInput);
+  if (!reviewId) {
+    throw new AdminReviewError("Review id este obligatoriu.", 400);
+  }
+
+  const db = getAdminDb();
+  const reviewRef = db.collection("reviews").doc(reviewId);
+  const reviewSnap = await reviewRef.get();
+  if (!reviewSnap.exists) {
+    throw new AdminReviewError("Review-ul nu există.", 404);
+  }
+
+  const current = (reviewSnap.data() || {}) as Record<string, unknown>;
+  const now = Timestamp.now();
+  const auditRef = db.collection("auditEvents").doc();
+  await auditRef.set({
+    eventId: auditRef.id,
+    action: "review.delete.hard",
+    actorUid: actor.uid,
+    actorRole: "admin",
+    resourceType: "review",
+    resourceId: reviewId,
+    statusFrom: readString(current.status) || null,
+    statusTo: "deleted",
+    result: "success",
+    context: {
+      bookingId: readString(current.bookingId) || reviewId,
+      providerId: readString(current.providerId) || null,
+      authorUserId: readString(current.authorUserId) || null,
+    },
+    createdAt: now,
+  });
+
+  await reviewRef.delete();
+  return { reviewId };
 }

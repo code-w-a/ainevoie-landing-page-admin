@@ -2,7 +2,65 @@ import { NextResponse } from "next/server";
 import { adminAuthErrorResponse, requireAdmin, requireAdminOrSupport } from "@/lib/adminAuth";
 import { AdminCallableError, callAdminCallable } from "@/lib/adminCallables";
 import { getAdminUserCaseFallback } from "@/lib/adminUsersFallback";
+import { getAdminAuth, getAdminDb } from "@/lib/firebaseAdmin";
 import { captureServerException } from "@/lib/sentryServer";
+
+function sanitizeRole(value: unknown) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function isPrivilegedAccount(data: Record<string, unknown> | null | undefined) {
+  if (!data) {
+    return false;
+  }
+
+  const role = sanitizeRole(data.role);
+  return Boolean(data.isAdmin) || Boolean(data.isSupport) || role === "admin" || role === "support";
+}
+
+function createRouteError(message: string, status: number) {
+  const error = new Error(message) as Error & { status: number };
+  error.status = status;
+  return error;
+}
+
+async function deleteUserViaFirestoreFallback(userId: string) {
+  const db = getAdminDb();
+  const auth = getAdminAuth();
+
+  const [adminSnap, userSnap] = await Promise.all([
+    db.collection("admini").doc(userId).get(),
+    db.collection("users").doc(userId).get(),
+  ]);
+
+  if (isPrivilegedAccount(adminSnap.data() as Record<string, unknown> | undefined)) {
+    throw createRouteError("Nu poți șterge conturi de admin/support.", 412);
+  }
+  if (isPrivilegedAccount(userSnap.data() as Record<string, unknown> | undefined)) {
+    throw createRouteError("Nu poți șterge conturi de admin/support.", 412);
+  }
+
+  await Promise.all([
+    db.collection("users").doc(userId).delete().catch(() => undefined),
+    db.collection("providers").doc(userId).delete().catch(() => undefined),
+    db.collection("providerDirectory").doc(userId).delete().catch(() => undefined),
+  ]);
+
+  try {
+    await auth.deleteUser(userId);
+  } catch (error) {
+    const code = String((error as { code?: unknown })?.code || "");
+    if (code !== "auth/user-not-found") {
+      throw error;
+    }
+  }
+
+  return {
+    userId,
+    deleted: true,
+    fallback: true,
+  };
+}
 
 export async function GET(
   request: Request,
@@ -77,15 +135,25 @@ export async function DELETE(
       return NextResponse.json({ error: "User id este obligatoriu." }, { status: 400 });
     }
 
-    const result = await callAdminCallable(
-      "adminDeleteUser",
-      {
-        userId,
-        adminUid: admin.uid,
-      },
-      "Nu am putut șterge utilizatorul.",
-      admin.idToken
-    );
+    let result: unknown;
+    try {
+      result = await callAdminCallable(
+        "adminDeleteUser",
+        {
+          userId,
+          adminUid: admin.uid,
+        },
+        "Nu am putut șterge utilizatorul.",
+        admin.idToken
+      );
+    } catch (error) {
+      if (error instanceof AdminCallableError && error.status === 404) {
+        console.warn("[admin-user-delete] callable missing, using firestore fallback", { userId });
+        result = await deleteUserViaFirestoreFallback(userId);
+      } else {
+        throw error;
+      }
+    }
 
     return NextResponse.json(result);
   } catch (error) {
@@ -96,6 +164,10 @@ export async function DELETE(
 
     if (error instanceof AdminCallableError) {
       return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+
+    if (error instanceof Error && "status" in error && typeof (error as { status?: unknown }).status === "number") {
+      return NextResponse.json({ error: error.message }, { status: (error as { status: number }).status });
     }
 
     captureServerException(error, { route: "api/admin/users/[id]/route.ts:DELETE" });

@@ -142,6 +142,39 @@ type ProviderCase = {
   item?: ProviderDocument | null;
 };
 
+type AdminSessionResponse = {
+  email?: string | null;
+};
+
+type ProviderServiceItem = {
+  serviceId: string;
+  name: string;
+  categoryLabel: string;
+  status: string;
+  baseRateAmount: number | null;
+  baseRateCurrency: string;
+  estimatedDurationMinutes: number | null;
+  maxProfessionals: number | null;
+};
+
+type ProviderAvailabilityRange = {
+  id: string;
+  startTime: string;
+  endTime: string;
+};
+
+type ProviderAvailabilityDay = {
+  dayKey: string;
+  label: string;
+  isEnabled: boolean;
+  timeRanges: ProviderAvailabilityRange[];
+};
+
+type ProviderBlockedDate = {
+  id: string;
+  dateKey: string;
+};
+
 type ReviewAction = "approve" | "reject" | "suspend" | "reinstate";
 type ReviewResult = {
   providerId?: string | null;
@@ -192,6 +225,14 @@ const reviewActionLabel: Record<string, string> = {
   suspend: "Suspendat",
   reinstate: "Reactivat",
 };
+const SERVICE_STATUS_LABELS: Record<string, string> = {
+  active: "Activ",
+  draft: "Ciornă",
+  inactive: "Inactiv",
+  archived: "Arhivat",
+};
+const SUPERADMIN_EMAIL = "superadmin@ainevoie.ro";
+const DRIFT_SPECIALIZATION_ISSUE = "specializare/categoryPrimary diferite.";
 
 const checklistStateMeta: Record<
   ChecklistState,
@@ -1003,6 +1044,74 @@ function AvatarPreview({
   );
 }
 
+function normalizeProviderServices(services?: Array<Record<string, unknown>>) {
+  return (services || []).map((service, index) => ({
+    serviceId: readString(service.serviceId) || `service_${index}`,
+    name: readString(service.name) || "Serviciu",
+    categoryLabel: readString(service.categoryLabel) || "-",
+    status: readString(service.status).toLowerCase() || "active",
+    baseRateAmount: readNumber(service.baseRateAmount),
+    baseRateCurrency: readString(service.baseRateCurrency) || "RON",
+    estimatedDurationMinutes: readNumber(service.estimatedDurationMinutes),
+    maxProfessionals: readNumber(service.maxProfessionals),
+  })) satisfies ProviderServiceItem[];
+}
+
+function getServiceStatusVariant(status: string): BadgeVariant {
+  if (status === "active") return "success";
+  if (status === "inactive") return "secondary";
+  if (status === "archived") return "danger";
+  return "outline";
+}
+
+function formatServiceStatus(status: string) {
+  return SERVICE_STATUS_LABELS[status] || status || "-";
+}
+
+function normalizeAvailabilityDays(availability?: Record<string, unknown> | null) {
+  const weekSchedule = Array.isArray((availability as { weekSchedule?: unknown[] } | null)?.weekSchedule)
+    ? (availability as { weekSchedule: unknown[] }).weekSchedule
+    : [];
+
+  return weekSchedule.map((item, dayIndex) => {
+    const day = item && typeof item === "object" ? item as Record<string, unknown> : {};
+    const ranges = Array.isArray(day.timeRanges) ? day.timeRanges : [];
+    const normalizedRanges = ranges
+      .map((range, rangeIndex) => {
+        const source = range && typeof range === "object" ? range as Record<string, unknown> : {};
+        return {
+          id: readString(source.id) || `range_${dayIndex}_${rangeIndex}`,
+          startTime: readString(source.startTime),
+          endTime: readString(source.endTime),
+        };
+      })
+      .filter((range) => Boolean(range.startTime && range.endTime));
+
+    return {
+      dayKey: readString(day.dayKey) || `day_${dayIndex}`,
+      label: readString(day.label) || readString(day.dayKey) || `Ziua ${dayIndex + 1}`,
+      isEnabled: day.isEnabled === true,
+      timeRanges: normalizedRanges,
+    };
+  }) satisfies ProviderAvailabilityDay[];
+}
+
+function normalizeBlockedDates(availability?: Record<string, unknown> | null) {
+  const blockedDates = Array.isArray((availability as { blockedDates?: unknown[] } | null)?.blockedDates)
+    ? (availability as { blockedDates: unknown[] }).blockedDates
+    : [];
+
+  return blockedDates
+    .map((item, index) => {
+      const source = item && typeof item === "object" ? item as Record<string, unknown> : {};
+      return {
+        id: readString(source.id) || `blocked_${index}`,
+        dateKey: readString(source.dateKey),
+      };
+    })
+    .filter((item) => Boolean(item.dateKey)) satisfies ProviderBlockedDate[];
+}
+
 export default function ProviderDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -1027,6 +1136,7 @@ export default function ProviderDetailPage() {
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
   const [avatarPreviewLoading, setAvatarPreviewLoading] = useState(false);
   const [avatarPreviewError, setAvatarPreviewError] = useState<string | null>(null);
+  const [adminEmail, setAdminEmail] = useState<string | null>(null);
   const latestReviewResultRef = useRef<ReviewResult | null>(null);
 
   const loadDetails = useCallback(async (options: { showLoading?: boolean } = {}) => {
@@ -1060,6 +1170,29 @@ export default function ProviderDetailPage() {
   useEffect(() => {
     void loadDetails();
   }, [loadDetails]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadAdminSession() {
+      try {
+        const res = await adminFetch("/api/admin/auth/session", { cache: "no-store" });
+        if (!res.ok) return;
+        const session = (await res.json()) as AdminSessionResponse;
+        if (!active) return;
+        setAdminEmail(readString(session?.email).toLowerCase() || null);
+      } catch {
+        if (active) {
+          setAdminEmail(null);
+        }
+      }
+    }
+
+    void loadAdminSession();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -1305,6 +1438,11 @@ export default function ProviderDetailPage() {
   const professionalMeta = getDocumentMeta(provider.documents?.professional);
   const availabilityOk = hasConfiguredAvailability(provider, data?.availability);
   const activeServices = getActiveServices(data?.services);
+  const providerServices = normalizeProviderServices(data?.services);
+  const availabilityDays = normalizeAvailabilityDays(data?.availability || null);
+  const blockedDates = normalizeBlockedDates(data?.availability || null);
+  const previewBlockedDates = blockedDates.slice(0, 6);
+  const remainingBlockedDates = Math.max(0, blockedDates.length - previewBlockedDates.length);
   const recentBookings = data?.recentBookings || [];
   const ratingSummary = getRatingSummary(data?.providerDirectory);
   const publicationMeta = getPublicationMeta(data?.providerDirectory);
@@ -1360,6 +1498,10 @@ export default function ProviderDetailPage() {
     activeServices.length === 0 ? "serviciu principal/serviciu activ lipsă" : "",
   ].filter(Boolean);
   const hasApprovalWarnings = approvalBlockedReasons.length > 0;
+  const isSuperAdmin = adminEmail === SUPERADMIN_EMAIL;
+  const visiblePublicPreviewIssues = isSuperAdmin
+    ? publicPreviewDrift.issues
+    : publicPreviewDrift.issues.filter((issue) => issue !== DRIFT_SPECIALIZATION_ISSUE);
 
   return (
     <div className="space-y-6">
@@ -1415,17 +1557,19 @@ export default function ProviderDetailPage() {
                   Înapoi la listă
                 </Link>
               </Button>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={resyncingDirectory}
-                onClick={() => {
-                  void resyncPublicDirectorySnapshot();
-                }}
-              >
-                <RotateCcw className="h-4 w-4" />
-                {resyncingDirectory ? "Se resincronizează..." : "Resync snapshot public"}
-              </Button>
+              {isSuperAdmin && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={resyncingDirectory}
+                  onClick={() => {
+                    void resyncPublicDirectorySnapshot();
+                  }}
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  {resyncingDirectory ? "Se resincronizează..." : "Resync snapshot public"}
+                </Button>
+              )}
               <div className="flex flex-wrap gap-2 lg:justify-end">
                 {availableActions.map((action) => {
                   const meta = actionMeta[action];
@@ -1597,36 +1741,40 @@ export default function ProviderDetailPage() {
               <Badge variant={publicPreviewDrift.hasDrift ? "warning" : "success"}>
                 {publicPreviewDrift.hasDrift ? "Drift detectat" : "Aligned"}
               </Badge>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={resyncingDirectory}
-                onClick={() => {
-                  void resyncPublicDirectorySnapshot();
-                }}
-              >
-                <RotateCcw className="h-4 w-4" />
-                Resync
-              </Button>
+              {isSuperAdmin && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={resyncingDirectory}
+                  onClick={() => {
+                    void resyncPublicDirectorySnapshot();
+                  }}
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Resync
+                </Button>
+              )}
             </div>
           </div>
 
-          {publicPreviewDrift.hasDrift && (
+          {visiblePublicPreviewIssues.length > 0 && (
             <ul className="space-y-1 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-              {publicPreviewDrift.issues.map((issue) => (
+              {visiblePublicPreviewIssues.map((issue) => (
                 <li key={issue}>- {issue}</li>
               ))}
             </ul>
           )}
 
-          <div className="grid gap-4 lg:grid-cols-2">
-            <div className="rounded-md border border-border p-3">
-              <p className="mb-2 text-sm font-medium">providerDirectory snapshot (raw)</p>
-              <pre className="max-h-[360px] overflow-auto rounded-md bg-muted/40 p-3 text-xs">
-                {JSON.stringify(data?.providerDirectory || null, null, 2)}
-              </pre>
-            </div>
+          <div className={`grid gap-4 ${isSuperAdmin ? "lg:grid-cols-2" : "lg:grid-cols-1"}`}>
+            {isSuperAdmin && (
+              <div className="rounded-md border border-border p-3">
+                <p className="mb-2 text-sm font-medium">providerDirectory snapshot (raw)</p>
+                <pre className="max-h-[360px] overflow-auto rounded-md bg-muted/40 p-3 text-xs">
+                  {JSON.stringify(data?.providerDirectory || null, null, 2)}
+                </pre>
+              </div>
+            )}
 
             <div className="rounded-md border border-border p-3">
               <p className="mb-2 text-sm font-medium">Cum apare în app</p>
@@ -1676,6 +1824,107 @@ export default function ProviderDetailPage() {
           </div>
         </CardContent>
       </Card>
+
+      <div className="grid gap-6 xl:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Servicii prestator (interne)</CardTitle>
+            <CardDescription>Lista completă de servicii returnată din `providers/{providerId}/services`.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {providerServices.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Nu există servicii configurate pentru acest prestator.</p>
+            ) : (
+              <div className="space-y-3">
+                {providerServices.map((service) => (
+                  <div key={service.serviceId} className="rounded-md border border-border p-3">
+                    <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm font-medium">{service.name}</p>
+                      <Badge variant={getServiceStatusVariant(service.status)}>
+                        {formatServiceStatus(service.status)}
+                      </Badge>
+                    </div>
+                    <div className="grid gap-2 text-sm sm:grid-cols-2">
+                      <FieldValue label="Categorie" value={formatCompactValue(service.categoryLabel)} />
+                      <FieldValue
+                        label="Tarif"
+                        value={formatCurrency(service.baseRateAmount, service.baseRateCurrency)}
+                      />
+                      <FieldValue
+                        label="Durată estimată"
+                        value={service.estimatedDurationMinutes ? `${service.estimatedDurationMinutes} min` : "Nu este completat"}
+                      />
+                      <FieldValue
+                        label="Max. profesioniști"
+                        value={service.maxProfessionals ? String(service.maxProfessionals) : "Nu este completat"}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Disponibilitate prestator (internă)</CardTitle>
+            <CardDescription>Programul pe zile și excepțiile (`blockedDates`) din profilul de disponibilitate.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {!availabilityDays.length ? (
+              <p className="text-sm text-muted-foreground">Nu există un profil de disponibilitate salvat.</p>
+            ) : (
+              <div className="space-y-2">
+                {availabilityDays.map((day) => (
+                  <div key={day.dayKey} className="rounded-md border border-border p-3">
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <p className="text-sm font-medium">{day.label}</p>
+                      <Badge variant={day.isEnabled && day.timeRanges.length > 0 ? "success" : "outline"}>
+                        {day.isEnabled && day.timeRanges.length > 0 ? "Configurat" : "Fără intervale"}
+                      </Badge>
+                    </div>
+                    {day.timeRanges.length ? (
+                      <div className="flex flex-wrap gap-2">
+                        {day.timeRanges.map((range) => (
+                          <span key={range.id} className="rounded-md bg-muted px-2 py-1 text-xs">
+                            {range.startTime}-{range.endTime}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">Nu există intervale pentru această zi.</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="rounded-md border border-border p-3">
+              <p className="text-sm font-medium">Zile blocate</p>
+              {blockedDates.length === 0 ? (
+                <p className="mt-1 text-xs text-muted-foreground">Nu există zile blocate.</p>
+              ) : (
+                <>
+                  <p className="mt-1 text-xs text-muted-foreground">Total: {blockedDates.length}</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {previewBlockedDates.map((blockedDate) => (
+                      <span key={blockedDate.id} className="rounded-md bg-muted px-2 py-1 text-xs">
+                        {blockedDate.dateKey}
+                      </span>
+                    ))}
+                    {remainingBlockedDates > 0 && (
+                      <span className="rounded-md bg-muted px-2 py-1 text-xs">
+                        +{remainingBlockedDates} în plus
+                      </span>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
         <Card>

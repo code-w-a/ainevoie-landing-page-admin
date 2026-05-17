@@ -2,13 +2,17 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { CalendarClock, Search } from "lucide-react";
+import { CalendarClock, MoreHorizontal, Search, Trash2 } from "lucide-react";
+import { adminFetch, readAdminResponseError } from "@/components/admin/adminApi";
+import { AdminConfirmDialog } from "@/components/admin/AdminConfirmDialog";
+import { runAdminBulkDelete, useAdminBulkSelection } from "@/components/admin/useAdminBulkSelection";
 import { useAdminData } from "@/components/admin/useAdminData";
 import { AdminTableSkeleton } from "@/components/admin/AdminSkeletonLayouts";
 import { humanProviderLabel, humanUserLabel } from "@/lib/adminHumanize";
 import { formatAdminDateTime } from "@/lib/formatAdminDateTime";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Card,
   CardContent,
@@ -17,6 +21,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Table,
   TableBody,
@@ -177,6 +188,13 @@ export default function AdminBookingsPage() {
   const [status, setStatus] = useState("all");
   const [paymentStatus, setPaymentStatus] = useState("all");
   const [page, setPage] = useState(1);
+  const [deleteTargetBookingId, setDeleteTargetBookingId] = useState<string | null>(null);
+  const [pendingDeleteBookingId, setPendingDeleteBookingId] = useState<string | null>(null);
+  const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
+  const [pendingBulkDelete, setPendingBulkDelete] = useState(false);
+  const [bulkActionSummary, setBulkActionSummary] = useState<string | null>(null);
+  const [bulkActionHasFailures, setBulkActionHasFailures] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQ(q), 250);
@@ -193,9 +211,96 @@ export default function AdminBookingsPage() {
     return `/api/admin/bookings?${params.toString()}`;
   }, [debouncedQ, page, paymentStatus, status]);
 
-  const { data, loading, error } = useAdminData<BookingsResponse>(endpoint);
+  const { data, loading, error, reload } = useAdminData<BookingsResponse>(endpoint);
   const items = data?.items || [];
   const pagination = data?.pagination;
+  const pageIds = useMemo(
+    () => items.map((item) => item.bookingId).filter(Boolean),
+    [items]
+  );
+  const {
+    selectedIds,
+    selectedCount,
+    allSelected,
+    toggleSelectAll,
+    toggleRow,
+    clearSelection,
+    setSelectedIds,
+  } = useAdminBulkSelection(pageIds, [endpoint]);
+
+  async function handleDeleteBookingConfirmed() {
+    if (!deleteTargetBookingId) {
+      return false;
+    }
+
+    setPendingDeleteBookingId(deleteTargetBookingId);
+    setActionError(null);
+
+    try {
+      const response = await adminFetch(`/api/admin/bookings/${encodeURIComponent(deleteTargetBookingId)}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error(await readAdminResponseError(response, "Nu am putut șterge programarea."));
+      }
+
+      setDeleteTargetBookingId(null);
+      await reload();
+      return true;
+    } catch (nextError) {
+      setActionError(nextError instanceof Error ? nextError.message : "Nu am putut șterge programarea.");
+      return false;
+    } finally {
+      setPendingDeleteBookingId(null);
+    }
+  }
+
+  async function handleBulkDeleteConfirmed() {
+    const ids = Array.from(selectedIds);
+    if (!ids.length) {
+      return false;
+    }
+
+    setPendingBulkDelete(true);
+    setActionError(null);
+    setBulkActionSummary(null);
+    setBulkActionHasFailures(false);
+
+    try {
+      const result = await runAdminBulkDelete(ids, async (bookingId) => {
+        const response = await adminFetch(`/api/admin/bookings/${encodeURIComponent(bookingId)}`, {
+          method: "DELETE",
+        });
+        if (!response.ok) {
+          return {
+            ok: false as const,
+            message: await readAdminResponseError(response, "Nu am putut șterge programarea."),
+          };
+        }
+        return { ok: true as const };
+      });
+
+      const successCount = result.successIds.length;
+      const failureCount = result.failures.length;
+
+      if (failureCount > 0) {
+        setBulkActionHasFailures(true);
+        setBulkActionSummary(`Ștergere parțială: ${successCount} șterse, ${failureCount} eșuate.`);
+        setActionError(`ID-uri eșuate: ${result.failures.map((item) => item.id).join(", ")}`);
+        setSelectedIds(new Set(result.failures.map((item) => item.id)));
+      } else {
+        setBulkActionSummary(`${successCount} programări au fost șterse.`);
+        clearSelection();
+      }
+
+      await reload();
+      setBulkDeleteConfirmOpen(false);
+      return true;
+    } finally {
+      setPendingBulkDelete(false);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -258,24 +363,49 @@ export default function AdminBookingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Lista programări</CardTitle>
-          <CardDescription>{pagination?.total || items.length} rezultate</CardDescription>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <CardTitle>Lista programări</CardTitle>
+              <CardDescription>{pagination?.total || items.length} rezultate</CardDescription>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="destructive"
+              disabled={loading || selectedCount === 0 || pendingBulkDelete}
+              onClick={() => setBulkDeleteConfirmOpen(true)}
+            >
+              Șterge selecția
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {error && <p className="mb-4 text-sm text-rose-500">{error}</p>}
+          {bulkActionSummary ? (
+            <p className={`mb-4 text-sm ${bulkActionHasFailures ? "text-amber-700" : "text-emerald-700"}`}>
+              {bulkActionSummary}
+            </p>
+          ) : null}
+          {actionError && <p className="mb-4 text-sm text-rose-500">{actionError}</p>}
           {loading ? (
-            <AdminTableSkeleton rows={10} columns={7} />
+            <AdminTableSkeleton rows={10} columns={8} />
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>
+                    <Checkbox
+                      checked={allSelected}
+                      onChange={(event) => toggleSelectAll(event.target.checked)}
+                    />
+                  </TableHead>
                   <TableHead>Programare</TableHead>
                   <TableHead>Client</TableHead>
                   <TableHead>Prestator</TableHead>
                   <TableHead>Serviciu</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Plată</TableHead>
-                  <TableHead className="text-right">Detalii</TableHead>
+                  <TableHead className="text-right">Acțiuni</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -284,6 +414,12 @@ export default function AdminBookingsPage() {
 
                   return (
                     <TableRow key={item.bookingId}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedIds.has(item.bookingId)}
+                          onChange={(event) => toggleRow(item.bookingId, event.target.checked)}
+                        />
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-start gap-2">
                           <CalendarClock className="mt-0.5 h-4 w-4 text-muted-foreground" />
@@ -324,19 +460,44 @@ export default function AdminBookingsPage() {
                           <p className="text-xs text-muted-foreground">{label(item.paymentSummary?.processor)}</p>
                         </div>
                       </TableCell>
-                      <TableCell className="text-right">
-                        <Button asChild size="sm" variant="outline">
-                          <Link href={`/admin/programari/${encodeURIComponent(item.bookingId)}`}>
-                            Vezi
-                          </Link>
-                        </Button>
+                      <TableCell className="text-right align-middle">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              className="h-8 w-8 shrink-0"
+                              disabled={Boolean(pendingDeleteBookingId) || pendingBulkDelete}
+                              aria-label="Acțiuni programare"
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-56">
+                            <DropdownMenuItem asChild>
+                              <Link href={`/admin/programari/${encodeURIComponent(item.bookingId)}`}>
+                                Vezi programare
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                              disabled={Boolean(pendingDeleteBookingId)}
+                              onSelect={() => setDeleteTargetBookingId(item.bookingId)}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Șterge programare
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   );
                 })}
                 {!items.length && (
                   <TableRow>
-                    <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
+                    <TableCell colSpan={8} className="py-8 text-center text-sm text-muted-foreground">
                       Nu există programări pentru filtrele selectate.
                     </TableCell>
                   </TableRow>
@@ -370,6 +531,43 @@ export default function AdminBookingsPage() {
           )}
         </CardContent>
       </Card>
+      <AdminConfirmDialog
+        open={Boolean(deleteTargetBookingId)}
+        onOpenChange={(open) => {
+          if (!open && !pendingDeleteBookingId) {
+            setDeleteTargetBookingId(null);
+          }
+        }}
+        title="Ștergi această programare?"
+        description={
+          <div className="space-y-2">
+            <p>Acțiunea este ireversibilă și șterge booking-ul din Firestore.</p>
+            {deleteTargetBookingId ? (
+              <div className="rounded-md border bg-muted/40 p-3 text-xs text-muted-foreground">
+                <div className="font-medium text-foreground">{deleteTargetBookingId}</div>
+              </div>
+            ) : null}
+          </div>
+        }
+        confirmLabel="Șterge definitiv"
+        variant="destructive"
+        confirmDisabled={!deleteTargetBookingId}
+        onConfirm={handleDeleteBookingConfirmed}
+      />
+      <AdminConfirmDialog
+        open={bulkDeleteConfirmOpen}
+        onOpenChange={(open) => {
+          if (!pendingBulkDelete) {
+            setBulkDeleteConfirmOpen(open);
+          }
+        }}
+        title="Ștergi programările selectate?"
+        description={`Vor fi șterse ${selectedCount} elemente selectate.`}
+        confirmLabel="Șterge selecția"
+        variant="destructive"
+        confirmDisabled={selectedCount === 0}
+        onConfirm={handleBulkDeleteConfirmed}
+      />
     </div>
   );
 }

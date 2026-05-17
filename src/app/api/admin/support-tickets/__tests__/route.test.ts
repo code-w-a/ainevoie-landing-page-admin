@@ -82,6 +82,7 @@ const mocks = vi.hoisted(() => {
   };
 
   return {
+    requireAdmin: vi.fn(),
     requireAdminOrSupport: vi.fn(),
     adminAuthErrorResponse: vi.fn(),
     captureServerException: vi.fn(),
@@ -115,6 +116,9 @@ const mocks = vi.hoisted(() => {
                     id,
                     data: () => row,
                   };
+                },
+                delete: async () => {
+                  tickets = tickets.filter((item) => item.ticketId !== id);
                 },
                 set: async (payload: AnyRecord, options?: { merge?: boolean }) => {
                   const index = tickets.findIndex((item) => item.ticketId === id);
@@ -154,6 +158,7 @@ const mocks = vi.hoisted(() => {
 });
 
 vi.mock("@/lib/adminAuth", () => ({
+  requireAdmin: mocks.requireAdmin,
   requireAdminOrSupport: mocks.requireAdminOrSupport,
   adminAuthErrorResponse: mocks.adminAuthErrorResponse,
 }));
@@ -239,6 +244,7 @@ describe("admin support tickets routes", () => {
     vi.setSystemTime(new Date("2026-05-08T12:00:00.000Z"));
     vi.clearAllMocks();
     buildFixtures();
+    mocks.requireAdmin.mockResolvedValue({ uid: "admin_1", adminAccessLevel: "admin" });
     mocks.requireAdminOrSupport.mockResolvedValue({ uid: "support_1", adminAccessLevel: "support" });
     mocks.adminAuthErrorResponse.mockReturnValue(null);
   });
@@ -306,6 +312,19 @@ describe("admin support tickets routes", () => {
     expect(json.item.resolvedAt).toBeTruthy();
   });
 
+  it("reads ticket detail by id", async () => {
+    const { GET } = await import("../[id]/route");
+    const response = await GET(
+      new Request("https://example.com/api/admin/support-tickets/ticket_1"),
+      { params: Promise.resolve({ id: "ticket_1" }) }
+    );
+    const json = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(json.item.ticketId).toBe("ticket_1");
+    expect(json.item.requester.uid).toBe("user_1");
+  });
+
   it("returns 404 when patching a missing ticket", async () => {
     const { PATCH } = await import("../[id]/route");
     const response = await PATCH(
@@ -320,5 +339,48 @@ describe("admin support tickets routes", () => {
 
     expect(response.status).toBe(404);
     expect(json.error).toContain("nu există");
+  });
+
+  it("deletes ticket by id for admin users", async () => {
+    const { DELETE } = await import("../[id]/route");
+    const response = await DELETE(
+      new Request("https://example.com/api/admin/support-tickets/ticket_1", {
+        method: "DELETE",
+      }),
+      { params: Promise.resolve({ id: "ticket_1" }) }
+    );
+    const json = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(json).toEqual({ ok: true, ticketId: "ticket_1" });
+
+    const { GET } = await import("../route");
+    const listResponse = await GET(
+      new Request("https://example.com/api/admin/support-tickets?page=1&pageSize=20")
+    );
+    const listJson = await listResponse.json();
+    expect(listJson.items.find((item: AnyRecord) => item.ticketId === "ticket_1")).toBeUndefined();
+  });
+
+  it("returns auth response when deleting without admin permissions", async () => {
+    const { DELETE } = await import("../[id]/route");
+    mocks.requireAdmin.mockRejectedValueOnce(new Error("not_admin"));
+    mocks.adminAuthErrorResponse.mockReturnValueOnce(
+      Response.json(
+        { error: "Nu ai drepturi de administrator pentru acest cont." },
+        { status: 403 }
+      )
+    );
+
+    const response = await DELETE(
+      new Request("https://example.com/api/admin/support-tickets/ticket_1", {
+        method: "DELETE",
+      }),
+      { params: Promise.resolve({ id: "ticket_1" }) }
+    );
+    const json = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(json.error).toContain("administrator");
   });
 });

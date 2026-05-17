@@ -130,6 +130,9 @@ const mocks = vi.hoisted(() => {
               limit: (value: number) => makeQuery(reviews, [], value),
               doc: (id: string) => ({
                 get: async () => getDocFrom(collectionName, id),
+                delete: async () => {
+                  reviews = reviews.filter((item) => item.reviewId !== id);
+                },
                 set: async (payload: AnyRecord, options?: { merge?: boolean }) => {
                   const index = reviews.findIndex((item) => item.reviewId === id);
                   if (index < 0) return;
@@ -298,6 +301,25 @@ describe("admin reviews routes", () => {
     expect(response.status).toBe(403);
   });
 
+  it("returns 403 for support on review delete", async () => {
+    mocks.requireAdmin.mockRejectedValueOnce(new Error("not_admin"));
+    mocks.adminAuthErrorResponse.mockReturnValueOnce(
+      Response.json({ error: "Nu ai drepturi de administrator pentru acest cont." }, { status: 403 })
+    );
+
+    const { PATCH } = await import("../[id]/moderation/route");
+    const response = await PATCH(
+      new Request("https://example.com/api/admin/reviews/bk_1/moderation", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ status: "deleted_by_admin" }),
+      }),
+      { params: Promise.resolve({ id: "bk_1" }) }
+    );
+
+    expect(response.status).toBe(403);
+  });
+
   it("moderates review and writes audit event", async () => {
     const { PATCH } = await import("../[id]/moderation/route");
     const response = await PATCH(
@@ -324,6 +346,57 @@ describe("admin reviews routes", () => {
     expect(auditWrites[0].statusTo).toBe("hidden_by_admin");
   });
 
+  it("soft deletes review and writes delete audit event", async () => {
+    const { PATCH } = await import("../[id]/moderation/route");
+    const response = await PATCH(
+      new Request("https://example.com/api/admin/reviews/bk_1/moderation", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          status: "deleted_by_admin",
+          note: "Șters la cererea adminului",
+        }),
+      }),
+      { params: Promise.resolve({ id: "bk_1" }) }
+    );
+    const json = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(json.item.status).toBe("deleted_by_admin");
+    expect(json.item.adminModeration.note).toBe("Șters la cererea adminului");
+
+    const auditWrites = mocks.getAuditWrites();
+    expect(auditWrites).toHaveLength(1);
+    expect(auditWrites[0].action).toBe("review.delete");
+    expect(auditWrites[0].statusFrom).toBe("published");
+    expect(auditWrites[0].statusTo).toBe("deleted_by_admin");
+  });
+
+  it("rejects republishing a review deleted by admin", async () => {
+    const { PATCH } = await import("../[id]/moderation/route");
+    await PATCH(
+      new Request("https://example.com/api/admin/reviews/bk_1/moderation", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ status: "deleted_by_admin" }),
+      }),
+      { params: Promise.resolve({ id: "bk_1" }) }
+    );
+
+    const response = await PATCH(
+      new Request("https://example.com/api/admin/reviews/bk_1/moderation", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ status: "published" }),
+      }),
+      { params: Promise.resolve({ id: "bk_1" }) }
+    );
+    const json = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(json.error).toContain("nu poate fi republicat");
+  });
+
   it("returns 404 when moderating a missing review", async () => {
     const { PATCH } = await import("../[id]/moderation/route");
     const response = await PATCH(
@@ -338,5 +411,63 @@ describe("admin reviews routes", () => {
 
     expect(response.status).toBe(404);
     expect(json.error).toContain("nu există");
+  });
+
+  it("hard deletes a review with admin rights", async () => {
+    const { DELETE } = await import("../[id]/route");
+    const response = await DELETE(
+      new Request("https://example.com/api/admin/reviews/bk_1", { method: "DELETE" }),
+      { params: Promise.resolve({ id: "bk_1" }) }
+    );
+    const json = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(json).toEqual({ ok: true, reviewId: "bk_1" });
+
+    const { GET } = await import("../route");
+    const listResponse = await GET(
+      new Request("https://example.com/api/admin/reviews?page=1&pageSize=20")
+    );
+    const listJson = await listResponse.json();
+    expect(listJson.items.find((item: AnyRecord) => item.reviewId === "bk_1")).toBeUndefined();
+  });
+
+  it("returns 400 when deleting a review with blank id", async () => {
+    const { DELETE } = await import("../[id]/route");
+    const response = await DELETE(
+      new Request("https://example.com/api/admin/reviews/%20", { method: "DELETE" }),
+      { params: Promise.resolve({ id: " " }) }
+    );
+    const json = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(json.error).toContain("obligatoriu");
+  });
+
+  it("returns 404 when deleting a missing review", async () => {
+    const { DELETE } = await import("../[id]/route");
+    const response = await DELETE(
+      new Request("https://example.com/api/admin/reviews/missing", { method: "DELETE" }),
+      { params: Promise.resolve({ id: "missing" }) }
+    );
+    const json = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(json.error).toContain("nu există");
+  });
+
+  it("returns 403 for support on hard review delete", async () => {
+    mocks.requireAdmin.mockRejectedValueOnce(new Error("not_admin"));
+    mocks.adminAuthErrorResponse.mockReturnValueOnce(
+      Response.json({ error: "Nu ai drepturi de administrator pentru acest cont." }, { status: 403 })
+    );
+
+    const { DELETE } = await import("../[id]/route");
+    const response = await DELETE(
+      new Request("https://example.com/api/admin/reviews/bk_1", { method: "DELETE" }),
+      { params: Promise.resolve({ id: "bk_1" }) }
+    );
+
+    expect(response.status).toBe(403);
   });
 });

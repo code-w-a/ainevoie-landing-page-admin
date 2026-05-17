@@ -594,6 +594,37 @@ async function getSupportTicketById(ticketId: string, now = new Date()) {
   });
 }
 
+export async function getAdminSupportTicketById(ticketIdInput: string): Promise<SupportTicketListItem> {
+  const ticketId = readString(ticketIdInput);
+  if (!ticketId) {
+    throw new AdminSupportTicketError("Ticket id este obligatoriu.", 400);
+  }
+
+  const item = await getSupportTicketById(ticketId, new Date());
+  if (!item) {
+    throw new AdminSupportTicketError("Ticket-ul nu există.", 404);
+  }
+
+  return item;
+}
+
+export async function deleteAdminSupportTicket(ticketIdInput: string): Promise<{ ticketId: string }> {
+  const ticketId = readString(ticketIdInput);
+  if (!ticketId) {
+    throw new AdminSupportTicketError("Ticket id este obligatoriu.", 400);
+  }
+
+  const db = getAdminDb();
+  const ticketRef = db.collection("supportTickets").doc(ticketId);
+  const ticketSnap = await ticketRef.get();
+  if (!ticketSnap.exists) {
+    throw new AdminSupportTicketError("Ticket-ul nu există.", 404);
+  }
+
+  await ticketRef.delete();
+  return { ticketId };
+}
+
 async function ensureAdminExists(db: FirebaseFirestore.Firestore, adminUid: string) {
   const adminSnap = await db.collection("admini").doc(adminUid).get();
   if (!adminSnap.exists) {
