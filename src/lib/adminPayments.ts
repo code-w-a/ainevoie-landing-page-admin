@@ -12,6 +12,13 @@ export type PaymentAdminListItem = {
   createdAt: string | null;
   updatedAt: string | null;
   amount: number;
+  grossAmount: number;
+  platformFeePercent: number;
+  platformFeeAmount: number;
+  providerNetAmount: number;
+  providerPayoutStatus: string;
+  providerPayoutRequestedAt: string | null;
+  providerPayoutPaidAt: string | null;
   currency: string;
   processor: string;
   method: string;
@@ -44,12 +51,33 @@ export type PaymentAdminListItem = {
 
 export type PaymentListFilters = {
   status?: string;
+  providerPayoutStatus?: string;
   dateFrom?: Date | null;
   dateTo?: Date | null;
   providerId?: string;
   userId?: string;
   processorId?: string;
   q?: string;
+};
+
+export type ProviderPayoutRequestAdminItem = {
+  requestId: string;
+  providerId: string | null;
+  status: string;
+  currency: string;
+  grossAmount: number;
+  platformFeeAmount: number;
+  providerNetAmount: number;
+  paymentIds: string[];
+  requestedAt: string | null;
+  paidAt: string | null;
+  paidByAdminUid: string | null;
+  adminNote: string | null;
+  provider: {
+    providerId: string | null;
+    displayName: string | null;
+    email: string | null;
+  };
 };
 
 export type PaymentQueryResult = {
@@ -106,6 +134,12 @@ function toMillis(value: unknown) {
 function toNumber(value: unknown) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function readStringArray(value: unknown) {
+  return Array.isArray(value)
+    ? value.map((item) => readString(item)).filter(Boolean)
+    : [];
 }
 
 function normalizeText(value: unknown) {
@@ -277,6 +311,13 @@ export async function listAdminPayments(
       createdAt: toIso(payment.createdAt),
       updatedAt: toIso(payment.updatedAt),
       amount: toNumber(payment.amount),
+      grossAmount: toNumber(payment.grossAmount) || toNumber(payment.amount),
+      platformFeePercent: toNumber(payment.platformFeePercent),
+      platformFeeAmount: toNumber(payment.platformFeeAmount),
+      providerNetAmount: toNumber(payment.providerNetAmount),
+      providerPayoutStatus: readString(payment.providerPayoutStatus) || "not_available",
+      providerPayoutRequestedAt: toIso(payment.providerPayoutRequestedAt),
+      providerPayoutPaidAt: toIso(payment.providerPayoutPaidAt),
       currency: readString(payment.currency) || "RON",
       processor: readString(payment.processor) || "unknown",
       method: readString(payment.method),
@@ -318,9 +359,13 @@ export async function listAdminPayments(
   });
 
   const processorId = normalizeText(filters.processorId);
+  const providerPayoutStatus = normalizeText(filters.providerPayoutStatus);
   const search = normalizeText(filters.q);
   const filtered = mapped.filter(
-    (item) => matchesProcessorId(item, processorId) && matchesSearch(item, search)
+    (item) =>
+      (!providerPayoutStatus || normalizeText(item.providerPayoutStatus) === providerPayoutStatus)
+      && matchesProcessorId(item, processorId)
+      && matchesSearch(item, search)
   );
 
   return {
@@ -329,4 +374,119 @@ export async function listAdminPayments(
     truncated,
     maxRows,
   };
+}
+
+export async function listAdminProviderPayoutRequests(options?: {
+  status?: string;
+  maxRows?: number;
+}): Promise<ProviderPayoutRequestAdminItem[]> {
+  const db = getAdminDb();
+  const maxRows = Math.max(1, Math.floor(options?.maxRows || 100));
+  const status = readString(options?.status);
+  let query: FirebaseFirestore.Query<FirebaseFirestore.DocumentData> =
+    db.collection("providerPayoutRequests");
+
+  if (status) {
+    query = query.where("status", "==", status);
+  }
+
+  const snapshot = await query.orderBy("requestedAt", "desc").limit(maxRows).get();
+  const requests = snapshot.docs.map((doc) => ({
+    requestId: doc.id,
+    ...doc.data(),
+  })) as Array<Record<string, unknown> & { requestId: string }>;
+  const providersById = await loadByIds("providers", readUniqueIds(requests, "providerId"));
+
+  return requests.map((request) => {
+    const providerId = readString(request.providerId) || null;
+    const provider = providerId ? providersById.get(providerId) || null : null;
+
+    return {
+      requestId: readString(request.requestId),
+      providerId,
+      status: readString(request.status) || "requested",
+      currency: readString(request.currency) || "RON",
+      grossAmount: toNumber(request.grossAmount),
+      platformFeeAmount: toNumber(request.platformFeeAmount),
+      providerNetAmount: toNumber(request.providerNetAmount),
+      paymentIds: readStringArray(request.paymentIds),
+      requestedAt: toIso(request.requestedAt),
+      paidAt: toIso(request.paidAt),
+      paidByAdminUid: readString(request.paidByAdminUid) || null,
+      adminNote: readString(request.adminNote) || null,
+      provider: {
+        providerId,
+        displayName:
+          readString((provider?.professionalProfile as Record<string, unknown> | undefined)?.displayName) || null,
+        email: readString(provider?.email) || null,
+      },
+    };
+  });
+}
+
+export async function markProviderPayoutRequestPaid(params: {
+  requestId: string;
+  adminUid: string;
+  adminNote?: string;
+}) {
+  const requestId = readString(params.requestId);
+  const adminUid = readString(params.adminUid);
+
+  if (!requestId) {
+    throw new Error("missing_request_id");
+  }
+
+  const db = getAdminDb();
+  const requestRef = db.collection("providerPayoutRequests").doc(requestId);
+  const now = Timestamp.now();
+
+  return db.runTransaction(async (transaction) => {
+    const requestSnap = await transaction.get(requestRef);
+    if (!requestSnap.exists) {
+      throw new Error("payout_request_not_found");
+    }
+
+    const request = requestSnap.data() || {};
+    if (readString(request.status) !== "requested") {
+      throw new Error("payout_request_not_requested");
+    }
+
+    const paymentIds = readStringArray(request.paymentIds);
+    const paymentRefs = paymentIds.map((paymentId) => db.collection("payments").doc(paymentId));
+    const paymentSnaps = await Promise.all(paymentRefs.map((ref) => transaction.get(ref)));
+
+    paymentSnaps.forEach((paymentSnap) => {
+      if (!paymentSnap.exists) {
+        throw new Error("payout_payment_not_found");
+      }
+      const payment = paymentSnap.data() || {};
+      if (readString(payment.providerPayoutStatus) !== "requested") {
+        throw new Error("payout_payment_not_requested");
+      }
+    });
+
+    transaction.set(requestRef, {
+      status: "paid",
+      paidAt: now,
+      paidByAdminUid: adminUid,
+      adminNote: readString(params.adminNote) || null,
+      updatedAt: now,
+    }, { merge: true });
+
+    paymentRefs.forEach((paymentRef) => {
+      transaction.set(paymentRef, {
+        providerPayoutStatus: "paid",
+        providerPayoutPaidAt: now,
+        updatedAt: now,
+        updatedBy: adminUid,
+      }, { merge: true });
+    });
+
+    return {
+      requestId,
+      status: "paid",
+      paidAt: now.toDate().toISOString(),
+      updatedPaymentCount: paymentRefs.length,
+    };
+  });
 }

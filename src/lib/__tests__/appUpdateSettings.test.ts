@@ -12,6 +12,7 @@ describe("app update settings", () => {
 
     expect(settings.enabled).toBe(false);
     expect(settings.paymentDemoModeEnabled).toBe(false);
+    expect(settings.platformFeePercent).toBe(20);
     expect(settings.mode).toBe("notice");
     expect(settings.title.ro).toBe(getDefaultAppUpdateSettings().title.ro);
   });
@@ -34,6 +35,7 @@ describe("app update settings", () => {
     const settings = sanitizeAppUpdateSettings({
       enabled: true,
       paymentDemoModeEnabled: true,
+      platformFeePercent: 12.5,
       mode: "notice",
       secret: "internal",
       urls: {
@@ -44,6 +46,7 @@ describe("app update settings", () => {
 
     expect(publicSettings.enabled).toBe(true);
     expect(publicSettings.paymentDemoModeEnabled).toBe(true);
+    expect(publicSettings.platformFeePercent).toBe(12.5);
     expect(publicSettings.urls.fallback).toBe("https://ainevoie.ro/update");
     expect(publicSettings).not.toHaveProperty("secret");
   });

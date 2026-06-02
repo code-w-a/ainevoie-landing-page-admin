@@ -557,6 +557,28 @@ export default function SettingsPage() {
                     </label>
 
                     <div className="space-y-2">
+                      <label className="text-sm font-medium">
+                        Comision platformă (%)
+                      </label>
+                      <Input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.01"
+                        value={appUpdateState.platformFeePercent}
+                        onChange={(event) =>
+                          updateAppUpdateField(
+                            "platformFeePercent",
+                            Math.min(Math.max(Number(event.target.value || 0), 0), 100)
+                          )
+                        }
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Folosit server-side pentru calculul soldului providerilor la plățile noi.
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
                       <label className="text-sm font-medium">Mod afișare</label>
                       <select
                         className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"

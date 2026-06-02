@@ -7,6 +7,7 @@ export type AppUpdateLocale = "ro" | "en";
 export type AppUpdateSettings = {
   enabled: boolean;
   paymentDemoModeEnabled: boolean;
+  platformFeePercent: number;
   mode: AppUpdateMode;
   revision: string;
   displayVersion: string;
@@ -26,6 +27,7 @@ export function getDefaultAppUpdateSettings(): AppUpdateSettings {
   return {
     enabled: false,
     paymentDemoModeEnabled: false,
+    platformFeePercent: 20,
     mode: "notice",
     revision: DEFAULT_REVISION,
     displayVersion: "",
@@ -82,6 +84,7 @@ function buildRevision(settings: AppUpdateSettings) {
   return [
     settings.enabled ? "enabled" : "disabled",
     settings.paymentDemoModeEnabled ? "payment-demo-enabled" : "payment-demo-disabled",
+    settings.platformFeePercent,
     settings.mode,
     settings.displayVersion,
     settings.title.ro,
@@ -106,6 +109,7 @@ export function sanitizeAppUpdateSettings(raw: unknown): AppUpdateSettings {
   const settings: AppUpdateSettings = {
     enabled: source.enabled === true,
     paymentDemoModeEnabled: source.paymentDemoModeEnabled === true,
+    platformFeePercent: sanitizePlatformFeePercent(source.platformFeePercent),
     mode: source.mode === "force" ? "force" : "notice",
     revision: readString(source.revision, 120) || defaults.revision,
     displayVersion: readString(source.displayVersion, 80),
@@ -145,6 +149,7 @@ export function getPublicAppUpdateSettings(settings: AppUpdateSettings) {
   return {
     enabled: settings.enabled,
     paymentDemoModeEnabled: settings.paymentDemoModeEnabled,
+    platformFeePercent: settings.platformFeePercent,
     mode: settings.mode,
     revision: settings.revision,
     displayVersion: settings.displayVersion,
@@ -153,4 +158,12 @@ export function getPublicAppUpdateSettings(settings: AppUpdateSettings) {
     primaryActionLabel: settings.primaryActionLabel,
     urls: settings.urls,
   };
+}
+
+function sanitizePlatformFeePercent(value: unknown) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return 20;
+  }
+  return Math.min(Math.max(Math.round(parsed * 100) / 100, 0), 100);
 }

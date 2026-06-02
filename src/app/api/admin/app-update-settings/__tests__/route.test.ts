@@ -71,7 +71,9 @@ describe("admin app update settings route", () => {
 
     expect(response.status).toBe(200);
     expect(json.item.paymentDemoModeEnabled).toBe(false);
+    expect(json.item.platformFeePercent).toBe(20);
     expect(json.defaults.paymentDemoModeEnabled).toBe(false);
+    expect(json.defaults.platformFeePercent).toBe(20);
   });
 
   it("persists paymentDemoModeEnabled on PUT", async () => {
@@ -81,6 +83,7 @@ describe("admin app update settings route", () => {
       body: JSON.stringify({
         enabled: false,
         paymentDemoModeEnabled: true,
+        platformFeePercent: 17.5,
         mode: "notice",
         urls: {},
       }),
@@ -89,9 +92,11 @@ describe("admin app update settings route", () => {
 
     expect(response.status).toBe(200);
     expect(json.item.paymentDemoModeEnabled).toBe(true);
+    expect(json.item.platformFeePercent).toBe(17.5);
     expect(mocks.setDoc).toHaveBeenCalledWith(
       expect.objectContaining({
         paymentDemoModeEnabled: true,
+        platformFeePercent: 17.5,
       }),
       { merge: true }
     );

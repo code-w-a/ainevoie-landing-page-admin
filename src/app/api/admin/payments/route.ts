@@ -47,6 +47,7 @@ export async function GET(request: Request) {
     const result = await listAdminPayments(
       {
         status: searchParams.get("status")?.trim() || undefined,
+        providerPayoutStatus: searchParams.get("providerPayoutStatus")?.trim() || undefined,
         dateFrom: readDateFromParam(searchParams.get("dateFrom")),
         dateTo: readDateToParam(searchParams.get("dateTo")),
         providerId: searchParams.get("providerId")?.trim() || undefined,

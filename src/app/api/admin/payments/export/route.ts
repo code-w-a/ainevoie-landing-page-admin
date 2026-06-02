@@ -47,14 +47,32 @@ function toAmountDisplay(item: PaymentAdminListItem) {
   }).format(item.amount);
 }
 
+function toMoney(value: number, currency: string) {
+  if (!Number.isFinite(value) || value <= 0) {
+    return "";
+  }
+  return new Intl.NumberFormat("ro-RO", {
+    style: "currency",
+    currency: currency || "RON",
+  }).format(value);
+}
+
 function toCsv(items: PaymentAdminListItem[]) {
   const headers = [
     "paymentId",
     "status",
     "createdAt",
     "amount",
+    "grossAmount",
+    "platformFeePercent",
+    "platformFeeAmount",
+    "providerNetAmount",
+    "providerPayoutStatus",
+    "providerPayoutRequestedAt",
+    "providerPayoutPaidAt",
     "currency",
     "amountDisplay",
+    "providerNetDisplay",
     "processor",
     "method",
     "last4",
@@ -81,8 +99,16 @@ function toCsv(items: PaymentAdminListItem[]) {
       item.status,
       item.createdAt,
       item.amount,
+      item.grossAmount,
+      item.platformFeePercent,
+      item.platformFeeAmount,
+      item.providerNetAmount,
+      item.providerPayoutStatus,
+      item.providerPayoutRequestedAt,
+      item.providerPayoutPaidAt,
       item.currency,
       toAmountDisplay(item),
+      toMoney(item.providerNetAmount, item.currency),
       item.processor,
       item.method,
       item.last4,
@@ -117,6 +143,7 @@ export async function GET(request: Request) {
     const result = await listAdminPayments(
       {
         status: searchParams.get("status")?.trim() || undefined,
+        providerPayoutStatus: searchParams.get("providerPayoutStatus")?.trim() || undefined,
         dateFrom: readDateFromParam(searchParams.get("dateFrom")),
         dateTo: readDateToParam(searchParams.get("dateTo")),
         providerId: searchParams.get("providerId")?.trim() || undefined,

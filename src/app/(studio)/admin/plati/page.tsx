@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Download, MoreHorizontal, Search, Trash2 } from "lucide-react";
+import { CheckCircle2, Download, MoreHorizontal, Search, Trash2 } from "lucide-react";
 import { adminFetch, readAdminResponseError } from "@/components/admin/adminApi";
 import { AdminConfirmDialog } from "@/components/admin/AdminConfirmDialog";
 import { runAdminBulkDelete, useAdminBulkSelection } from "@/components/admin/useAdminBulkSelection";
@@ -48,6 +48,13 @@ type PaymentAdminListItem = {
   status: string;
   createdAt: string | null;
   amount: number;
+  grossAmount: number;
+  platformFeePercent: number;
+  platformFeeAmount: number;
+  providerNetAmount: number;
+  providerPayoutStatus: string;
+  providerPayoutRequestedAt: string | null;
+  providerPayoutPaidAt: string | null;
   currency: string;
   processor: string;
   method: string;
@@ -86,7 +93,31 @@ type PaymentsResponse = {
   };
 };
 
+type ProviderPayoutRequestAdminItem = {
+  requestId: string;
+  providerId: string | null;
+  status: string;
+  currency: string;
+  grossAmount: number;
+  platformFeeAmount: number;
+  providerNetAmount: number;
+  paymentIds: string[];
+  requestedAt: string | null;
+  paidAt: string | null;
+  paidByAdminUid: string | null;
+  adminNote: string | null;
+  provider: {
+    displayName: string | null;
+    email: string | null;
+  };
+};
+
+type ProviderPayoutRequestsResponse = {
+  items: ProviderPayoutRequestAdminItem[];
+};
+
 const paymentStatuses = ["unpaid", "in_progress", "paid", "failed"];
+const payoutStatuses = ["not_available", "available", "requested", "paid"];
 
 function paymentBadgeVariant(status?: string | null) {
   if (status === "paid") return "success";
@@ -101,18 +132,25 @@ function webhookBadgeVariant(state: PaymentWebhookState) {
   return "success";
 }
 
+function payoutBadgeVariant(status?: string | null) {
+  if (status === "paid") return "success";
+  if (status === "requested") return "warning";
+  if (status === "available") return "success";
+  return "outline";
+}
+
 function label(value?: string | null) {
   return value ? value.replaceAll("_", " ") : "-";
 }
 
-function formatAmount(item: PaymentAdminListItem) {
-  if (!Number.isFinite(item.amount) || item.amount <= 0) {
+function formatMoneyValue(amount: number, currency = "RON") {
+  if (!Number.isFinite(amount) || amount <= 0) {
     return "-";
   }
   return new Intl.NumberFormat("ro-RO", {
     style: "currency",
-    currency: item.currency || "RON",
-  }).format(item.amount);
+    currency: currency || "RON",
+  }).format(amount);
 }
 
 export default function AdminPaymentsPage() {
@@ -122,6 +160,8 @@ export default function AdminPaymentsPage() {
   const [providerId, setProviderId] = useState("");
   const [userId, setUserId] = useState("");
   const [processorId, setProcessorId] = useState("");
+  const [providerPayoutStatus, setProviderPayoutStatus] = useState("all");
+  const [payoutRequestStatus, setPayoutRequestStatus] = useState("requested");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
@@ -132,6 +172,7 @@ export default function AdminPaymentsPage() {
   const [bulkActionSummary, setBulkActionSummary] = useState<string | null>(null);
   const [bulkActionHasFailures, setBulkActionHasFailures] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [pendingMarkPaidRequestId, setPendingMarkPaidRequestId] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQ(q), 250);
@@ -147,10 +188,11 @@ export default function AdminPaymentsPage() {
     if (providerId.trim()) params.set("providerId", providerId.trim());
     if (userId.trim()) params.set("userId", userId.trim());
     if (processorId.trim()) params.set("processorId", processorId.trim());
+    if (providerPayoutStatus !== "all") params.set("providerPayoutStatus", providerPayoutStatus);
     if (dateFrom) params.set("dateFrom", dateFrom);
     if (dateTo) params.set("dateTo", dateTo);
     return params;
-  }, [dateFrom, dateTo, debouncedQ, page, processorId, providerId, status, userId]);
+  }, [dateFrom, dateTo, debouncedQ, page, processorId, providerId, providerPayoutStatus, status, userId]);
 
   const endpoint = useMemo(
     () => `/api/admin/payments?${searchParams.toString()}`,
@@ -162,7 +204,18 @@ export default function AdminPaymentsPage() {
   );
 
   const { data, loading, error, reload } = useAdminData<PaymentsResponse>(endpoint);
+  const payoutRequestsEndpoint = useMemo(
+    () => `/api/admin/provider-payout-requests?status=${encodeURIComponent(payoutRequestStatus)}`,
+    [payoutRequestStatus]
+  );
+  const {
+    data: payoutRequestsData,
+    loading: payoutRequestsLoading,
+    error: payoutRequestsError,
+    reload: reloadPayoutRequests,
+  } = useAdminData<ProviderPayoutRequestsResponse>(payoutRequestsEndpoint);
   const items = data?.items || [];
+  const payoutRequests = payoutRequestsData?.items || [];
   const pagination = data?.pagination;
   const truncated = Boolean(data?.meta?.truncated);
   const pageIds = useMemo(
@@ -253,6 +306,32 @@ export default function AdminPaymentsPage() {
     }
   }
 
+  async function handleMarkPayoutPaid(requestId: string) {
+    setPendingMarkPaidRequestId(requestId);
+    setActionError(null);
+
+    try {
+      const response = await adminFetch(
+        `/api/admin/provider-payout-requests/${encodeURIComponent(requestId)}/mark-paid`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ adminNote: "Marcat plătit din Admin Plăți." }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(await readAdminResponseError(response, "Nu am putut marca payout-ul ca plătit."));
+      }
+
+      await Promise.all([reload(), reloadPayoutRequests()]);
+    } catch (nextError) {
+      setActionError(nextError instanceof Error ? nextError.message : "Nu am putut marca payout-ul ca plătit.");
+    } finally {
+      setPendingMarkPaidRequestId(null);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -306,6 +385,22 @@ export default function AdminPaymentsPage() {
               setProcessorId(event.target.value);
             }}
           />
+          <select
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm disabled:opacity-60"
+            value={providerPayoutStatus}
+            disabled={loading}
+            onChange={(event) => {
+              setPage(1);
+              setProviderPayoutStatus(event.target.value);
+            }}
+          >
+            <option value="all">Toate payout-urile</option>
+            {payoutStatuses.map((item) => (
+              <option key={item} value={item}>
+                {label(item)}
+              </option>
+            ))}
+          </select>
           <AdminEntityLookup
             value={providerId}
             entityType="provider"
@@ -349,6 +444,105 @@ export default function AdminPaymentsPage() {
 
       <Card>
         <CardHeader>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <CardTitle>Cereri payout provideri</CardTitle>
+              <CardDescription>
+                Providerii cer plata manuală din soldul disponibil. Confirmarea marchează plățile ca achitate către provider.
+              </CardDescription>
+            </div>
+            <select
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm disabled:opacity-60"
+              value={payoutRequestStatus}
+              disabled={payoutRequestsLoading}
+              onChange={(event) => setPayoutRequestStatus(event.target.value)}
+            >
+              <option value="requested">Requested</option>
+              <option value="paid">Paid</option>
+              <option value="all">Toate</option>
+            </select>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {payoutRequestsError && <p className="mb-4 text-sm text-rose-500">{payoutRequestsError}</p>}
+          {payoutRequestsLoading ? (
+            <AdminTableSkeleton rows={3} columns={7} />
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Request</TableHead>
+                  <TableHead>Provider</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Solicitat la</TableHead>
+                  <TableHead>Brut</TableHead>
+                  <TableHead>Comision</TableHead>
+                  <TableHead>Net provider</TableHead>
+                  <TableHead className="text-right">Acțiuni</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {payoutRequests.map((request) => (
+                  <TableRow key={request.requestId}>
+                    <TableCell>
+                      <div className="font-medium">{request.requestId}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {request.paymentIds.length} plăți
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {request.providerId ? (
+                        <Link
+                          href={`/admin/prestatori/${encodeURIComponent(request.providerId)}`}
+                          className="underline underline-offset-2"
+                        >
+                          {humanProviderLabel({
+                            displayName: request.provider.displayName,
+                            email: request.provider.email,
+                          })}
+                        </Link>
+                      ) : (
+                        "-"
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={payoutBadgeVariant(request.status)}>
+                        {label(request.status)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{formatAdminDateTime(request.requestedAt, { includeSeconds: true })}</TableCell>
+                    <TableCell>{formatMoneyValue(request.grossAmount, request.currency)}</TableCell>
+                    <TableCell>{formatMoneyValue(request.platformFeeAmount, request.currency)}</TableCell>
+                    <TableCell>{formatMoneyValue(request.providerNetAmount, request.currency)}</TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={request.status !== "requested" || pendingMarkPaidRequestId === request.requestId}
+                        onClick={() => { void handleMarkPayoutPaid(request.requestId); }}
+                      >
+                        <CheckCircle2 className="mr-2 h-4 w-4" />
+                        Mark paid
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {!payoutRequests.length && (
+                  <TableRow>
+                    <TableCell colSpan={8} className="py-8 text-center text-sm text-muted-foreground">
+                      Nu există cereri payout pentru filtrul selectat.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <div className="flex items-center justify-between gap-3">
             <div>
               <CardTitle>Lista plati</CardTitle>
@@ -385,7 +579,7 @@ export default function AdminPaymentsPage() {
           ) : null}
           {actionError && <p className="mb-4 text-sm text-rose-500">{actionError}</p>}
           {loading ? (
-            <AdminTableSkeleton rows={10} columns={14} />
+            <AdminTableSkeleton rows={10} columns={17} />
           ) : (
             <Table>
               <TableHeader>
@@ -399,7 +593,10 @@ export default function AdminPaymentsPage() {
                   <TableHead>Payment</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Creat la</TableHead>
-                  <TableHead>Suma</TableHead>
+                  <TableHead>Brut</TableHead>
+                  <TableHead>Comision</TableHead>
+                  <TableHead>Net provider</TableHead>
+                  <TableHead>Payout</TableHead>
                   <TableHead>Procesator</TableHead>
                   <TableHead>Tranzactie</TableHead>
                   <TableHead>Stripe PI</TableHead>
@@ -436,7 +633,17 @@ export default function AdminPaymentsPage() {
                       </Badge>
                     </TableCell>
                     <TableCell>{formatAdminDateTime(item.createdAt, { includeSeconds: true })}</TableCell>
-                    <TableCell>{formatAmount(item)}</TableCell>
+                    <TableCell>{formatMoneyValue(item.grossAmount || item.amount, item.currency)}</TableCell>
+                    <TableCell>
+                      <div>{formatMoneyValue(item.platformFeeAmount, item.currency)}</div>
+                      <div className="text-xs text-muted-foreground">{item.platformFeePercent || 0}%</div>
+                    </TableCell>
+                    <TableCell>{formatMoneyValue(item.providerNetAmount, item.currency)}</TableCell>
+                    <TableCell>
+                      <Badge variant={payoutBadgeVariant(item.providerPayoutStatus)}>
+                        {label(item.providerPayoutStatus)}
+                      </Badge>
+                    </TableCell>
                     <TableCell>{label(item.processor)}</TableCell>
                     <TableCell className="max-w-[180px] truncate" title={item.transactionId || "-"}>
                       {item.transactionId || "-"}
@@ -541,7 +748,7 @@ export default function AdminPaymentsPage() {
                 ))}
                 {!items.length && (
                   <TableRow>
-                    <TableCell colSpan={14} className="py-8 text-center text-sm text-muted-foreground">
+                    <TableCell colSpan={17} className="py-8 text-center text-sm text-muted-foreground">
                       Nu exista plati pentru filtrele selectate.
                     </TableCell>
                   </TableRow>

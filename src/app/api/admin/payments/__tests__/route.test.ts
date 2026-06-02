@@ -165,6 +165,11 @@ function buildFixtures() {
       providerId: "provider_1",
       status: "in_progress",
       amount: 120,
+      grossAmount: 120,
+      platformFeePercent: 20,
+      platformFeeAmount: 24,
+      providerNetAmount: 96,
+      providerPayoutStatus: "not_available",
       currency: "RON",
       processor: "stripe",
       transactionId: "tx_1",
@@ -181,6 +186,11 @@ function buildFixtures() {
       providerId: "provider_2",
       status: "in_progress",
       amount: 150,
+      grossAmount: 150,
+      platformFeePercent: 20,
+      platformFeeAmount: 30,
+      providerNetAmount: 120,
+      providerPayoutStatus: "not_available",
       currency: "RON",
       processor: "stripe",
       transactionId: "tx_2",
@@ -197,6 +207,11 @@ function buildFixtures() {
       providerId: "provider_3",
       status: "paid",
       amount: 200,
+      grossAmount: 200,
+      platformFeePercent: 20,
+      platformFeeAmount: 40,
+      providerNetAmount: 160,
+      providerPayoutStatus: "available",
       currency: "RON",
       processor: "stripe",
       transactionId: "tx_3",
@@ -250,6 +265,12 @@ describe("admin payments routes", () => {
     expect(json.items.find((item: AnyRecord) => item.paymentId === "pay_missing")?.webhookState).toBe("missing");
     expect(json.items.find((item: AnyRecord) => item.paymentId === "pay_delayed")?.webhookState).toBe("delayed");
     expect(json.items.find((item: AnyRecord) => item.paymentId === "pay_ok")?.webhookState).toBe("ok");
+    expect(json.items.find((item: AnyRecord) => item.paymentId === "pay_ok")).toEqual(expect.objectContaining({
+      grossAmount: 200,
+      platformFeeAmount: 40,
+      providerNetAmount: 160,
+      providerPayoutStatus: "available",
+    }));
   });
 
   it("applies status/date/provider/user/processorId and q filters", async () => {
@@ -264,6 +285,18 @@ describe("admin payments routes", () => {
     expect(response.status).toBe(200);
     expect(json.items).toHaveLength(1);
     expect(json.items[0].paymentId).toBe("pay_delayed");
+  });
+
+  it("filters by provider payout status", async () => {
+    const { GET } = await import("../route");
+    const response = await GET(
+      new Request("https://example.com/api/admin/payments?page=1&pageSize=20&providerPayoutStatus=available")
+    );
+    const json = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(json.items).toHaveLength(1);
+    expect(json.items[0].paymentId).toBe("pay_ok");
   });
 
   it("returns auth response when account is not authorized", async () => {
@@ -290,6 +323,7 @@ describe("admin payments routes", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("text/csv");
     expect(csv).toContain("paymentId,status,createdAt");
+    expect(csv).toContain("providerPayoutStatus");
     expect(csv).toContain("pay_ok");
     expect(csv).not.toContain("pay_missing");
   });

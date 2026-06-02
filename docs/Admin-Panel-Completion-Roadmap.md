@@ -226,6 +226,15 @@ Daca produsul va avea comision sau payout catre prestatori, aceasta zona trebuie
 - raport lunar;
 - export contabil.
 
+MVP implementat pentru payout manual:
+
+- platforma incaseaza integral plata Stripe;
+- `platformFeePercent` se configureaza in Admin -> Settings;
+- `payments` pastreaza `grossAmount`, `platformFeeAmount`, `providerNetAmount` si `providerPayoutStatus`;
+- providerul cere payout din aplicatia mobila, din Profil -> Plati si sold;
+- adminul vede cererile in `/admin/plati` si le marcheaza `paid` dupa transfer bancar manual;
+- Stripe Connect ramane etapa ulterioara pentru automatizarea transferurilor.
+
 Prioritate: mare.
 
 ## 7. Inbox de suport
