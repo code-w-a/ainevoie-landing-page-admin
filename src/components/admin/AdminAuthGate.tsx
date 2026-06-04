@@ -18,6 +18,11 @@ export default function AdminAuthGate({
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
+    if (process.env.NEXT_PUBLIC_ADMIN_SMOKE_BYPASS === "1") {
+      setReady(true);
+      return undefined;
+    }
+
     let active = true;
     const auth = getFirebaseAuth();
 

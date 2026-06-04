@@ -73,6 +73,13 @@ type ProviderDocument = {
     avatarPath?: string | null;
     coverageArea?: Record<string, unknown> | null;
   } | null;
+  payoutDetails?: {
+    iban?: string | null;
+    accountHolderName?: string | null;
+    bankName?: string | null;
+    updatedAt?: string | null;
+    updatedBy?: string | null;
+  } | null;
   documents?: {
     identity?: ProviderDocumentFile | null;
     professional?: ProviderDocumentFile | null;
@@ -564,6 +571,7 @@ function getPublicPreviewDrift(
   }
 
   const profile = provider.professionalProfile || {};
+  const payoutDetails = provider.payoutDetails || null;
   const expectedDisplayName = readString(profile.businessName) || readString(profile.displayName);
   const expectedSpecialization = readString(profile.specialization || provider.serviceType);
   const expectedCoverage = readString(profile.coverageAreaText || provider.coverageAreaText);
@@ -659,7 +667,7 @@ function getChecklistItems({
       badge: availabilityOk ? "Complet" : "Lipsă",
     },
     {
-      title: "Servicii active",
+      title: "Servicii",
       detail:
         activeServicesCount > 0
           ? `${activeServicesCount} servicii active.`
@@ -1430,6 +1438,7 @@ export default function ProviderDetailPage() {
 
   const providerId = getProviderId(provider, id);
   const profile = provider.professionalProfile || {};
+  const payoutDetails = provider.payoutDetails || null;
   const displayName = getDisplayName(provider);
   const specialization = getSpecialization(provider);
   const locationLabel = getLocationLabel(provider);
@@ -1719,6 +1728,27 @@ export default function ProviderDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Date payout</CardTitle>
+          <CardDescription>Datele bancare folosite de admin pentru transferul manual către prestator.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {payoutDetails?.iban && payoutDetails?.accountHolderName && payoutDetails?.bankName ? (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <FieldValue label="Titular cont" value={formatValue(payoutDetails.accountHolderName)} />
+              <FieldValue label="Bancă" value={formatValue(payoutDetails.bankName)} />
+              <FieldValue label="IBAN" value={formatValue(payoutDetails.iban)} />
+              <FieldValue label="Actualizat la" value={formatAdminDateTime(payoutDetails.updatedAt)} />
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Prestatorul nu a salvat încă datele bancare pentru payout.
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

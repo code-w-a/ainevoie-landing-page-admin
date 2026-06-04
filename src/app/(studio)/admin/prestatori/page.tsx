@@ -56,15 +56,9 @@ type ProviderListItem = {
   displayName?: string | null;
   specialization?: string | null;
   coverageAreaText?: string | null;
-  availabilitySummary?: string | null;
   identityDocumentStatus?: string | null;
   professionalDocumentStatus?: string | null;
-  submittedAt?: string | null;
-  lastReviewedAt?: string | null;
-  reviewedAt?: string | null;
-  reviewAction?: string | null;
-  lastPublishedAt?: string | null;
-  updatedAt?: string | null;
+  createdAt?: string | null;
 };
 
 type ProvidersResponse = {
@@ -97,18 +91,6 @@ function getDocumentMeta(status?: string | null) {
     return { label: "Respins", variant: "danger" as const };
   }
   return { label: "Lipsă", variant: "outline" as const };
-}
-
-function formatReviewTimeline(item: ProviderListItem) {
-  const submitted = formatAdminDateTime(item.submittedAt);
-  const reviewed = formatAdminDateTime(item.lastReviewedAt || item.reviewedAt);
-  const published = formatAdminDateTime(item.lastPublishedAt);
-
-  return [
-    submitted !== "-" ? `Trimis: ${submitted}` : null,
-    reviewed !== "-" ? `Revizuit: ${reviewed}` : null,
-    published !== "-" ? `Publicat: ${published}` : null,
-  ].filter(Boolean);
 }
 
 export default function AdminProvidersPage() {
@@ -379,7 +361,7 @@ export default function AdminProvidersPage() {
           {deleteSuccess && <p className="mb-4 text-sm text-emerald-700">{deleteSuccess}</p>}
 
           {loading ?
-            <AdminTableSkeleton rows={12} columns={10} />
+            <AdminTableSkeleton rows={12} columns={9} />
           : <Table>
               <TableHeader>
                 <TableRow>
@@ -396,15 +378,14 @@ export default function AdminProvidersPage() {
                   <TableHead>Zonă</TableHead>
                   <TableHead>Document identitate</TableHead>
                   <TableHead>Document profesional</TableHead>
-                  <TableHead>Disponibilitate</TableHead>
-                  <TableHead>Timeline</TableHead>
+                  <TableHead>Data creare cont</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {items.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={11} className="text-center text-sm text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center text-sm text-muted-foreground">
                       Nu există prestatori pentru filtrele curente.
                     </TableCell>
                   </TableRow>
@@ -413,7 +394,6 @@ export default function AdminProvidersPage() {
                   const providerId = getProviderId(item);
                   const identityMeta = getDocumentMeta(item.identityDocumentStatus);
                   const professionalMeta = getDocumentMeta(item.professionalDocumentStatus);
-                  const timeline = formatReviewTimeline(item);
 
                   return (
                     <TableRow key={providerId || item.email || item.displayName}>
@@ -458,17 +438,8 @@ export default function AdminProvidersPage() {
                       <TableCell>
                         <Badge variant={professionalMeta.variant}>{professionalMeta.label}</Badge>
                       </TableCell>
-                      <TableCell>{item.availabilitySummary || "-"}</TableCell>
-                      <TableCell>
-                        {timeline.length ? (
-                          <div className="space-y-1 text-xs text-muted-foreground">
-                            {timeline.map((line) => (
-                              <div key={line}>{line}</div>
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
+                      <TableCell className="text-sm text-muted-foreground">
+                        {formatAdminDateTime(item.createdAt)}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">

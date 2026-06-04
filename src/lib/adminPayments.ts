@@ -22,7 +22,6 @@ export type PaymentAdminListItem = {
   currency: string;
   processor: string;
   method: string;
-  last4: string | null;
   transactionId: string | null;
   stripePaymentIntentId: string | null;
   stripeLatestChargeId: string | null;
@@ -321,7 +320,6 @@ export async function listAdminPayments(
       currency: readString(payment.currency) || "RON",
       processor: readString(payment.processor) || "unknown",
       method: readString(payment.method),
-      last4: readString(payment.last4) || null,
       transactionId: readString(payment.transactionId) || null,
       stripePaymentIntentId: readString(payment.stripePaymentIntentId) || null,
       stripeLatestChargeId: readString(payment.stripeLatestChargeId) || null,

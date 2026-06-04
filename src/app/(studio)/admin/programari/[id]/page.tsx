@@ -77,13 +77,12 @@ function formatPricingContext(booking?: Record<string, any>) {
   const requestDetails = booking?.requestDetails || {};
   const rate = Number(pricing.ratePerHourPerProfessional ?? booking?.serviceSnapshot?.baseRateAmount ?? 0);
   const hours = Math.max(1, Number(requestDetails.estimatedHours ?? pricing.estimatedHours ?? 1) || 1);
-  const professionals = Math.max(1, Number(requestDetails.professionalsCount ?? pricing.professionalsCount ?? 1) || 1);
 
   if (!Number.isFinite(rate) || rate <= 0) {
-    return `${hours}h × ${professionals} pers`;
+    return `${hours}h`;
   }
 
-  return `${hours}h × ${rate} × ${professionals} pers`;
+  return `${hours}h × ${rate} RON`;
 }
 
 function formatRequestResponseStatus(status?: string | null) {
@@ -91,6 +90,15 @@ function formatRequestResponseStatus(status?: string | null) {
   if (status === "answered") return "answered";
   if (status === "expired") return "expired";
   return "-";
+}
+
+function getOperationalBookingState(booking?: Record<string, any>, payment?: Record<string, any> | null) {
+  const bookingStatus = booking?.status;
+  const paymentStatus = payment?.status || booking?.paymentSummary?.status;
+  if (bookingStatus === "confirmed" && (paymentStatus === "unpaid" || paymentStatus === "failed")) {
+    return "Confirmată, în așteptarea plății";
+  }
+  return label(bookingStatus);
 }
 
 function parseMillis(value: unknown) {
@@ -186,6 +194,7 @@ export default function AdminBookingDetailPage() {
   });
   const paymentId = payment?.paymentId || payment?.transactionId || payment?.stripePaymentIntentId || "";
   const conversationId = conversation?.conversationId || `conv_bk_${bookingId}`;
+  const operationalState = getOperationalBookingState(booking, payment);
   const [pendingAction, setPendingAction] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [reason, setReason] = useState("");
@@ -261,7 +270,7 @@ export default function AdminBookingDetailPage() {
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-            <MetricCard label="Booking" value={label(booking.status)} status={booking.status} />
+            <MetricCard label="Booking" value={operationalState} status={booking.status} />
             <MetricCard label="SLA răspuns prestator" value={formatSla(requestResponse)} status={requestResponse?.status} />
             <MetricCard label="Plată" value={formatAmount(payment)} status={payment?.status} />
             <MetricCard label="Suport" value={`${supportTickets.length} tichete`} status={supportTickets[0]?.priority} />
@@ -276,6 +285,7 @@ export default function AdminBookingDetailPage() {
               </CardHeader>
               <CardContent className="grid gap-3">
                 <InfoRow label="Status" value={label(booking.status)} />
+                <InfoRow label="Interpretare operațională" value={operationalState} />
                 <InfoRow label="Început" value={formatAdminDateTime(booking.scheduledStartAt)} />
                 <InfoRow label="Sfârșit" value={formatAdminDateTime(booking.scheduledEndAt)} />
                 <InfoRow label="Timezone" value={booking.timezone} />

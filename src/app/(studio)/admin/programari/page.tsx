@@ -95,6 +95,8 @@ type BookingsResponse = {
   };
 };
 
+const EMPTY_BOOKINGS: BookingListItem[] = [];
+
 const bookingStatuses = [
   "requested",
   "confirmed",
@@ -118,6 +120,14 @@ function badgeVariant(status?: string | null) {
 
 function label(value?: string | null) {
   return value ? value.replaceAll("_", " ") : "-";
+}
+
+function getOperationalStatusLabel(item: BookingListItem) {
+  const paymentStatus = item.paymentSummary?.status;
+  if (item.status === "confirmed" && (paymentStatus === "unpaid" || paymentStatus === "failed")) {
+    return "Confirmată, în așteptarea plății";
+  }
+  return null;
 }
 
 function formatAmount(item: BookingListItem) {
@@ -150,21 +160,11 @@ function formatPricingContext(item: BookingListItem) {
       ?? 1
     ) || 1
   );
-  const professionals = Math.max(
-    1,
-    Number(
-      item.requestDetails?.professionalsCount
-      ?? item.pricingSnapshot?.professionalsCount
-      ?? item.paymentSummary?.professionalsCount
-      ?? 1
-    ) || 1
-  );
-
   if (!Number.isFinite(rate) || rate <= 0 || !Number.isFinite(paymentAmount) || paymentAmount <= 0) {
-    return `${hours}h × ${professionals} pers`;
+    return `${hours}h`;
   }
 
-  return `${hours}h × ${rate} × ${professionals} pers`;
+  return `${hours}h × ${rate} RON`;
 }
 
 function formatRequestResponseMeta(item: BookingListItem) {
@@ -212,7 +212,7 @@ export default function AdminBookingsPage() {
   }, [debouncedQ, page, paymentStatus, status]);
 
   const { data, loading, error, reload } = useAdminData<BookingsResponse>(endpoint);
-  const items = data?.items || [];
+  const items = data?.items ?? EMPTY_BOOKINGS;
   const pagination = data?.pagination;
   const pageIds = useMemo(
     () => items.map((item) => item.bookingId).filter(Boolean),
@@ -411,6 +411,7 @@ export default function AdminBookingsPage() {
               <TableBody>
                 {items.map((item) => {
                   const requestResponseMeta = formatRequestResponseMeta(item);
+                  const operationalStatus = getOperationalStatusLabel(item);
 
                   return (
                     <TableRow key={item.bookingId}>
@@ -447,6 +448,11 @@ export default function AdminBookingsPage() {
                         {requestResponseMeta ? (
                           <div className="mb-1 text-xs text-muted-foreground">
                             {requestResponseMeta}
+                          </div>
+                        ) : null}
+                        {operationalStatus ? (
+                          <div className="mb-1 text-xs font-medium text-amber-700">
+                            {operationalStatus}
                           </div>
                         ) : null}
                         <Badge variant={badgeVariant(item.status)}>{label(item.status)}</Badge>

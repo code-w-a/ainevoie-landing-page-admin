@@ -1,13 +1,13 @@
 "use client";
 
-import type { ElementType } from "react";
+import type { ElementType, ReactNode } from "react";
 import Link from "next/link";
 import {
-  AlertTriangle,
+  ArrowRight,
   BriefcaseBusiness,
   CalendarClock,
+  Clock3,
   CreditCard,
-  ExternalLink,
   LifeBuoy,
   MessageSquare,
   RotateCw,
@@ -15,8 +15,6 @@ import {
 } from "lucide-react";
 
 import {
-  AdminLogStackSkeleton,
-  AdminKpiRowSkeleton,
   AdminPageHeaderSkeleton,
   AdminStatCardsSkeleton,
   AdminTableSkeleton,
@@ -26,14 +24,6 @@ import { humanProviderLabel, humanUserLabel } from "@/lib/adminHumanize";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { formatAdminDateTime } from "@/lib/formatAdminDateTime";
 import { providerStatusLabel, providerStatusVariant } from "@/lib/providers";
 
@@ -94,14 +84,6 @@ function readNumber(value: unknown) {
 
 function readItems(queue?: DashboardQueue) {
   return Array.isArray(queue?.items) ? queue.items : [];
-}
-
-function readCountMap(value: unknown) {
-  const source = readRecord(value);
-  return Object.entries(source)
-    .map(([key, count]) => ({ key, count: readNumber(count) }))
-    .filter((item) => item.count > 0)
-    .sort((a, b) => b.count - a.count);
 }
 
 function labelFromKey(value: string) {
@@ -185,21 +167,6 @@ function formatAmount(item: Record<string, unknown>) {
   }).format(amount);
 }
 
-function auditResourceHref(event: Record<string, unknown>) {
-  const type = readString(event.resourceType);
-  const id = readString(event.resourceId);
-  if (!id) {
-    return "";
-  }
-  if (type === "provider" || type === "providerDirectory") {
-    return `/admin/prestatori/${encodeURIComponent(id)}`;
-  }
-  if (type === "booking" || type === "payment") {
-    return `/admin/programari/${encodeURIComponent(id.replace(/^pay_/, ""))}`;
-  }
-  return "";
-}
-
 function KpiCard({
   icon: Icon,
   label,
@@ -232,6 +199,45 @@ function KpiCard({
   );
 }
 
+function priorityTone(count: number): BadgeVariant {
+  if (count > 0) return "warning";
+  return "success";
+}
+
+function riskTone(count: number): BadgeVariant {
+  if (count > 0) return "danger";
+  return "success";
+}
+
+function queueTotal(queue: DashboardQueue | undefined, fallbackItems: Array<Record<string, unknown>>) {
+  return queue?.total ?? fallbackItems.length;
+}
+
+function SectionHeading({
+  eyebrow,
+  title,
+  description,
+  action,
+}: {
+  eyebrow?: string;
+  title: string;
+  description: string;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="space-y-1">
+        {eyebrow ? <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">{eyebrow}</p> : null}
+        <div>
+          <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
+          <p className="text-sm text-muted-foreground">{description}</p>
+        </div>
+      </div>
+      {action}
+    </div>
+  );
+}
+
 function EmptyQueue({ message }: { message: string }) {
   return (
     <div className="rounded-md border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
@@ -240,59 +246,139 @@ function EmptyQueue({ message }: { message: string }) {
   );
 }
 
-function ProviderQueue({ items }: { items: Array<Record<string, unknown>> }) {
+function ActionCard({
+  icon: Icon,
+  title,
+  value,
+  summary,
+  href,
+  cta,
+  tone,
+}: {
+  icon: ElementType;
+  title: string;
+  value: number;
+  summary: string;
+  href: string;
+  cta: string;
+  tone: BadgeVariant;
+}) {
+  return (
+    <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <span className="rounded-lg border border-border bg-background p-2 text-muted-foreground">
+              <Icon className="h-4 w-4" />
+            </span>
+            <span>{title}</span>
+          </div>
+          <div className="flex items-end gap-3">
+            <span className="text-3xl font-semibold leading-none">{value}</span>
+            <Badge variant={tone}>{value > 0 ? "Atenție" : "OK"}</Badge>
+          </div>
+          <p className="text-sm text-muted-foreground">{summary}</p>
+        </div>
+      </div>
+      <Button asChild className="mt-4 w-full justify-between" variant="outline">
+        <Link href={href}>
+          {cta}
+          <ArrowRight className="h-4 w-4" />
+        </Link>
+      </Button>
+    </div>
+  );
+}
+
+function SummaryRow({
+  label,
+  value,
+  hint,
+  variant = "outline",
+}: {
+  label: string;
+  value: number;
+  hint: string;
+  variant?: BadgeVariant;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-border/80 bg-background/60 px-4 py-3">
+      <div className="min-w-0">
+        <p className="text-sm font-medium">{label}</p>
+        <p className="text-xs text-muted-foreground">{hint}</p>
+      </div>
+      <Badge variant={variant}>{value}</Badge>
+    </div>
+  );
+}
+
+function PreviewCard({
+  title,
+  description,
+  href,
+  hrefLabel,
+  children,
+}: {
+  title: string;
+  description: string;
+  href: string;
+  hrefLabel: string;
+  children: ReactNode;
+}) {
+  return (
+    <Card className="overflow-hidden">
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <CardTitle className="text-lg">{title}</CardTitle>
+            <CardDescription>{description}</CardDescription>
+          </div>
+          <Button asChild size="sm" variant="outline">
+            <Link href={href}>{hrefLabel}</Link>
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">{children}</CardContent>
+    </Card>
+  );
+}
+
+function ProviderPreview({ items }: { items: Array<Record<string, unknown>> }) {
   if (!items.length) {
     return <EmptyQueue message="Nu există prestatori în review acum." />;
   }
 
   return (
-    <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Prestator</TableHead>
-            <TableHead>Specializare</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Trimis</TableHead>
-            <TableHead className="text-right">Detalii</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {items.map((item) => {
-            const id = providerId(item);
-            const status = readString(item.status);
-            return (
-              <TableRow key={id || providerName(item)}>
-                <TableCell>
-                  <div>
-                    <p className="font-medium">{providerName(item)}</p>
-                    <p className="text-xs text-muted-foreground">{readString(item.email) || id || "-"}</p>
-                  </div>
-                </TableCell>
-                <TableCell>{readString(item.specialization) || "-"}</TableCell>
-                <TableCell>
-                  <Badge variant={providerStatusVariant(status)}>
-                    {providerStatusLabel[status as keyof typeof providerStatusLabel] || labelFromKey(status || "-")}
-                  </Badge>
-                </TableCell>
-                <TableCell>{formatAdminDateTime(readString(item.submittedAt))}</TableCell>
-                <TableCell className="text-right">
-                  {id ?
-                    <Button asChild size="sm" variant="outline">
-                      <Link href={`/admin/prestatori/${encodeURIComponent(id)}`}>Vezi</Link>
-                    </Button>
-                  : "-"}
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
+    <div className="space-y-3">
+      {items.slice(0, 3).map((item) => {
+        const id = providerId(item);
+        const status = readString(item.status);
+        return (
+          <div key={id || providerName(item)} className="rounded-lg border border-border/80 px-4 py-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium">{providerName(item)}</p>
+                <p className="text-xs text-muted-foreground">
+                  {readString(item.specialization) || "Fără specializare"} · {formatAdminDateTime(readString(item.submittedAt))}
+                </p>
+              </div>
+              <Badge variant={providerStatusVariant(status)}>
+                {providerStatusLabel[status as keyof typeof providerStatusLabel] || labelFromKey(status || "-")}
+              </Badge>
+            </div>
+            {id ?
+              <Button asChild className="mt-3" size="sm" variant="ghost">
+                <Link href={`/admin/prestatori/${encodeURIComponent(id)}`}>Deschide profilul</Link>
+              </Button>
+            : null}
+          </div>
+        );
+      })}
     </div>
   );
 }
 
-function BookingQueue({
+function BookingPreview({
   items,
   emptyMessage,
   showPayment = false,
@@ -306,71 +392,60 @@ function BookingQueue({
   }
 
   return (
-    <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Programare</TableHead>
-            <TableHead>Client</TableHead>
-            <TableHead>Prestator</TableHead>
-            <TableHead>{showPayment ? "Plată" : "Status"}</TableHead>
-            <TableHead className="text-right">Detalii</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {items.map((item) => {
-            const id = bookingId(item);
-            const payment = readRecord(item.paymentSummary);
-            return (
-              <TableRow key={id || `${bookingPerson(item, "userSnapshot", "userId")}-${bookingService(item)}`}>
-                <TableCell>
-                  <div>
-                    <p className="font-medium">{formatAdminDateTime(readString(item.scheduledStartAt))}</p>
-                    <p className="text-xs text-muted-foreground">{bookingService(item)}</p>
-                  </div>
-                </TableCell>
-                <TableCell>{bookingPerson(item, "userSnapshot", "userId")}</TableCell>
-                <TableCell>{bookingPerson(item, "providerSnapshot", "providerId")}</TableCell>
-                <TableCell>
-                  {showPayment ?
-                    <div className="space-y-1">
-                      <Badge variant={paymentStatusVariant(payment.status)}>
-                        {paymentStatusLabel(payment.status)}
-                      </Badge>
-                      <p className="text-xs text-muted-foreground">{formatAmount(item)}</p>
-                    </div>
-                  : <Badge variant={bookingStatusVariant(item.status)}>
-                      {bookingStatusLabel(item.status)}
-                    </Badge>}
-                </TableCell>
-                <TableCell className="text-right">
-                  {id ?
-                    <Button asChild size="sm" variant="outline">
-                      <Link href={`/admin/programari/${encodeURIComponent(id)}`}>Vezi</Link>
-                    </Button>
-                  : "-"}
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
+    <div className="space-y-3">
+      {items.slice(0, 4).map((item) => {
+        const id = bookingId(item);
+        const payment = readRecord(item.paymentSummary);
+        return (
+          <div
+            key={id || `${bookingPerson(item, "userSnapshot", "userId")}-${bookingService(item)}`}
+            className="rounded-lg border border-border/80 px-4 py-3"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium">{bookingService(item)}</p>
+                <p className="text-xs text-muted-foreground">
+                  {bookingPerson(item, "userSnapshot", "userId")} · {bookingPerson(item, "providerSnapshot", "providerId")}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {formatAdminDateTime(readString(item.scheduledStartAt))}
+                </p>
+              </div>
+              {showPayment ?
+                <div className="text-right">
+                  <Badge variant={paymentStatusVariant(payment.status)}>
+                    {paymentStatusLabel(payment.status)}
+                  </Badge>
+                  <p className="mt-1 text-xs text-muted-foreground">{formatAmount(item)}</p>
+                </div>
+              : <Badge variant={bookingStatusVariant(item.status)}>
+                  {bookingStatusLabel(item.status)}
+                </Badge>}
+            </div>
+            {id ?
+              <Button asChild className="mt-3" size="sm" variant="ghost">
+                <Link href={`/admin/programari/${encodeURIComponent(id)}`}>Deschide programarea</Link>
+              </Button>
+            : null}
+          </div>
+        );
+      })}
     </div>
   );
 }
 
-function SupportQueue({ items }: { items: Array<Record<string, unknown>> }) {
+function SupportPreview({ items }: { items: Array<Record<string, unknown>> }) {
   if (!items.length) {
     return <EmptyQueue message="Nu există tichete urgente active." />;
   }
 
   return (
     <div className="space-y-3">
-      {items.map((item, index) => {
+      {items.slice(0, 3).map((item, index) => {
         const id = readString(item.ticketId) || `ticket-${index}`;
         const requester = readRecord(item.requesterSnapshot);
         return (
-          <div key={id} className="rounded-md border border-border p-3">
+          <div key={id} className="rounded-md border border-border/80 p-3">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium">{readString(item.subject) || id}</p>
@@ -401,18 +476,18 @@ function SupportQueue({ items }: { items: Array<Record<string, unknown>> }) {
   );
 }
 
-function ConversationQueue({ items }: { items: Array<Record<string, unknown>> }) {
+function ConversationPreview({ items }: { items: Array<Record<string, unknown>> }) {
   if (!items.length) {
-    return <EmptyQueue message="Nu există conversații flagged sau în review." />;
+    return <EmptyQueue message="Nu există conversații cu probleme în acest moment." />;
   }
 
   return (
     <div className="space-y-3">
-      {items.map((item, index) => {
+      {items.slice(0, 3).map((item, index) => {
         const id = readString(item.conversationId) || `conversation-${index}`;
         const status = readString(item.moderationStatus) || "flagged";
         return (
-          <div key={id} className="rounded-md border border-border p-3">
+          <div key={id} className="rounded-md border border-border/80 p-3">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium">{id}</p>
@@ -438,86 +513,12 @@ function ConversationQueue({ items }: { items: Array<Record<string, unknown>> })
   );
 }
 
-function StatusDistribution({
-  title,
-  items,
-  variantResolver,
-}: {
-  title: string;
-  items: Array<{ key: string; count: number }>;
-  variantResolver?: (key: string) => BadgeVariant;
-}) {
-  return (
-    <div className="rounded-md border border-border p-4">
-      <p className="text-sm font-medium">{title}</p>
-      <div className="mt-3 flex flex-wrap gap-2">
-        {items.length ?
-          items.map((item) => (
-            <Badge key={item.key} variant={variantResolver?.(item.key) || "outline"}>
-              {labelFromKey(item.key)}: {item.count}
-            </Badge>
-          ))
-        : <span className="text-sm text-muted-foreground">Nu există date încă.</span>}
-      </div>
-    </div>
-  );
-}
-
-function AuditStack({ items }: { items: Array<Record<string, unknown>> }) {
-  if (!items.length) {
-    return <EmptyQueue message="Nu există evenimente recente de audit." />;
-  }
-
-  return (
-    <div className="space-y-3">
-      {items.map((event, index) => {
-        const href = auditResourceHref(event);
-        const transition = [readString(event.statusFrom), readString(event.statusTo)]
-          .filter(Boolean)
-          .join(" → ");
-        return (
-          <div key={readString(event.eventId) || index} className="rounded-lg border border-border p-3">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium">
-                  {labelFromKey(readString(event.action) || "Audit")}
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {formatAdminDateTime(readString(event.createdAt), { includeSeconds: true })}
-                </p>
-              </div>
-              <Badge variant={readString(event.result) === "failure" ? "danger" : "secondary"}>
-                {readString(event.result) || "event"}
-              </Badge>
-            </div>
-            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              <span>{readString(event.actorRole) || "actor"}: {readString(event.actorUid) || "-"}</span>
-              <span>Resursă: {readString(event.resourceType) || "-"}</span>
-              {transition ? <span>{transition}</span> : null}
-              {href ?
-                <Link className="inline-flex items-center gap-1 text-primary" href={href}>
-                  Deschide
-                  <ExternalLink className="h-3 w-3" />
-                </Link>
-              : null}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 export default function AdminOperationalDashboardPage() {
   const { data, loading, error, reload } =
     useAdminData<DashboardResponse>("/api/admin/dashboard");
 
   const summary = readRecord(data?.summary);
   const totals = readRecord(summary.totals);
-  const providersByStatus = readCountMap(summary.providersByStatus);
-  const bookingsByStatus = readCountMap(summary.bookingsByStatus);
-  const paymentsByStatus = readCountMap(summary.paymentsByStatus);
-  const reviewsByStatus = readCountMap(summary.reviewsByStatus);
   const pendingProviders = readItems(data?.queues?.pendingProviders);
   const requestedBookings = readItems(data?.queues?.requestedBookings);
   const overdueBookingRequests = readItems(data?.queues?.overdueBookingRequests);
@@ -525,40 +526,37 @@ export default function AdminOperationalDashboardPage() {
   const failedPaymentBookings = readItems(data?.queues?.failedPaymentBookings);
   const urgentSupportTickets = readItems(data?.queues?.urgentSupportTickets);
   const flaggedConversations = readItems(data?.queues?.flaggedConversations);
-  const auditEvents = readItems(data?.recentAuditEvents);
   const lastUpdated = data?.generatedAt || readString(summary.generatedAt);
+  const pendingProvidersTotal = queueTotal(data?.queues?.pendingProviders, pendingProviders);
+  const requestedBookingsTotal = queueTotal(data?.queues?.requestedBookings, requestedBookings);
+  const overdueBookingsTotal = queueTotal(data?.queues?.overdueBookingRequests, overdueBookingRequests);
+  const rescheduleBookingsTotal = queueTotal(data?.queues?.rescheduleBookings, rescheduleBookings);
+  const failedPaymentsTotal = queueTotal(data?.queues?.failedPaymentBookings, failedPaymentBookings);
+  const urgentSupportTotal = queueTotal(data?.queues?.urgentSupportTickets, urgentSupportTickets);
+  const flaggedConversationsTotal = queueTotal(data?.queues?.flaggedConversations, flaggedConversations);
 
   if (loading) {
     return (
       <div className="space-y-8">
         <AdminPageHeaderSkeleton />
         <AdminStatCardsSkeleton count={4} />
-        <div className="grid gap-6 xl:grid-cols-[1.5fr_0.9fr]">
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Cozi operaționale</CardTitle>
-                <CardDescription>Elemente care au nevoie de atenție.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <AdminTableSkeleton rows={5} columns={5} />
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>Distribuții status</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <AdminKpiRowSkeleton count={4} />
-              </CardContent>
-            </Card>
-          </div>
+        <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
           <Card>
             <CardHeader>
-              <CardTitle>Audit recent</CardTitle>
+              <CardTitle>Atenție acum</CardTitle>
+              <CardDescription>Zonele care cer decizii rapide.</CardDescription>
             </CardHeader>
             <CardContent>
-              <AdminLogStackSkeleton lines={6} />
+              <AdminTableSkeleton rows={5} columns={5} />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Activitate în platformă</CardTitle>
+              <CardDescription>Sumar business pentru client.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <AdminTableSkeleton rows={5} columns={2} />
             </CardContent>
           </Card>
         </div>
@@ -572,7 +570,7 @@ export default function AdminOperationalDashboardPage() {
         <div>
           <h1 className="text-2xl font-semibold">Dashboard operațional</h1>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-            Privire rapidă asupra prestatorilor, programărilor, plăților și auditului din aplicația mobilă.
+            O vedere clară asupra lucrurilor care trebuie urmărite și a principalelor date din platformă.
           </p>
           <p className="mt-2 text-xs text-muted-foreground">
             Ultima actualizare: {formatAdminDateTime(lastUpdated, { includeSeconds: true })}
@@ -605,240 +603,213 @@ export default function AdminOperationalDashboardPage() {
         />
         <KpiCard
           icon={ShieldCheck}
-          label="În review"
-          value={readNumber(summary.pendingProviderReviewCount)}
-          note="așteaptă decizie admin"
-          variant={readNumber(summary.pendingProviderReviewCount) > 0 ? "warning" : "success"}
+          label="Așteaptă aprobare"
+          value={pendingProvidersTotal}
+          note="prestatori în așteptare"
+          variant={priorityTone(pendingProvidersTotal)}
         />
         <KpiCard
           icon={CalendarClock}
-          label="Programări cu atenție"
-          value={readNumber(summary.openBookingIssueCount)}
-          note="cereri, reprogramări sau plăți eșuate"
-          variant={readNumber(summary.openBookingIssueCount) > 0 ? "warning" : "success"}
+          label="Cereri noi"
+          value={requestedBookingsTotal}
+          note="programări care cer răspuns"
+          variant={priorityTone(requestedBookingsTotal)}
         />
         <KpiCard
           icon={CreditCard}
-          label="Plăți eșuate"
-          value={paymentsByStatus.find((item) => item.key === "failed")?.count || failedPaymentBookings.length}
+          label="Probleme la plată"
+          value={failedPaymentsTotal}
           note="necesită verificare"
-          variant={failedPaymentBookings.length > 0 ? "danger" : "success"}
+          variant={riskTone(failedPaymentsTotal)}
         />
         <KpiCard
           icon={LifeBuoy}
           label="Suport urgent"
-          value={urgentSupportTickets.length}
+          value={urgentSupportTotal}
           note="tichete active cu prioritate urgent"
-          variant={urgentSupportTickets.length > 0 ? "danger" : "success"}
+          variant={riskTone(urgentSupportTotal)}
         />
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1.5fr_0.9fr]">
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Cozi operaționale</CardTitle>
-              <CardDescription>
-                Liste scurte pentru elementele care cer atenție imediată.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-8">
-              <section className="space-y-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <h2 className="text-base font-semibold">Prestatori în review</h2>
-                    <p className="text-xs text-muted-foreground">
-                      {data?.queues?.pendingProviders?.total ?? pendingProviders.length} total
-                    </p>
-                  </div>
-                  <Button asChild size="sm" variant="outline">
-                    <Link href="/admin/prestatori?status=pending_review">Toți</Link>
-                  </Button>
-                </div>
-                <ProviderQueue items={pendingProviders} />
-              </section>
+      <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+        <Card className="overflow-hidden">
+          <CardHeader className="border-b border-border/70 bg-muted/30">
+            <SectionHeading
+              eyebrow="Azi"
+              title="Atenție acum"
+              description="Aceste zone cer decizie sau verificare rapidă."
+            />
+          </CardHeader>
+          <CardContent className="grid gap-4 p-6 md:grid-cols-2">
+            <ActionCard
+              icon={ShieldCheck}
+              title="Prestatori în așteptare"
+              value={pendingProvidersTotal}
+              summary="Profiluri trimise care au nevoie de aprobare sau respingere."
+              href="/admin/prestatori?status=pending_review"
+              cta="Vezi prestatorii"
+              tone={priorityTone(pendingProvidersTotal)}
+            />
+            <ActionCard
+              icon={CalendarClock}
+              title="Cereri noi"
+              value={requestedBookingsTotal}
+              summary="Programări noi care așteaptă răspuns și confirmare."
+              href="/admin/programari?status=requested"
+              cta="Vezi cererile"
+              tone={priorityTone(requestedBookingsTotal)}
+            />
+            <ActionCard
+              icon={Clock3}
+              title="Necesită răspuns"
+              value={overdueBookingsTotal}
+              summary="Cereri care întârzie și pot afecta experiența clientului."
+              href="/admin/programari?status=requested"
+              cta="Verifică întârzierile"
+              tone={riskTone(overdueBookingsTotal)}
+            />
+            <ActionCard
+              icon={CreditCard}
+              title="Probleme la plată"
+              value={failedPaymentsTotal}
+              summary="Plăți care au nevoie de verificare sau contact cu clientul."
+              href="/admin/programari?paymentStatus=failed"
+              cta="Vezi plățile"
+              tone={riskTone(failedPaymentsTotal)}
+            />
+          </CardContent>
+        </Card>
 
-              <section className="space-y-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <h2 className="text-base font-semibold">Cereri de programare</h2>
-                    <p className="text-xs text-muted-foreground">
-                      {data?.queues?.requestedBookings?.total ?? requestedBookings.length} total
-                    </p>
-                  </div>
-                  <Button asChild size="sm" variant="outline">
-                    <Link href="/admin/programari?status=requested">Toate</Link>
-                  </Button>
-                </div>
-                <BookingQueue
-                  items={requestedBookings}
-                  emptyMessage="Nu există cereri de programare nepreluate."
-                />
-              </section>
+        <Card className="overflow-hidden">
+          <CardHeader className="border-b border-border/70 bg-muted/30">
+            <SectionHeading
+              eyebrow="Sumar"
+              title="Activitate în platformă"
+              description="O imagine scurtă a situației curente din business."
+            />
+          </CardHeader>
+          <CardContent className="space-y-3 p-6">
+            <SummaryRow
+              label="Prestatori activi în platformă"
+              value={readNumber(totals.providers)}
+              hint="Baza totală de prestatori înregistrați."
+              variant="secondary"
+            />
+            <SummaryRow
+              label="Programări care cer atenție"
+              value={readNumber(summary.openBookingIssueCount)}
+              hint="Cereri noi, reprogramări sau plăți cu probleme."
+              variant={priorityTone(readNumber(summary.openBookingIssueCount))}
+            />
+            <SummaryRow
+              label="Reprogramări propuse"
+              value={rescheduleBookingsTotal}
+              hint="Programări care trebuie reconfirmate."
+              variant={priorityTone(rescheduleBookingsTotal)}
+            />
+            <SummaryRow
+              label="Tichete urgente"
+              value={urgentSupportTotal}
+              hint="Solicitări care pot afecta direct experiența clientului."
+              variant={riskTone(urgentSupportTotal)}
+            />
+            <SummaryRow
+              label="Conversații cu probleme"
+              value={flaggedConversationsTotal}
+              hint="Discuții care pot cere verificare sau intervenție."
+              variant={riskTone(flaggedConversationsTotal)}
+            />
+          </CardContent>
+        </Card>
+      </div>
 
-              <section className="space-y-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <h2 className="text-base font-semibold">Cereri fără răspuns în SLA</h2>
-                    <p className="text-xs text-muted-foreground">
-                      {data?.queues?.overdueBookingRequests?.total ?? overdueBookingRequests.length} total
-                    </p>
-                  </div>
-                  <Button asChild size="sm" variant="outline">
-                    <Link href="/admin/programari?status=requested">Toate cererile</Link>
-                  </Button>
-                </div>
-                <BookingQueue
-                  items={overdueBookingRequests}
-                  emptyMessage="Nu există cereri întârziate peste deadline-ul de răspuns."
-                />
-              </section>
+      <div className="space-y-6">
+        <SectionHeading
+          eyebrow="Liste de lucru"
+          title="Zonele pe care merită să le deschizi"
+          description="Am lăsat doar preview-uri scurte, ca să vezi imediat ce merită urmărit."
+        />
 
-              <section className="space-y-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <h2 className="text-base font-semibold">Reprogramări propuse</h2>
-                    <p className="text-xs text-muted-foreground">
-                      {data?.queues?.rescheduleBookings?.total ?? rescheduleBookings.length} total
-                    </p>
-                  </div>
-                  <Button asChild size="sm" variant="outline">
-                    <Link href="/admin/programari?status=reschedule_proposed">Toate</Link>
-                  </Button>
-                </div>
-                <BookingQueue
-                  items={rescheduleBookings}
-                  emptyMessage="Nu există reprogramări propuse în acest moment."
-                />
-              </section>
+        <div className="grid gap-6 xl:grid-cols-2">
+          <PreviewCard
+            title="Prestatori în așteptare"
+            description={`${pendingProvidersTotal} profiluri care cer aprobare.`}
+            href="/admin/prestatori?status=pending_review"
+            hrefLabel="Toți prestatorii"
+          >
+            <ProviderPreview items={pendingProviders} />
+          </PreviewCard>
 
-              <section className="space-y-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <h2 className="text-base font-semibold">Plăți eșuate</h2>
-                    <p className="text-xs text-muted-foreground">
-                      {data?.queues?.failedPaymentBookings?.total ?? failedPaymentBookings.length} total
-                    </p>
-                  </div>
-                  <Button asChild size="sm" variant="outline">
-                    <Link href="/admin/programari?paymentStatus=failed">Toate</Link>
-                  </Button>
-                </div>
-                <BookingQueue
-                  items={failedPaymentBookings}
-                  emptyMessage="Nu există plăți eșuate de verificat."
-                  showPayment
-                />
-              </section>
-
-              <section className="grid gap-6 lg:grid-cols-2">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <h2 className="flex items-center gap-2 text-base font-semibold">
-                        <LifeBuoy className="h-4 w-4" />
-                        Suport urgent
-                      </h2>
-                      <p className="text-xs text-muted-foreground">
-                        {data?.queues?.urgentSupportTickets?.total ?? urgentSupportTickets.length} total
-                      </p>
-                    </div>
-                    <Button asChild size="sm" variant="outline">
-                      <Link href="/admin/suport?priority=urgent">Toate</Link>
-                    </Button>
-                  </div>
-                  <SupportQueue items={urgentSupportTickets} />
-                </div>
-
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <h2 className="flex items-center gap-2 text-base font-semibold">
-                        <MessageSquare className="h-4 w-4" />
-                        Conversații moderate
-                      </h2>
-                      <p className="text-xs text-muted-foreground">
-                        {data?.queues?.flaggedConversations?.total ?? flaggedConversations.length} total
-                      </p>
-                    </div>
-                    <Button asChild size="sm" variant="outline">
-                      <Link href="/admin/conversatii?moderationStatus=flagged">Flagged</Link>
-                    </Button>
-                  </div>
-                  <ConversationQueue items={flaggedConversations} />
-                </div>
-              </section>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Distribuții status</CardTitle>
-              <CardDescription>
-                Volum curent pe statusuri pentru obiectele principale.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-2">
-              <StatusDistribution
-                title="Prestatori"
-                items={providersByStatus}
-                variantResolver={providerStatusVariant}
-              />
-              <StatusDistribution
-                title="Programări"
-                items={bookingsByStatus}
-                variantResolver={bookingStatusVariant}
-              />
-              <StatusDistribution
-                title="Plăți"
-                items={paymentsByStatus}
-                variantResolver={paymentStatusVariant}
-              />
-              <StatusDistribution title="Review-uri" items={reviewsByStatus} />
-            </CardContent>
-          </Card>
+          <PreviewCard
+            title="Cereri noi de programare"
+            description={`${requestedBookingsTotal} cereri care trebuie confirmate.`}
+            href="/admin/programari?status=requested"
+            hrefLabel="Toate cererile"
+          >
+            <BookingPreview
+              items={requestedBookings}
+              emptyMessage="Nu există cereri de programare nepreluate."
+            />
+          </PreviewCard>
         </div>
 
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-amber-600" />
-                Audit recent
-              </CardTitle>
-              <CardDescription>
-                Ultimele evenimente operaționale din aplicație.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <AuditStack items={auditEvents} />
-            </CardContent>
-          </Card>
+        <div className="grid gap-6 xl:grid-cols-3">
+          <PreviewCard
+            title="Necesită răspuns"
+            description={`${overdueBookingsTotal} cereri fără răspuns rapid.`}
+            href="/admin/programari?status=requested"
+            hrefLabel="Vezi întârzierile"
+          >
+            <BookingPreview
+              items={overdueBookingRequests}
+              emptyMessage="Nu există cereri întârziate peste timpul dorit de răspuns."
+            />
+          </PreviewCard>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Snapshot sistem</CardTitle>
-              <CardDescription>Totaluri din colecțiile principale.</CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-3 text-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Programări</span>
-                <span className="font-medium">{readNumber(totals.bookings)}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Plăți</span>
-                <span className="font-medium">{readNumber(totals.payments)}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Review-uri</span>
-                <span className="font-medium">{readNumber(totals.reviews)}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Audit events</span>
-                <span className="font-medium">{readNumber(totals.auditEvents)}</span>
-              </div>
-            </CardContent>
-          </Card>
+          <PreviewCard
+            title="Plăți cu probleme"
+            description={`${failedPaymentsTotal} situații care cer verificare.`}
+            href="/admin/programari?paymentStatus=failed"
+            hrefLabel="Vezi plățile"
+          >
+            <BookingPreview
+              items={failedPaymentBookings}
+              emptyMessage="Nu există plăți eșuate de verificat."
+              showPayment
+            />
+          </PreviewCard>
+
+          <PreviewCard
+            title="Reprogramări propuse"
+            description={`${rescheduleBookingsTotal} programări care trebuie confirmate.`}
+            href="/admin/programari?status=reschedule_proposed"
+            hrefLabel="Vezi reprogramările"
+          >
+            <BookingPreview
+              items={rescheduleBookings}
+              emptyMessage="Nu există reprogramări propuse în acest moment."
+            />
+          </PreviewCard>
+        </div>
+
+        <div className="grid gap-6 xl:grid-cols-2">
+          <PreviewCard
+            title="Suport urgent"
+            description={`${urgentSupportTotal} tichete cu impact imediat.`}
+            href="/admin/suport?priority=urgent"
+            hrefLabel="Vezi suportul"
+          >
+            <SupportPreview items={urgentSupportTickets} />
+          </PreviewCard>
+
+          <PreviewCard
+            title="Conversații cu probleme"
+            description={`${flaggedConversationsTotal} conversații care cer atenție.`}
+            href="/admin/conversatii?moderationStatus=flagged"
+            hrefLabel="Vezi conversațiile"
+          >
+            <ConversationPreview items={flaggedConversations} />
+          </PreviewCard>
         </div>
       </div>
     </div>
