@@ -167,6 +167,7 @@ service cloud.firestore {
         'baseRateAmount',
         'baseRateCurrency',
         'estimatedDurationMinutes',
+        'maxProfessionals',
         'createdAt',
         'updatedAt',
         'createdBy',
@@ -185,6 +186,7 @@ service cloud.firestore {
         'baseRateAmount',
         'baseRateCurrency',
         'estimatedDurationMinutes',
+        'maxProfessionals',
         'updatedAt',
         'updatedBy'
       ];

@@ -497,9 +497,9 @@ Sursa reală de adevăr pentru booking engine, provider profile și snapshot-ul 
 - `categoryKey`
 - `categoryLabel`
 - `status: ServiceStatus`
-- `baseRateAmount`
+- `baseRateAmount` — tarif orar (RON/oră); folosit la rezervare ca `ratePerHourPerProfessional`
 - `baseRateCurrency`
-- `estimatedDurationMinutes`
+- `estimatedDurationMinutes` — legacy opțional; serviciile noi folosesc model orar (`0`); durata rezervării este `requestDetails.estimatedHours`
 - `createdAt`
 - `updatedAt`
 - `createdBy`
@@ -523,7 +523,7 @@ Sursa reală de adevăr pentru booking engine, provider profile și snapshot-ul 
   "status": "active",
   "baseRateAmount": 90,
   "baseRateCurrency": "RON",
-  "estimatedDurationMinutes": 180,
+  "estimatedDurationMinutes": 0,
   "createdBy": "uid_provider_123",
   "updatedBy": "uid_provider_123",
   "schemaVersion": 1,
