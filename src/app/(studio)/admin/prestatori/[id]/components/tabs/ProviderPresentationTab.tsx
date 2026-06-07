@@ -83,36 +83,6 @@ export function ProviderPresentationTab({
           </div>
         </CardContent>
       </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Previzualizare profil</CardTitle>
-          <CardDescription>Așa arată profilul în aplicația mobilă.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="mx-auto max-w-md space-y-4 rounded-lg border border-border bg-background p-4">
-            <div className="flex items-center gap-3">
-              <AvatarPreview
-                src={avatarPreviewUrl}
-                loading={avatarPreviewLoading}
-                name={displayName}
-                size="sm"
-              />
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold">
-                  {readString(providerDirectory?.displayName) || displayName}
-                </p>
-                <p className="truncate text-xs text-muted-foreground">
-                  {readString(providerDirectory?.categoryPrimary) || specialization || "-"}
-                </p>
-              </div>
-            </div>
-            <p className="text-sm text-muted-foreground line-clamp-3">
-              {formatValue(profile.shortBio, "Fără descriere")}
-            </p>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }
