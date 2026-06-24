@@ -607,6 +607,43 @@ export default function SettingsPage() {
                         }
                       />
                     </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">
+                        Versiune minimă iOS
+                      </label>
+                      <Input
+                        placeholder="Ex: 1.0.2"
+                        value={appUpdateState.minVersionIos}
+                        onChange={(event) =>
+                          updateAppUpdateField("minVersionIos", event.target.value)
+                        }
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Modalul apare doar dacă versiunea instalată e mai mică
+                        decât aceasta.
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">
+                        Versiune minimă Android
+                      </label>
+                      <Input
+                        placeholder="Ex: 1.0.2"
+                        value={appUpdateState.minVersionAndroid}
+                        onChange={(event) =>
+                          updateAppUpdateField(
+                            "minVersionAndroid",
+                            event.target.value
+                          )
+                        }
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Modalul apare doar dacă versiunea instalată e mai mică
+                        decât aceasta.
+                      </p>
+                    </div>
                   </div>
 
                   <div className="grid gap-4 md:grid-cols-3">

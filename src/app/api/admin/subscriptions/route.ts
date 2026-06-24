@@ -17,26 +17,21 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const page = readPositiveNumber(searchParams.get("page"), 1, 10_000);
     const pageSize = readPositiveNumber(searchParams.get("pageSize"), 20, 100);
-    const limit = Math.min(page * pageSize, 100);
+    const limit = Math.min(page * pageSize, 500);
     const filters = {
       limit,
-      search: searchParams.get("q")?.trim() || undefined,
       status: searchParams.get("status")?.trim() || undefined,
-      paymentStatus: searchParams.get("paymentStatus")?.trim() || undefined,
       providerId: searchParams.get("providerId")?.trim() || undefined,
       userId: searchParams.get("userId")?.trim() || undefined,
-      ...(searchParams.get("authorizationExpiringOnly") === "true"
-        ? { authorizationExpiringOnly: true }
-        : {}),
     };
 
     const result = await callAdminCallable<{
       total: number;
       items: Array<Record<string, unknown>>;
     }>(
-      "listAdminBookings",
+      "listAdminSubscriptions",
       filters,
-      "Nu am putut încărca programările.",
+      "Nu am putut încărca abonamentele.",
       admin.idToken
     );
     const start = (page - 1) * pageSize;
@@ -62,9 +57,9 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: error.message }, { status: error.status });
     }
 
-    captureServerException(error, { route: "api/admin/bookings/route.ts" });
+    captureServerException(error, { route: "api/admin/subscriptions/route.ts" });
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Nu am putut încărca programările." },
+      { error: error instanceof Error ? error.message : "Nu am putut încărca abonamentele." },
       { status: 500 }
     );
   }

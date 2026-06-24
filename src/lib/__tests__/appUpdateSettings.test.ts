@@ -31,6 +31,44 @@ describe("app update settings", () => {
     expect(validateAppUpdateSettings(settings)).toMatch(/URL valid/);
   });
 
+  it("keeps valid semver min versions and drops invalid ones", () => {
+    const settings = sanitizeAppUpdateSettings({
+      enabled: true,
+      minVersionIos: "1.0.2",
+      minVersionAndroid: "not-a-version",
+    });
+
+    expect(settings.minVersionIos).toBe("1.0.2");
+    expect(settings.minVersionAndroid).toBe("");
+  });
+
+  it("rejects enabled configs without any minimum version", () => {
+    const settings = sanitizeAppUpdateSettings({
+      enabled: true,
+      mode: "force",
+      urls: {
+        fallback: "https://ainevoie.ro/update",
+      },
+    });
+
+    expect(validateAppUpdateSettings(settings)).toMatch(/versiune minimă/);
+  });
+
+  it("exposes min versions in the public payload", () => {
+    const settings = sanitizeAppUpdateSettings({
+      enabled: true,
+      minVersionIos: "1.0.2",
+      minVersionAndroid: "1.1.0",
+      urls: {
+        fallback: "https://ainevoie.ro/update",
+      },
+    });
+    const publicSettings = getPublicAppUpdateSettings(settings);
+
+    expect(publicSettings.minVersionIos).toBe("1.0.2");
+    expect(publicSettings.minVersionAndroid).toBe("1.1.0");
+  });
+
   it("keeps only public fields in the public payload", () => {
     const settings = sanitizeAppUpdateSettings({
       enabled: true,

@@ -14,8 +14,33 @@ export type BadgeVariant = "success" | "warning" | "danger" | "outline" | "secon
 
 export type ResolutionStatus = "open" | "in_progress" | "resolved";
 
+export type BookingServiceLocation = {
+  formattedAddress?: string | null;
+  streetNumber?: string | null;
+  building?: string | null;
+  apartment?: string | null;
+  floor?: string | null;
+  entrance?: string | null;
+  intercom?: string | null;
+  accessDetails?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+};
+
+export type BookingAddOn = {
+  addOnId?: string | null;
+  key?: string | null;
+  name?: string | null;
+  price?: number | null;
+  currency?: string | null;
+};
+
 export type BookingDocument = Record<string, unknown> & {
   bookingId?: string;
+  requestNumber?: number | null;
+  bookingType?: string | null;
+  subscriptionId?: string | null;
+  subscriptionFrequency?: string | null;
   status?: string | null;
   userId?: string | null;
   providerId?: string | null;
@@ -23,6 +48,8 @@ export type BookingDocument = Record<string, unknown> & {
   scheduledStartAt?: string | null;
   scheduledEndAt?: string | null;
   timezone?: string | null;
+  serviceLocation?: BookingServiceLocation | null;
+  addOns?: BookingAddOn[] | null;
   requestDetails?: {
     description?: string | null;
     estimatedHours?: number | null;
@@ -33,6 +60,8 @@ export type BookingDocument = Record<string, unknown> & {
     currency?: string | null;
     estimatedHours?: number | null;
     ratePerHourPerProfessional?: number | null;
+    baseAmount?: number | null;
+    addOnsTotal?: number | null;
   } | null;
   paymentSummary?: Record<string, unknown> | null;
   userSnapshot?: {
@@ -249,6 +278,88 @@ export function getProviderDisplayName(
     email: readString(providerSnapshot.email) || readString(provider?.email),
     phoneNumber: readString(provider?.phoneNumber),
   });
+}
+
+export function formatRequestNumber(booking?: BookingDocument | null) {
+  const value = Number(booking?.requestNumber);
+  if (!Number.isFinite(value) || value <= 0) {
+    return null;
+  }
+  return `#${value}`;
+}
+
+const SUBSCRIPTION_FREQUENCY_LABELS: Record<string, string> = {
+  weekly: "Săptămânal",
+  biweekly: "La 2 săptămâni",
+  monthly: "Lunar",
+};
+
+export function formatBookingTypeLabel(booking?: BookingDocument | null) {
+  const type = readString(booking?.bookingType).toLowerCase();
+  if (type === "subscription") {
+    const frequency = readString(booking?.subscriptionFrequency).toLowerCase();
+    const frequencyLabel = SUBSCRIPTION_FREQUENCY_LABELS[frequency];
+    return frequencyLabel ? `Abonament · ${frequencyLabel}` : "Abonament";
+  }
+  return "Programare unică";
+}
+
+export function formatSubscriptionFrequencyLabel(frequency: unknown) {
+  const normalized = readString(frequency).toLowerCase();
+  return SUBSCRIPTION_FREQUENCY_LABELS[normalized] || formatCompactValue(frequency);
+}
+
+export function getServiceLocation(booking?: BookingDocument | null): BookingServiceLocation {
+  const location = booking?.serviceLocation;
+  if (location && typeof location === "object") {
+    return location;
+  }
+  const fallbackAddress = readString(
+    (booking?.userSnapshot as Record<string, unknown> | undefined)?.primaryLocation &&
+      typeof (booking?.userSnapshot as Record<string, unknown>)?.primaryLocation === "object"
+      ? ((booking?.userSnapshot as Record<string, unknown>).primaryLocation as Record<string, unknown>).formattedAddress
+      : undefined
+  );
+  return { formattedAddress: fallbackAddress || null };
+}
+
+export function formatServiceAddress(booking?: BookingDocument | null) {
+  const location = getServiceLocation(booking);
+  const parts = [readString(location.formattedAddress)];
+  const streetNumber = readString(location.streetNumber);
+  const building = readString(location.building);
+  if (streetNumber) parts.push(`Nr. ${streetNumber}`);
+  if (building) parts.push(`Bloc ${building}`);
+  return parts.filter(Boolean).join(" · ") || "Nu este completat";
+}
+
+export function formatAccessDetails(booking?: BookingDocument | null) {
+  const location = getServiceLocation(booking);
+  const parts: string[] = [];
+  const apartment = readString(location.apartment);
+  const floor = readString(location.floor);
+  const entrance = readString(location.entrance);
+  const intercom = readString(location.intercom);
+  const accessDetails = readString(location.accessDetails);
+  if (apartment) parts.push(`Ap. ${apartment}`);
+  if (floor) parts.push(`Et. ${floor}`);
+  if (entrance) parts.push(`Scara ${entrance}`);
+  if (intercom) parts.push(`Interfon ${intercom}`);
+  if (accessDetails) parts.push(accessDetails);
+  return parts.length ? parts.join(" · ") : "Fără detalii de acces";
+}
+
+export function getBookingAddOns(booking?: BookingDocument | null): BookingAddOn[] {
+  return Array.isArray(booking?.addOns) ? (booking?.addOns as BookingAddOn[]) : [];
+}
+
+export function formatAddOnPrice(addOn: BookingAddOn) {
+  const amount = Number(addOn?.price);
+  const currency = readString(addOn?.currency) || "RON";
+  if (!Number.isFinite(amount) || amount < 0) {
+    return "-";
+  }
+  return new Intl.NumberFormat("ro-RO", { style: "currency", currency }).format(amount);
 }
 
 export function getServiceName(booking?: BookingDocument | null) {

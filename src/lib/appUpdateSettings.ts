@@ -11,6 +11,8 @@ export type AppUpdateSettings = {
   mode: AppUpdateMode;
   revision: string;
   displayVersion: string;
+  minVersionIos: string;
+  minVersionAndroid: string;
   title: Record<AppUpdateLocale, string>;
   body: Record<AppUpdateLocale, string>;
   primaryActionLabel: Record<AppUpdateLocale, string>;
@@ -31,6 +33,8 @@ export function getDefaultAppUpdateSettings(): AppUpdateSettings {
     mode: "notice",
     revision: DEFAULT_REVISION,
     displayVersion: "",
+    minVersionIos: "",
+    minVersionAndroid: "",
     title: {
       ro: "Actualizare disponibilă",
       en: "Update available",
@@ -53,6 +57,14 @@ export function getDefaultAppUpdateSettings(): AppUpdateSettings {
 
 function readString(value: unknown, maxLength: number) {
   return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
+}
+
+const SEMVER_PATTERN = /^\d{1,4}(\.\d{1,4}){0,3}$/;
+
+function sanitizeSemver(value: unknown) {
+  const raw = readString(value, 24);
+  if (!raw) return "";
+  return SEMVER_PATTERN.test(raw) ? raw : "";
 }
 
 function readLocaleRecord(
@@ -87,6 +99,8 @@ function buildRevision(settings: AppUpdateSettings) {
     settings.platformFeePercent,
     settings.mode,
     settings.displayVersion,
+    settings.minVersionIos,
+    settings.minVersionAndroid,
     settings.title.ro,
     settings.title.en,
     settings.body.ro,
@@ -113,6 +127,8 @@ export function sanitizeAppUpdateSettings(raw: unknown): AppUpdateSettings {
     mode: source.mode === "force" ? "force" : "notice",
     revision: readString(source.revision, 120) || defaults.revision,
     displayVersion: readString(source.displayVersion, 80),
+    minVersionIos: sanitizeSemver(source.minVersionIos),
+    minVersionAndroid: sanitizeSemver(source.minVersionAndroid),
     title: readLocaleRecord(source.title, defaults.title, 120),
     body: readLocaleRecord(source.body, defaults.body, 900),
     primaryActionLabel: readLocaleRecord(
@@ -142,6 +158,10 @@ export function validateAppUpdateSettings(settings: AppUpdateSettings) {
     return "Adaugă cel puțin un URL valid de actualizare înainte să activezi modalul.";
   }
 
+  if (!settings.minVersionIos && !settings.minVersionAndroid) {
+    return "Setează cel puțin o versiune minimă (iOS sau Android) înainte să activezi modalul.";
+  }
+
   return null;
 }
 
@@ -153,6 +173,8 @@ export function getPublicAppUpdateSettings(settings: AppUpdateSettings) {
     mode: settings.mode,
     revision: settings.revision,
     displayVersion: settings.displayVersion,
+    minVersionIos: settings.minVersionIos,
+    minVersionAndroid: settings.minVersionAndroid,
     title: settings.title,
     body: settings.body,
     primaryActionLabel: settings.primaryActionLabel,

@@ -24,6 +24,9 @@ const operationsItems = [
   { href: "/admin/prestatori", label: "Prestatori", icon: BriefcaseBusiness },
   { href: "/admin/utilizatori", label: "Utilizatori", icon: Users },
   { href: "/admin/programari", label: "Programări", icon: CalendarClock },
+  // Pagina Abonamente este ascunsă temporar (rezervări recurente — implementare ulterioară).
+  // Reactivează linia de mai jos (+ import RefreshCw) când funcția e livrată clientului:
+  // { href: "/admin/abonamente", label: "Abonamente", icon: RefreshCw },
   { href: "/admin/plati", label: "Plăți", icon: CreditCard },
   { href: "/admin/recenzii", label: "Recenzii", icon: Star },
   { href: "/admin/conversatii", label: "Conversații", icon: MessageSquare },

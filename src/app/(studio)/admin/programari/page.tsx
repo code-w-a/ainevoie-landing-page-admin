@@ -98,8 +98,11 @@ type BookingsResponse = {
 const EMPTY_BOOKINGS: BookingListItem[] = [];
 
 const bookingStatuses = [
+  "draft_payment",
   "requested",
+  "confirmation_pending",
   "confirmed",
+  "payment_expired",
   "reschedule_proposed",
   "completed",
   "rejected",
@@ -109,12 +112,21 @@ const bookingStatuses = [
   "cancelled_by_admin",
 ];
 
-const paymentStatuses = ["unpaid", "in_progress", "paid", "failed"];
+const paymentStatuses = [
+  "unpaid",
+  "authorizing",
+  "authorized",
+  "capturing",
+  "paid",
+  "failed",
+  "released",
+  "capture_failed",
+];
 
 function badgeVariant(status?: string | null) {
   if (status === "paid" || status === "completed" || status === "confirmed") return "success";
-  if (status === "failed" || status === "rejected" || status === "expired_unanswered" || status?.startsWith("cancelled")) return "danger";
-  if (status === "requested" || status === "reschedule_proposed" || status === "in_progress") return "warning";
+  if (status === "failed" || status === "capture_failed" || status === "rejected" || status === "expired_unanswered" || status?.startsWith("cancelled")) return "danger";
+  if (status === "draft_payment" || status === "confirmation_pending" || status === "requested" || status === "reschedule_proposed" || status === "in_progress" || status === "authorizing" || status === "authorized" || status === "capturing") return "warning";
   return "outline";
 }
 
@@ -187,6 +199,7 @@ export default function AdminBookingsPage() {
   const [debouncedQ, setDebouncedQ] = useState("");
   const [status, setStatus] = useState("all");
   const [paymentStatus, setPaymentStatus] = useState("all");
+  const [authorizationExpiringOnly, setAuthorizationExpiringOnly] = useState(false);
   const [page, setPage] = useState(1);
   const [deleteTargetBookingId, setDeleteTargetBookingId] = useState<string | null>(null);
   const [pendingDeleteBookingId, setPendingDeleteBookingId] = useState<string | null>(null);
@@ -208,8 +221,9 @@ export default function AdminBookingsPage() {
     if (debouncedQ.trim()) params.set("q", debouncedQ.trim());
     if (status !== "all") params.set("status", status);
     if (paymentStatus !== "all") params.set("paymentStatus", paymentStatus);
+    if (authorizationExpiringOnly) params.set("authorizationExpiringOnly", "true");
     return `/api/admin/bookings?${params.toString()}`;
-  }, [debouncedQ, page, paymentStatus, status]);
+  }, [authorizationExpiringOnly, debouncedQ, page, paymentStatus, status]);
 
   const { data, loading, error, reload } = useAdminData<BookingsResponse>(endpoint);
   const items = data?.items ?? EMPTY_BOOKINGS;
@@ -358,6 +372,18 @@ export default function AdminBookingsPage() {
               <option key={item} value={item}>{label(item)}</option>
             ))}
           </select>
+          <label className="flex h-9 items-center gap-2 rounded-md border border-input px-3 text-sm md:col-span-4">
+            <input
+              type="checkbox"
+              checked={authorizationExpiringOnly}
+              disabled={loading}
+              onChange={(event) => {
+                setPage(1);
+                setAuthorizationExpiringOnly(event.target.checked);
+              }}
+            />
+            Autorizații care expiră în următoarele 24 de ore
+          </label>
         </CardContent>
       </Card>
 

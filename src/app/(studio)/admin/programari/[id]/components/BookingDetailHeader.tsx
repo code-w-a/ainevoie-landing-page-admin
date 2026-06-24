@@ -17,6 +17,8 @@ import {
   formatBookingAmount,
   formatBookingStatusLabel,
   formatBookingPaymentStatusLabel,
+  formatBookingTypeLabel,
+  formatRequestNumber,
   getBookingStatusVariant,
   getPaymentStatusVariant,
   getProviderDisplayName,
@@ -48,6 +50,7 @@ export function BookingDetailHeader({
   const providerName = getProviderDisplayName(booking, provider);
   const serviceName = getServiceName(booking);
   const paymentStatus = String(payment?.status || booking.paymentSummary?.status || "");
+  const requestNumber = formatRequestNumber(booking);
 
   return (
     <Card>
@@ -62,10 +65,14 @@ export function BookingDetailHeader({
         <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 space-y-3">
             <div className="flex flex-wrap items-center gap-2">
+              {requestNumber ? (
+                <span className="text-sm font-semibold text-muted-foreground">{requestNumber}</span>
+              ) : null}
               <h1 className="text-2xl font-semibold tracking-tight">{serviceName}</h1>
               <Badge variant={getBookingStatusVariant(booking.status)}>
                 {formatBookingStatusLabel(booking.status)}
               </Badge>
+              <Badge variant="outline">{formatBookingTypeLabel(booking)}</Badge>
               {paymentStatus && (
                 <Badge variant={getPaymentStatusVariant(paymentStatus)}>
                   {formatBookingPaymentStatusLabel(paymentStatus)}

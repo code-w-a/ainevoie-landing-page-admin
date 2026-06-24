@@ -50,8 +50,11 @@ type DashboardResponse = {
 };
 
 const bookingStatusMeta: Record<string, { label: string; variant: BadgeVariant }> = {
+  draft_payment: { label: "Așteaptă garanția", variant: "warning" },
   requested: { label: "Cerere nouă", variant: "warning" },
+  confirmation_pending: { label: "Confirmare în curs", variant: "warning" },
   confirmed: { label: "Confirmată", variant: "success" },
+  payment_expired: { label: "Garanție expirată", variant: "danger" },
   reschedule_proposed: { label: "Reprogramare", variant: "warning" },
   completed: { label: "Finalizată", variant: "success" },
   rejected: { label: "Respinsă", variant: "danger" },
@@ -62,9 +65,14 @@ const bookingStatusMeta: Record<string, { label: string; variant: BadgeVariant }
 
 const paymentStatusMeta: Record<string, { label: string; variant: BadgeVariant }> = {
   unpaid: { label: "Neplătită", variant: "outline" },
+  authorizing: { label: "Autorizare", variant: "warning" },
   in_progress: { label: "În procesare", variant: "warning" },
+  authorized: { label: "Sumă blocată", variant: "warning" },
+  capturing: { label: "Încasare", variant: "warning" },
   paid: { label: "Plătită", variant: "success" },
   failed: { label: "Eșuată", variant: "danger" },
+  released: { label: "Garanție eliberată", variant: "outline" },
+  capture_failed: { label: "Încasare eșuată", variant: "danger" },
 };
 
 function readRecord(value: unknown): Record<string, unknown> {

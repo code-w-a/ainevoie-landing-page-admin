@@ -9,6 +9,10 @@
           "order": "ASCENDING"
         },
         {
+          "fieldPath": "providerVisible",
+          "order": "ASCENDING"
+        },
+        {
           "fieldPath": "scheduledStartAt",
           "order": "DESCENDING"
         }

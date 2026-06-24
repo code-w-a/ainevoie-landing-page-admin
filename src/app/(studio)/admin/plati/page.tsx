@@ -116,13 +116,13 @@ type ProviderPayoutRequestsResponse = {
   items: ProviderPayoutRequestAdminItem[];
 };
 
-const paymentStatuses = ["unpaid", "in_progress", "paid", "failed"];
+const paymentStatuses = ["unpaid", "authorizing", "in_progress", "authorized", "capturing", "paid", "failed", "released", "capture_failed"];
 const payoutStatuses = ["not_available", "available", "requested", "paid"];
 
 function paymentBadgeVariant(status?: string | null) {
   if (status === "paid") return "success";
-  if (status === "failed") return "danger";
-  if (status === "in_progress") return "warning";
+  if (status === "failed" || status === "capture_failed") return "danger";
+  if (status === "in_progress" || status === "authorizing" || status === "authorized" || status === "capturing") return "warning";
   return "outline";
 }
 
