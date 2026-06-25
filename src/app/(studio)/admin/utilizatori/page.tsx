@@ -29,15 +29,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-
 type LegalConsentState = "accepted" | "partial" | "missing";
 
 type UserListItem = {
@@ -99,7 +90,6 @@ export default function AdminUsersPage() {
   const { data, loading, error, reload } = useAdminData<UsersResponse>(endpoint);
   const items = data?.items || [];
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
-  const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteSuccess, setDeleteSuccess] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -122,13 +112,8 @@ export default function AdminUsersPage() {
     setSelectedIds,
   } = useAdminBulkSelection(pageIds, [endpoint]);
 
-  const canDeleteConfirm = Boolean(
-    deleteTarget
-      && deleteConfirmation.trim() === deleteTarget.id
-  );
-
   async function deleteUserFromList() {
-    if (!deleteTarget?.id) return;
+    if (!deleteTarget?.id) return false;
     setDeleting(true);
     setDeleteError(null);
     try {
@@ -140,11 +125,12 @@ export default function AdminUsersPage() {
       }
       const deletedName = deleteTarget.name;
       setDeleteTarget(null);
-      setDeleteConfirmation("");
       setDeleteSuccess(`Utilizatorul "${deletedName}" a fost șters definitiv.`);
       await reload();
+      return true;
     } catch (err) {
       setDeleteError(err instanceof Error ? err.message : "Nu am putut șterge utilizatorul.");
+      return false;
     } finally {
       setDeleting(false);
     }
@@ -336,7 +322,6 @@ export default function AdminUsersPage() {
                             onClick={() => {
                               setDeleteSuccess(null);
                               setDeleteError(null);
-                              setDeleteConfirmation("");
                               setDeleteTarget({
                                 id: userId,
                                 name: item.displayName || item.email || userId,
@@ -363,62 +348,30 @@ export default function AdminUsersPage() {
         </CardContent>
       </Card>
 
-      <Dialog
+      <AdminConfirmDialog
         open={Boolean(deleteTarget)}
         onOpenChange={(open) => {
           if (deleting) return;
           if (!open) {
             setDeleteTarget(null);
-            setDeleteConfirmation("");
             setDeleteError(null);
           }
         }}
-      >
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Șterge definitiv utilizatorul</DialogTitle>
-            <DialogDescription>
-              Această acțiune este ireversibilă. Tastează codul intern pentru confirmare.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm">
-            <p className="font-medium">{deleteTarget?.name || "-"}</p>
-            <p className="mt-1 text-muted-foreground">Cod intern: {deleteTarget?.id || "-"}</p>
+        title="Ștergi definitiv utilizatorul?"
+        description={
+          <div className="space-y-2">
+            <p>
+              Utilizator: <strong>{deleteTarget?.name || "—"}</strong>. Acțiunea este
+              ireversibilă.
+            </p>
+            {deleteError ? <p className="text-sm text-rose-500">{deleteError}</p> : null}
           </div>
-          <input
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-            value={deleteConfirmation}
-            disabled={deleting}
-            onChange={(event) => setDeleteConfirmation(event.target.value)}
-            placeholder={deleteTarget?.id || ""}
-          />
-          {deleteError && <p className="text-sm text-rose-500">{deleteError}</p>}
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={deleting}
-              onClick={() => {
-                setDeleteTarget(null);
-                setDeleteConfirmation("");
-                setDeleteError(null);
-              }}
-            >
-              Anulează
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              disabled={!canDeleteConfirm || deleting}
-              onClick={() => {
-                void deleteUserFromList();
-              }}
-            >
-              {deleting ? "Se șterge..." : "Șterge definitiv"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        }
+        confirmLabel="Șterge definitiv"
+        variant="destructive"
+        confirmDisabled={!deleteTarget}
+        onConfirm={deleteUserFromList}
+      />
       <AdminConfirmDialog
         open={bulkDeleteConfirmOpen}
         onOpenChange={(open) => {

@@ -31,6 +31,7 @@ import type { AppLocale } from "@/lib/apiLocale";
 const TOP_TABS = {
   newsletter: "newsletter",
   templates: "templates",
+  platformFee: "platformFee",
   appUpdate: "appUpdate",
 } as const;
 
@@ -268,7 +269,7 @@ export default function SettingsPage() {
       <div>
         <h1 className="text-2xl font-semibold">Setări</h1>
         <p className="text-sm text-muted-foreground">
-          Configurații pentru newsletter, emailuri și experiența aplicației mobile.
+          Configurații pentru newsletter, emailuri, comision platformă și experiența aplicației mobile.
         </p>
       </div>
 
@@ -285,6 +286,12 @@ export default function SettingsPage() {
             className={tabTriggerClass(topTab === TOP_TABS.templates)}
           >
             Template-uri email
+          </TabTrigger>
+          <TabTrigger
+            value={TOP_TABS.platformFee}
+            className={tabTriggerClass(topTab === TOP_TABS.platformFee)}
+          >
+            Comision platformă
           </TabTrigger>
           <TabTrigger
             value={TOP_TABS.appUpdate}
@@ -496,6 +503,66 @@ export default function SettingsPage() {
           </div>
         </TabContent>
 
+        <TabContent value={TOP_TABS.platformFee} className="mt-6 space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Comision platformă</CardTitle>
+              <CardDescription>
+                Procentul reținut din plățile noi, folosit server-side pentru calculul
+                comisionului și al soldului net al prestatorilor.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {appUpdateError && (
+                <p className="text-sm text-rose-500">{appUpdateError}</p>
+              )}
+              {appUpdateLoading ? (
+                <AdminFormGridSkeleton fields={2} />
+              ) : (
+                <div className="max-w-md space-y-2">
+                  <label className="text-sm font-medium">
+                    Comision platformă (%)
+                  </label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={appUpdateState.platformFeePercent}
+                    onChange={(event) =>
+                      updateAppUpdateField(
+                        "platformFeePercent",
+                        Math.min(Math.max(Number(event.target.value || 0), 0), 100)
+                      )
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Se aplică la plățile noi. Valorile existente în istoricul de plăți
+                    rămân neschimbate.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <div className="flex items-center justify-end gap-3">
+            {appUpdateSaveError && (
+              <p className="text-sm text-rose-500">{appUpdateSaveError}</p>
+            )}
+            {appUpdateSaveOk && !appUpdateSaveError && (
+              <p className="text-sm text-emerald-600">
+                Comisionul platformă a fost salvat.
+              </p>
+            )}
+            <Button
+              onClick={saveAppUpdateSettings}
+              disabled={appUpdateSaving || appUpdateLoading}
+            >
+              {appUpdateSaving ? "Se salvează..." : "Salvează comisionul"}
+            </Button>
+          </div>
+        </TabContent>
+
         <TabContent value={TOP_TABS.appUpdate} className="mt-6 space-y-6">
           <Card>
             <CardHeader>
@@ -555,28 +622,6 @@ export default function SettingsPage() {
                         </span>
                       </span>
                     </label>
-
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">
-                        Comision platformă (%)
-                      </label>
-                      <Input
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.01"
-                        value={appUpdateState.platformFeePercent}
-                        onChange={(event) =>
-                          updateAppUpdateField(
-                            "platformFeePercent",
-                            Math.min(Math.max(Number(event.target.value || 0), 0), 100)
-                          )
-                        }
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Folosit server-side pentru calculul soldului providerilor la plățile noi.
-                      </p>
-                    </div>
 
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Mod afișare</label>
