@@ -506,10 +506,10 @@ export default function SettingsPage() {
         <TabContent value={TOP_TABS.platformFee} className="mt-6 space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Comision platformă</CardTitle>
+              <CardTitle>Comision platformă și payout</CardTitle>
               <CardDescription>
-                Procentul reținut din plățile noi, folosit server-side pentru calculul
-                comisionului și al soldului net al prestatorilor.
+                Procentul reținut din plățile noi și suma minimă pe care prestatorul
+                trebuie să o aibă disponibilă înainte de a solicita retragerea.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -519,27 +519,51 @@ export default function SettingsPage() {
               {appUpdateLoading ? (
                 <AdminFormGridSkeleton fields={2} />
               ) : (
-                <div className="max-w-md space-y-2">
-                  <label className="text-sm font-medium">
-                    Comision platformă (%)
-                  </label>
-                  <Input
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    value={appUpdateState.platformFeePercent}
-                    onChange={(event) =>
-                      updateAppUpdateField(
-                        "platformFeePercent",
-                        Math.min(Math.max(Number(event.target.value || 0), 0), 100)
-                      )
-                    }
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Se aplică la plățile noi. Valorile existente în istoricul de plăți
-                    rămân neschimbate.
-                  </p>
+                <div className="grid max-w-md gap-6">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">
+                      Comision platformă (%)
+                    </label>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.01"
+                      value={appUpdateState.platformFeePercent}
+                      onChange={(event) =>
+                        updateAppUpdateField(
+                          "platformFeePercent",
+                          Math.min(Math.max(Number(event.target.value || 0), 0), 100)
+                        )
+                      }
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Se aplică la plățile noi. Valorile existente în istoricul de plăți
+                      rămân neschimbate.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">
+                      Sumă minimă payout (RON)
+                    </label>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100000"
+                      step="0.01"
+                      value={appUpdateState.minPayoutAmount}
+                      onChange={(event) =>
+                        updateAppUpdateField(
+                          "minPayoutAmount",
+                          Math.min(Math.max(Number(event.target.value || 0), 0), 100000)
+                        )
+                      }
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Prestatorul poate solicita plata doar când soldul disponibil (net)
+                      atinge această sumă. 0 = fără minim.
+                    </p>
+                  </div>
                 </div>
               )}
             </CardContent>
@@ -551,14 +575,14 @@ export default function SettingsPage() {
             )}
             {appUpdateSaveOk && !appUpdateSaveError && (
               <p className="text-sm text-emerald-600">
-                Comisionul platformă a fost salvat.
+                Setările de plată prestator au fost salvate.
               </p>
             )}
             <Button
               onClick={saveAppUpdateSettings}
               disabled={appUpdateSaving || appUpdateLoading}
             >
-              {appUpdateSaving ? "Se salvează..." : "Salvează comisionul"}
+              {appUpdateSaving ? "Se salvează..." : "Salvează setările"}
             </Button>
           </div>
         </TabContent>

@@ -8,6 +8,7 @@ export type AppUpdateSettings = {
   enabled: boolean;
   paymentDemoModeEnabled: boolean;
   platformFeePercent: number;
+  minPayoutAmount: number;
   mode: AppUpdateMode;
   revision: string;
   displayVersion: string;
@@ -30,6 +31,7 @@ export function getDefaultAppUpdateSettings(): AppUpdateSettings {
     enabled: false,
     paymentDemoModeEnabled: false,
     platformFeePercent: 20,
+    minPayoutAmount: 50,
     mode: "notice",
     revision: DEFAULT_REVISION,
     displayVersion: "",
@@ -97,6 +99,7 @@ function buildRevision(settings: AppUpdateSettings) {
     settings.enabled ? "enabled" : "disabled",
     settings.paymentDemoModeEnabled ? "payment-demo-enabled" : "payment-demo-disabled",
     settings.platformFeePercent,
+    settings.minPayoutAmount,
     settings.mode,
     settings.displayVersion,
     settings.minVersionIos,
@@ -124,6 +127,7 @@ export function sanitizeAppUpdateSettings(raw: unknown): AppUpdateSettings {
     enabled: source.enabled === true,
     paymentDemoModeEnabled: source.paymentDemoModeEnabled === true,
     platformFeePercent: sanitizePlatformFeePercent(source.platformFeePercent),
+    minPayoutAmount: sanitizeMinPayoutAmount(source.minPayoutAmount),
     mode: source.mode === "force" ? "force" : "notice",
     revision: readString(source.revision, 120) || defaults.revision,
     displayVersion: readString(source.displayVersion, 80),
@@ -170,6 +174,7 @@ export function getPublicAppUpdateSettings(settings: AppUpdateSettings) {
     enabled: settings.enabled,
     paymentDemoModeEnabled: settings.paymentDemoModeEnabled,
     platformFeePercent: settings.platformFeePercent,
+    minPayoutAmount: settings.minPayoutAmount,
     mode: settings.mode,
     revision: settings.revision,
     displayVersion: settings.displayVersion,
@@ -188,4 +193,16 @@ function sanitizePlatformFeePercent(value: unknown) {
     return 20;
   }
   return Math.min(Math.max(Math.round(parsed * 100) / 100, 0), 100);
+}
+
+export function sanitizeMinPayoutAmount(value: unknown) {
+  if (value === null || value === undefined || value === '') {
+    return 50;
+  }
+
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return 50;
+  }
+  return Math.min(Math.max(Math.round(parsed * 100) / 100, 0), 100000);
 }

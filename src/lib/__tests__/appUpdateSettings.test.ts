@@ -3,6 +3,7 @@ import {
   getDefaultAppUpdateSettings,
   getPublicAppUpdateSettings,
   sanitizeAppUpdateSettings,
+  sanitizeMinPayoutAmount,
   validateAppUpdateSettings,
 } from "../appUpdateSettings";
 
@@ -13,6 +14,7 @@ describe("app update settings", () => {
     expect(settings.enabled).toBe(false);
     expect(settings.paymentDemoModeEnabled).toBe(false);
     expect(settings.platformFeePercent).toBe(20);
+    expect(settings.minPayoutAmount).toBe(50);
     expect(settings.mode).toBe("notice");
     expect(settings.title.ro).toBe(getDefaultAppUpdateSettings().title.ro);
   });
@@ -85,7 +87,21 @@ describe("app update settings", () => {
     expect(publicSettings.enabled).toBe(true);
     expect(publicSettings.paymentDemoModeEnabled).toBe(true);
     expect(publicSettings.platformFeePercent).toBe(12.5);
+    expect(publicSettings.minPayoutAmount).toBe(50);
     expect(publicSettings.urls.fallback).toBe("https://ainevoie.ro/update");
     expect(publicSettings).not.toHaveProperty("secret");
+  });
+
+  it("sanitizes min payout amount within bounds", () => {
+    expect(sanitizeMinPayoutAmount(null)).toBe(50);
+    expect(sanitizeMinPayoutAmount(100.556)).toBe(100.56);
+    expect(sanitizeMinPayoutAmount(0)).toBe(0);
+    expect(sanitizeMinPayoutAmount(-10)).toBe(0);
+    expect(sanitizeMinPayoutAmount(200000)).toBe(100000);
+  });
+
+  it("exposes min payout amount in the public payload", () => {
+    const settings = sanitizeAppUpdateSettings({ minPayoutAmount: 75 });
+    expect(getPublicAppUpdateSettings(settings).minPayoutAmount).toBe(75);
   });
 });
